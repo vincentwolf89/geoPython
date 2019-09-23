@@ -18,7 +18,7 @@ arcpy.env.overwriteOutput = True
 # definieer de werkomgeving
 arcpy.env.workspace = r'C:\Users\vince\Desktop\GIS\maatgevende_profielen.gdb'
 
-profielen = 'testset'
+profielen = 'profielen_safe_10m'
 dijkvakindeling = r'C:\Users\vince\Desktop\GIS\stph_testomgeving.gdb\dijkvakindeling_sm_juli_2019'
 raster = r'C:\Users\vince\Desktop\GIS\losse rasters\ahn3clip\ahn3clip_safe'
 landlijn = 'landzijde'
@@ -137,7 +137,7 @@ def afstanden_punten(): # hier worden routes gemaakt op de profielen, zodat de a
     arcpy.FeatureToPoint_management("snijpunten_centerline", "punten_centerline")
     arcpy.Merge_management(['punten_land', 'punten_rivier','punten_centerline'], 'punten_profielen', fieldmappings)
 
-
+    print 'punten op route gelocaliseerd'
 
 def values_points(): # hier wordt een hoogtewaarde aan ieder punt, op iedere route, gekoppeld
     # bepaal invoer
@@ -393,9 +393,9 @@ def to_excel():
 
     wb.save(resultfile)
 
-# afstanden_punten()
-# values_points()
-# koppeling_kniklijnen()
-# volume_berekening()
+afstanden_punten()
+values_points()
+koppeling_kniklijnen()
+volume_berekening()
 # velden()
-to_excel()
+# to_excel()
