@@ -65,7 +65,7 @@ def velden_voor_profielen(profielen):
     print "profielen voorzien van schone velden"
 
 def koppel_hoogte_zandlaag(profielen):
-    zandlagen = r"C:\Users\vince\Desktop\GIS\zandlagen_safe.gdb\zandlaag_totaal_xls_z_totaal_route"
+    zandlagen = r"C:\Users\vince\Dropbox\Wolfwater\WSRL\gis\wsrl_cloud.gdb\zandlaag_totaal_xls_z_totaal_route"
     output = 'spatial_zandlagen_profielen'
     veld_z = 'z_totaal'
     veld_id = 'uniek_id'
@@ -885,33 +885,7 @@ def controle_stph(naam_run):
                 cursor.updateRow(row)
 
 
-def verlenger(coastline, directions):
-    # coastline = r"C:\Users\vince\Desktop\GIS\analyse_stph.gdb\voorlanden_30m"
-    # directions = "profielen_final"
-    g = arcpy.Geometry()
-    bank = arcpy.CopyFeatures_management(coastline, g)[0]
 
-    with arcpy.da.UpdateCursor(directions, "Shape@") as cursor:
-        for row in cursor:
-            line = row[0]
-            pStart = line.firstPoint
-            pEnd = line.lastPoint
-            L = line.length
-            dX = (pEnd.X - pStart.X) / L;
-            dY = (pEnd.Y - pStart.Y) / L
-            p = pEnd
-            m = 0
-            while True:
-                l = bank.distanceTo(p)
-                L += l
-                p.X = pStart.X + dX * L
-                p.Y = pStart.Y + dY * L
-                m += 1
-                if m > 100: break
-                if l < 0.001: break
-            if m > 100: continue
-            row[0] = arcpy.Polyline(arcpy.Array([pStart, p]))
-            cursor.updateRow(row)
 
 # velden_voor_profielen()
 # koppel_hoogte_zandlaag()
