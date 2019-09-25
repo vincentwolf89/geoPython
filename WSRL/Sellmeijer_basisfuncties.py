@@ -1,7 +1,6 @@
 # import gc
 # gc.collect()
 import arcpy
-from Basisfuncties import*
 import math
 from arcpy.sa import *
 import numpy as np
@@ -10,7 +9,8 @@ import pandas as pd
 
 arcpy.env.overwriteOutput = True
 # werkdatabase
-arcpy.env.workspace = "C:/Users/vince/Desktop/GIS/stph_testomgeving.gdb"
+arcpy.env.workspace = r"C:\Users\vince\Desktop\GIS\stph_testomgeving.gdb"
+
 
 # profielen = 'profielen_sm_test_sel'
 # waterstanden = "gekb_safe"

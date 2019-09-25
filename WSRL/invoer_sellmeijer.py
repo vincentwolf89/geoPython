@@ -1,23 +1,23 @@
 # import gc
 # gc.collect()
-from Vincent.werk_scripts.Werkbestanden.WSRL.Sellmeijer_basisfuncties import*
+from Sellmeijer_basisfuncties import*
 
 arcpy.env.overwriteOutput = True
 # werkdatabase
-arcpy.env.workspace = "C:/Users/vince/Desktop/GIS/stph_testomgeving.gdb"
+arcpy.env.workspace = r"C:\Users\vince\Desktop\GIS\stph_testomgeving.gdb"
 
 # profielen = "profielen_sm_juli_2019"  #'profielen_sm_juli_2019'
-profielen = r'C:\Users\vince\Desktop\GIS\stph_juli_2019.gdb\profielen_extra_sept_2019'
+profielen = "profielen_sept_2019"
 waterstanden = "gekb_safe"
-intredelijn = r'C:\Users\vince\Desktop\GIS\analyse_stph.gdb\voorlanden_max'
+intredelijn = "voorlanden_aangepast"
 intredelijn_buffer = "voorlanden_aangepast"
-uittredelijn = "binnenteenlijn_2m"
+uittredelijn = "binnenteenlijn_20m"
 sloten = 'waterlopen_safe_langs'
-sloten_punt = "waterlopen_safe_langs_point" #waterlopen_safe_langs_point
-dijkvakindeling = "dijkvakindeling_sm_juli_2019"
+sloten_punt = "waterlopen_safe_langs_dummy" #waterlopen_safe_langs_point
+dijkvakindeling = "dijkvakindeling_sept_2019"
 koppeling_voorlandbuffers = 'voorlanden_aangepast_koppeling'
 
-naam_run = r"C:\Users\vince\Desktop\GIS\stph_juli_2019.gdb\extra_september_2019"
+naam_run = r"C:\Users\vince\Desktop\GIS\stph_sept_2019.gdb\basis_20m"
 
 # standaard parameters
 n = 0.25
@@ -43,7 +43,10 @@ voeg_nieuwe_velden_toe()
 join_velden_aan_resultaten(naam_run)
 calc_r_exit(naam_run)
 bereken_beta(naam_run)
-#
+
+
+
+
 # calc_extensie(naam_run, intredelijn_buffer, koppeling_voorlandbuffers)
 
-controle_stph(naam_run)
+# controle_stph(naam_run)

@@ -19,13 +19,13 @@ sys.setrecursionlimit(1000000000)
 arcpy.env.overwriteOutput = True
 
 # Set environment settings
-arcpy.env.workspace = 'C:/Users/vince/Desktop/GIS/stph_eindresultaat.gdb'
+arcpy.env.workspace = 'C:/Users/vince/Desktop/GIS/stph_sept_2019.gdb'
 
-invoer = 'eindresultaat_laagste_beta'
-resultfile = "C:/Users/vince/Desktop/uitvoer_temp.xls"
+invoer = 'merge'
+resultfile = "C:/Users/vince/Desktop/uitvoer_stph_safe.xls"
 
-veld_profiel = 'profielnummer'
-veld_beta = 'beta_max'
+# veld_profiel = 'profielnummer'
+# veld_beta = 'beta_max'
 
 
 
@@ -222,10 +222,10 @@ def beta_schrijver():
 
 
 def plot_maatgevende_profielen_stph():
-    arcpy.CopyFeatures_management(invoer, "C:/Users/vince/Desktop/GIS/stph_eindresultaat.gdb/mg_stph")
+    arcpy.CopyFeatures_management(invoer, "mg_stph")
 
     veld = ["uniek_id"]
-    with arcpy.da.UpdateCursor("C:/Users/vince/Desktop/GIS/stph_eindresultaat.gdb/mg_stph", veld) as cursor:
+    with arcpy.da.UpdateCursor("mg_stph", veld) as cursor:
         for row in cursor:
             if row[0] not in list_profielid:
                 cursor.deleteRow()
@@ -233,4 +233,4 @@ def plot_maatgevende_profielen_stph():
                 continue
 
 beta_schrijver()
-# plot_maatgevende_profielen_stph()
+plot_maatgevende_profielen_stph()
