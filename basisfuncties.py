@@ -76,6 +76,12 @@ def extract_z_arcpy(invoerpunten, uitvoerpunten, raster): #
 
 
 def copy_trajectory_lr():
+    existing_fields = arcpy.ListFields(trajectlijn)
+    needed_fields = ['OBJECTID','SHAPE','SHAPE_Length']
+    for field in existing_fields:
+        if field.name not in needed_fields:
+            arcpy.DeleteField_management(trajectlijn, field.name)
+
     arcpy.AddField_management(trajectlijn, "Width", "DOUBLE", 2, field_is_nullable="NULLABLE")
     arcpy.CalculateField_management(trajectlijn, "Width", 5, "PYTHON")
 
@@ -130,4 +136,4 @@ def CopyParallelR(plyP,sLength):
     section=arcpy.Polyline(array)
     return section
 
-copy_trajectory_lr()
+copy_trajectory_lr() # doorbouwen op profiel_extractor_ag functies
