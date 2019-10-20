@@ -8,98 +8,26 @@ arcpy.env.overwriteOutput = True
 arcpy.env.workspace = r'C:\Users\vince\Desktop\GIS\test.gdb'
 
 profielen = 'test_profielen'
+invoerpunten = 'punten_profielen'
+uitvoerpunten = 'punten_profielen_z'
 stapgrootte_punten = 2
 raster = r'C:\Users\vince\Desktop\GIS\losse rasters\ahn3clip\ahn3clip_2m'
 trajectlijn = 'test_trajectlijn'
-
-def distance_points(profielen):
-
-    # clean feature
-    existing_fields = arcpy.ListFields(profielen)
-    needed_fields = ['OBJECTID','SHAPE','SHAPE_Length']
-    for field in existing_fields:
-        if field.name not in needed_fields:
-            arcpy.DeleteField_management(profielen, field.name)
-
-
-    # add needed fields
-    arcpy.AddField_management(profielen, "profielnummer", "DOUBLE", 2, field_is_nullable="NULLABLE")
-    arcpy.AddField_management(profielen, "van", "DOUBLE", 2, field_is_nullable="NULLABLE")
-    arcpy.AddField_management(profielen, "tot", "DOUBLE", 2, field_is_nullable="NULLABLE")
-
-    # set values of new fields
-    arcpy.CalculateField_management(profielen, "profielnummer", '!OBJECTID!', "PYTHON")
-    arcpy.CalculateField_management(profielen, "van", 0, "PYTHON")
-    arcpy.CalculateField_management(profielen, "tot", '!SHAPE_Length!', "PYTHON")
-
-    # create routes
-    arcpy.CreateRoutes_lr(profielen, "profielnummer", "routes_profielen", "TWO_FIELDS", "van", "tot", "", "1", "0", "IGNORE", "INDEX")
-    arcpy.GeneratePointsAlongLines_management('routes_profielen', 'punten_route', 'DISTANCE', Distance= stapgrootte_punten, Include_End_Points='END_POINTS')
-
-    # extra field for joining
-    arcpy.AddField_management('punten_route', 'punt_id', "DOUBLE", field_precision=2, field_is_nullable="NULLABLE")
-    arcpy.CalculateField_management("punten_route", "punt_id", '!OBJECTID!', "PYTHON")
-
-
-    # lokaliseren van de punten op de gemaakte routes
-    Output_Event_Table_Properties = "RID POINT MEAS"
-    arcpy.LocateFeaturesAlongRoutes_lr('punten_route', 'routes_profielen', "profielnummer", "1 Meters",
-                                       'uitvoer_tabel', Output_Event_Table_Properties, "FIRST", "DISTANCE", "ZERO",
-                                       "FIELDS", "M_DIRECTON")
-
-
-    # Koppelen van tabel met locaties met de punten, hier is het punt_id veld weer nodig
-    arcpy.JoinField_management('punten_route', 'punt_id', 'uitvoer_tabel', 'punt_id', 'MEAS')
-    arcpy.AlterField_management('punten_route', 'MEAS', 'afstand')
-    arcpy.CalculateField_management("punten_route", "afstand", 'round(!afstand!, 2)', "PYTHON")
-    # print 'MEAS toegevoegd aan puntenlaag vanuit tabel en veldnaam aangepast naar afstand'
+code = 'dv_nummer'
 
 
 
 
 
-def extract_z_arcpy(invoerpunten, uitvoerpunten, raster): #
-
-    # Test de ArcGIS Spatial Analyst extension license
-    arcpy.CheckOutExtension("Spatial")
-
-    # Koppel z-waardes
-    ExtractValuesToPoints(invoerpunten, raster, uitvoerpunten,
-                          "INTERPOLATE", "VALUE_ONLY")
-
-    # Pas het veld 'RASTERVALU' aan naar 'z_ahn'
-    arcpy.AlterField_management(uitvoerpunten, 'RASTERVALU', 'z_ahn')
-    print "Hoogte-waarde aan punten gekoppeld en veld aangepast naar z_ahn"
 
 
 
 
 
-def copy_trajectory_lr():
-    existing_fields = arcpy.ListFields(trajectlijn)
-    needed_fields = ['OBJECTID','SHAPE','SHAPE_Length']
-    for field in existing_fields:
-        if field.name not in needed_fields:
-            arcpy.DeleteField_management(trajectlijn, field.name)
-
-    arcpy.AddField_management(trajectlijn, "Width", "DOUBLE", 2, field_is_nullable="NULLABLE")
-    arcpy.CalculateField_management(trajectlijn, "Width", 5, "PYTHON")
-
-    arcpy.CopyFeatures_management(trajectlijn, "river")
-    arcpy.CopyFeatures_management(trajectlijn, "land")
-    land = "land"
-    river = "river"
 
 
-    with arcpy.da.UpdateCursor(land, ("Shape@", "Width")) as cursor:
-        for shp, w in cursor:
-            LeftLine = CopyParallelL(shp, w)
-            cursor.updateRow((LeftLine, w))
 
-    with arcpy.da.UpdateCursor(river, ("Shape@", "Width")) as cursor:
-        for shp, w in cursor:
-            RightLine = CopyParallelR(shp, w)
-            cursor.updateRow((RightLine, w))
+
 
 
 def CopyParallelL(plyP,sLength):
@@ -136,4 +64,174 @@ def CopyParallelR(plyP,sLength):
     section=arcpy.Polyline(array)
     return section
 
-copy_trajectory_lr() # doorbouwen op profiel_extractor_ag functies
+def copy_trajectory_lr(trajectlijn):
+    existing_fields = arcpy.ListFields(trajectlijn)
+    needed_fields = ['OBJECTID','SHAPE','SHAPE_Length',code]
+    for field in existing_fields:
+        if field.name not in needed_fields:
+            arcpy.DeleteField_management(trajectlijn, field.name)
+
+    arcpy.AddField_management(trajectlijn, "Width", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.CalculateField_management(trajectlijn, "Width", 5, "PYTHON")
+
+    arcpy.CopyFeatures_management(trajectlijn, "river")
+    arcpy.CopyFeatures_management(trajectlijn, "land")
+    land = "land"
+    river = "river"
+
+
+    with arcpy.da.UpdateCursor(land, ("Shape@", "Width")) as cursor:
+        for shp, w in cursor:
+            LeftLine = CopyParallelL(shp, w)
+            cursor.updateRow((LeftLine, w))
+
+    with arcpy.da.UpdateCursor(river, ("Shape@", "Width")) as cursor:
+        for shp, w in cursor:
+            RightLine = CopyParallelR(shp, w)
+            cursor.updateRow((RightLine, w))
+    print "river and land parts created"
+
+def set_measurements_trajectory(profielen,trajectlijn,code):
+    # clean feature
+    existing_fields = arcpy.ListFields(profielen)
+    needed_fields = ['OBJECTID', 'SHAPE', 'SHAPE_Length']
+    for field in existing_fields:
+        if field.name not in needed_fields:
+            arcpy.DeleteField_management(profielen, field.name)
+
+    # add needed fields
+    arcpy.AddField_management(profielen, "profielnummer", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.AddField_management(profielen, "van", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.AddField_management(profielen, "tot", "DOUBLE", 2, field_is_nullable="NULLABLE")
+
+    arcpy.CalculateField_management(profielen, "profielnummer", '!OBJECTID!', "PYTHON")
+
+    # split profiles
+    rivierlijn = "river"
+    landlijn = "land"
+    clusterTolerance = 0
+    invoer = [profielen, trajectlijn]
+    uitvoer = 'snijpunten_centerline'
+    arcpy.Intersect_analysis(invoer, uitvoer, "", clusterTolerance, "point")
+    arcpy.SplitLineAtPoint_management(profielen, uitvoer, 'profielsplits', 1)
+
+    velden = ['profielnummer', 'van', 'tot',code]
+
+    fieldmappings = arcpy.FieldMappings()
+    fieldmappings.addTable('profielsplits')
+    fieldmappings.addTable(rivierlijn)
+    fieldmappings.addTable(landlijn)
+    keepers = velden
+
+    # join splits to river/land parts
+    for field in fieldmappings.fields:
+        if field.name not in keepers:
+            fieldmappings.removeFieldMap(fieldmappings.findFieldMapIndex(field.name))
+
+    arcpy.SpatialJoin_analysis('profielsplits', rivierlijn, 'profieldeel_rivier', "JOIN_ONE_TO_ONE", "KEEP_COMMON", fieldmappings,
+                               match_option="INTERSECT")
+    arcpy.SpatialJoin_analysis('profielsplits', landlijn, 'profieldeel_land', "JOIN_ONE_TO_ONE", "KEEP_COMMON",
+                               fieldmappings,
+                               match_option="INTERSECT")
+
+    # create routes
+    arcpy.CalculateField_management("profieldeel_rivier", "tot", '!Shape_Length!', "PYTHON")
+    arcpy.CalculateField_management("profieldeel_land", "tot", '!Shape_Length!', "PYTHON")
+    arcpy.CalculateField_management("profieldeel_rivier", "van", 0, "PYTHON")
+    arcpy.CalculateField_management("profieldeel_land", "van", 0, "PYTHON")
+
+
+    arcpy.CreateRoutes_lr('profieldeel_rivier', "profielnummer", "routes_rivier_", "TWO_FIELDS", "van", "tot", "", "1", "0",
+                          "IGNORE", "INDEX")
+
+    arcpy.CreateRoutes_lr('profieldeel_land', "profielnummer", "routes_land_", "TWO_FIELDS", "tot", "van", "", "1",
+                          "0", "IGNORE", "INDEX")
+
+    #join code
+    velden = ['profielnummer',code]
+    fieldmappings = arcpy.FieldMappings()
+    fieldmappings.addTable('routes_land_')
+    fieldmappings.addTable('routes_rivier_')
+    fieldmappings.addTable(trajectlijn)
+
+    keepers = velden
+    for field in fieldmappings.fields:
+        if field.name not in keepers:
+            fieldmappings.removeFieldMap(fieldmappings.findFieldMapIndex(field.name))
+
+    arcpy.SpatialJoin_analysis('routes_rivier_', trajectlijn, 'routes_rivier', "JOIN_ONE_TO_ONE", "KEEP_COMMON",
+                               fieldmappings,
+                               match_option="INTERSECT")
+    arcpy.SpatialJoin_analysis('routes_land_', trajectlijn, 'routes_land', "JOIN_ONE_TO_ONE", "KEEP_COMMON",
+                               fieldmappings,
+                               match_option="INTERSECT")
+
+
+    arcpy.GeneratePointsAlongLines_management('routes_land', 'punten_land', 'DISTANCE', Distance= stapgrootte_punten)
+    arcpy.GeneratePointsAlongLines_management('routes_rivier', 'punten_rivier', 'DISTANCE', Distance=stapgrootte_punten)
+
+
+    # id field for joining table
+    arcpy.AddField_management('punten_land', 'punt_id', "DOUBLE", field_precision=2, field_is_nullable="NULLABLE")
+    arcpy.AddField_management('punten_rivier', 'punt_id', "DOUBLE", field_precision=2, field_is_nullable="NULLABLE")
+    arcpy.CalculateField_management("punten_land", "punt_id", '!OBJECTID!', "PYTHON")
+    arcpy.CalculateField_management("punten_rivier", "punt_id", '!OBJECTID!', "PYTHON")
+
+
+    # find points along routes
+    Output_Event_Table_Properties = "RID POINT MEAS"
+    arcpy.LocateFeaturesAlongRoutes_lr('punten_land', 'routes_land', "profielnummer", "1 Meters",
+                                       'uitvoer_tabel_land', Output_Event_Table_Properties, "FIRST", "DISTANCE", "ZERO",
+                                       "FIELDS", "M_DIRECTON")
+    arcpy.LocateFeaturesAlongRoutes_lr('punten_rivier', 'routes_rivier', "profielnummer", "1 Meters",
+                                       'uitvoer_tabel_rivier', Output_Event_Table_Properties, "FIRST", "DISTANCE", "ZERO",
+                                       "FIELDS", "M_DIRECTON")
+
+    # join fields from table
+    arcpy.JoinField_management('punten_land', 'punt_id', 'uitvoer_tabel_land', 'punt_id', 'MEAS')
+    arcpy.JoinField_management('punten_rivier', 'punt_id', 'uitvoer_tabel_rivier', 'punt_id', 'MEAS')
+    arcpy.AlterField_management('punten_land', 'MEAS', 'afstand')
+    arcpy.AlterField_management('punten_rivier', 'MEAS', 'afstand')
+
+    with arcpy.da.UpdateCursor('punten_rivier', ['profielnummer', 'afstand']) as cursor:
+        for row in cursor:
+            row[1] = row[1]*-1
+            cursor.updateRow(row)
+
+    fieldmappings = arcpy.FieldMappings()
+    fieldmappings.addTable('punten_land')
+    fieldmappings.addTable('punten_rivier')
+    fieldmappings.addTable('snijpunten_centerline')
+
+    velden = ['profielnummer', 'afstand', code]
+    keepers = velden
+
+    for field in fieldmappings.fields:
+        if field.name not in keepers:
+            fieldmappings.removeFieldMap(fieldmappings.findFieldMapIndex(field.name))
+
+    arcpy.FeatureToPoint_management("snijpunten_centerline", "punten_centerline")
+    arcpy.Merge_management(['punten_land', 'punten_rivier','punten_centerline'], 'punten_profielen', fieldmappings)
+
+    arcpy.CalculateField_management("punten_profielen", "afstand", 'round(!afstand!, 0)', "PYTHON")
+
+    print 'points located on routes'
+
+def extract_z_arcpy(invoerpunten, uitvoerpunten, raster): #
+
+    # Test de ArcGIS Spatial Analyst extension license
+    arcpy.CheckOutExtension("Spatial")
+
+    # Koppel z-waardes
+    ExtractValuesToPoints(invoerpunten, raster, uitvoerpunten,
+                          "INTERPOLATE", "VALUE_ONLY")
+
+    # Pas het veld 'RASTERVALU' aan naar 'z_ahn'
+    arcpy.AlterField_management(uitvoerpunten, 'RASTERVALU', 'z_ahn')
+    print "elevation added to points"
+
+
+
+copy_trajectory_lr(trajectlijn)
+set_measurements_trajectory(profielen,trajectlijn,code)
+extract_z_arcpy(invoerpunten,uitvoerpunten,raster)
