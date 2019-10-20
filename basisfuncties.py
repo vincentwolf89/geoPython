@@ -1,6 +1,9 @@
+import gc
+gc.collect()
 import arcpy
 import math
 from arcpy.sa import *
+import xlwt
 
 arcpy.env.overwriteOutput = True
 
@@ -14,6 +17,7 @@ stapgrootte_punten = 2
 raster = r'C:\Users\vince\Desktop\GIS\losse rasters\ahn3clip\ahn3clip_2m'
 trajectlijn = 'test_trajectlijn'
 code = 'dv_nummer'
+resultfile = "C:/Users/vince/Desktop/testprofielen.xls"
 
 
 
@@ -230,8 +234,118 @@ def extract_z_arcpy(invoerpunten, uitvoerpunten, raster): #
     arcpy.AlterField_management(uitvoerpunten, 'RASTERVALU', 'z_ahn')
     print "elevation added to points"
 
+def add_xy(uitvoerpunten):
+
+    existing_fields = arcpy.ListFields(uitvoerpunten)
+    needed_fields = ['OBJECTID', 'Shape', 'profielnummer', 'afstand', 'z_ahn', code]
+    for field in existing_fields:
+        if field.name not in needed_fields:
+            arcpy.DeleteField_management(trajectlijn, field.name)
+
+    arcpy.env.outputCoordinateSystem = arcpy.Describe(uitvoerpunten).spatialReference
+    # Set local variables
+    in_features = uitvoerpunten
+    properties = "POINT_X_Y_Z_M"
+    length_unit = ""
+    area_unit = ""
+    coordinate_system = ""
+
+    # Generate the extent coordinates using Add Geometry Properties tool
+    arcpy.AddGeometryAttributes_management(in_features, properties, length_unit,
+                                           area_unit,
+                                           coordinate_system)
+
+    arcpy.AlterField_management(uitvoerpunten, 'POINT_X', 'x')
+    arcpy.AlterField_management(uitvoerpunten, 'POINT_Y', 'y')
+
+    print "x and y added"
+
+def to_excel(uitvoerpunten):
 
 
-copy_trajectory_lr(trajectlijn)
-set_measurements_trajectory(profielen,trajectlijn,code)
-extract_z_arcpy(invoerpunten,uitvoerpunten,raster)
+    fields = ['profielnummer', 'afstand', 'z_ahn', 'x', 'y']
+    list_profielnummer = []
+    list_afstand = []
+    list_z_ahn = []
+    list_x = []
+    list_y =[]
+
+    with arcpy.da.SearchCursor(uitvoerpunten, fields) as cur:
+        for row in cur:
+            if row[2] is None:
+                pass
+            elif row[1] == None:
+                profielnummer = row[0]
+                afstand = 0
+                z_ahn = row[2]
+                x = row[3]
+                y = row[4]
+
+
+                list_profielnummer.append(profielnummer)
+                list_afstand.append(round(afstand,1))
+                list_z_ahn.append(round(z_ahn,2))
+                list_x.append(round(x,2))
+                list_y.append(round(y,2))
+            else:
+                profielnummer = row[0]
+                afstand = row[1]
+                z_ahn = row[2]
+                x = row[3]
+                y = row[4]
+
+                list_profielnummer.append(profielnummer)
+                list_afstand.append(round(afstand,1))
+                list_z_ahn.append(round(z_ahn,2))
+                list_x.append(round(x,2))
+                list_y.append(round(y,2))
+        # define styles
+
+    style = xlwt.easyxf('font: bold 1')  # define style
+    wb = xlwt.Workbook()  # open new workbook
+    ws = wb.add_sheet("overzicht")  # add new sheet
+
+    # write headers
+    row = 0
+    ws.write(row, 0, "profielnummer", style=style)
+    ws.write(row, 1, "afstand buk [m, buitenkant -]", style=style)
+    ws.write(row, 2, "z_ahn [m NAP]", style=style)
+    ws.write(row, 3, "x", style=style)
+    ws.write(row, 4, "y", style=style)
+
+
+    # write colums
+    row = 1
+    for i in list_profielnummer:
+        ws.write(row, 0, i)
+        row += 1
+
+    row = 1
+    for i in list_afstand:
+        ws.write(row, 1, i)
+        row += 1
+
+    row = 1
+    for i in list_z_ahn:
+        ws.write(row, 2, i)
+        row += 1
+
+    row = 1
+    for i in list_x:
+        ws.write(row, 3, i)
+        row += 1
+
+    row = 1
+    for i in list_y:
+        ws.write(row, 4, i)
+        row += 1
+
+
+    wb.save(resultfile)
+    print "Excel file generated"
+
+# copy_trajectory_lr(trajectlijn)
+# set_measurements_trajectory(profielen,trajectlijn,code)
+# extract_z_arcpy(invoerpunten,uitvoerpunten,raster)
+# add_xy(uitvoerpunten)
+# to_excel(uitvoerpunten)
