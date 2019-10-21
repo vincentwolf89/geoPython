@@ -70,7 +70,7 @@ def CopyParallelR(plyP,sLength):
 
 def copy_trajectory_lr(trajectlijn):
     existing_fields = arcpy.ListFields(trajectlijn)
-    needed_fields = ['OBJECTID','SHAPE','SHAPE_Length',code]
+    needed_fields = ['OBJECTID','Shape','Shape_Length',code]
     for field in existing_fields:
         if field.name not in needed_fields:
             arcpy.DeleteField_management(trajectlijn, field.name)
@@ -98,7 +98,7 @@ def copy_trajectory_lr(trajectlijn):
 def set_measurements_trajectory(profielen,trajectlijn,code):
     # clean feature
     existing_fields = arcpy.ListFields(profielen)
-    needed_fields = ['OBJECTID', 'SHAPE', 'SHAPE_Length']
+    needed_fields = ['OBJECTID', 'SHAPE', 'SHAPE_Length','Shape','Shape_Length']
     for field in existing_fields:
         if field.name not in needed_fields:
             arcpy.DeleteField_management(profielen, field.name)
@@ -343,6 +343,47 @@ def to_excel(uitvoerpunten):
 
     wb.save(resultfile)
     print "Excel file generated"
+
+def create_contour_lines(trajectlijn,raster,contourlines,distance):
+    # buffer trajectlijn
+    buffer_traject = 'buffer_traject'
+
+    print "buffer gemaakt"
+    arcpy.Buffer_analysis(trajectlijn,buffer_traject, "50 Meters", "FULL", "ROUND", "NONE", "", "PLANAR")
+
+    # clip raster with buffer
+    arcpy.Clip_management(raster, "110891,550900001 435080,382600008 140346,480208685 445543,559100002",
+                          "clip_dijktraject", buffer_traject, "-3,402823e+038", "ClippingGeometry",
+                          "MAINTAIN_EXTENT")
+
+    print "raster geclipt"
+    arcpy.Contour_3d("clip_dijktraject", contourlines, distance, "0", "1")
+    print "contour gemaakt"
+
+def snap_to_contour(puntenset,contour,output_tabel):
+    # neartable
+    arcpy.GenerateNearTable_analysis(puntenset, contour, output_tabel, "5 Meters", "NO_LOCATION", "ANGLE", "CLOSEST", "0", "PLANAR")
+
+    arcpy.CopyFeatures_management(contour, "contour_copy")
+
+    # delete onnodig
+    id_punten =[]
+    id_contour = []
+    with arcpy.da.UpdateCursor(output_tabel, ("IN_FID", "NEAR_FID")) as cursor:
+        for row in cursor:
+            id_punten.append(row[0])
+            id_contour.append(row[1])
+    contour_copy = 'contour_copy'
+    with arcpy.da.UpdateCursor(contour_copy, ("OBJECTID")) as cursor:
+        for row in cursor:
+            if row[0] not in id_contour:
+                cursor.deleteRow()
+            else:
+                pass
+
+    # snap
+    arcpy.Snap_edit(puntenset, "contour_copy EDGE '3 Meters'")
+    arcpy.CopyFeatures_management(puntenset, puntenset+"_snap")
 
 # copy_trajectory_lr(trajectlijn)
 # set_measurements_trajectory(profielen,trajectlijn,code)
