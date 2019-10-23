@@ -70,7 +70,7 @@ def CopyParallelR(plyP,sLength):
 
 def copy_trajectory_lr(trajectlijn):
     existing_fields = arcpy.ListFields(trajectlijn)
-    needed_fields = ['OBJECTID','Shape','Shape_Length',code]
+    needed_fields = ['OBJECTID','Shape','Shape_Length','SHAPE', 'SHAPE_Length',code]
     for field in existing_fields:
         if field.name not in needed_fields:
             arcpy.DeleteField_management(trajectlijn, field.name)
@@ -95,7 +95,7 @@ def copy_trajectory_lr(trajectlijn):
             cursor.updateRow((RightLine, w))
     print "river and land parts created"
 
-def set_measurements_trajectory(profielen,trajectlijn,code):
+def set_measurements_trajectory(profielen,trajectlijn,code): #trajectlijn van links naar rechts, profielen van binnen naar buiten
     # clean feature
     existing_fields = arcpy.ListFields(profielen)
     needed_fields = ['OBJECTID', 'SHAPE', 'SHAPE_Length','Shape','Shape_Length']
@@ -218,6 +218,13 @@ def set_measurements_trajectory(profielen,trajectlijn,code):
     arcpy.Merge_management(['punten_land', 'punten_rivier','punten_centerline'], 'punten_profielen', fieldmappings)
 
     arcpy.CalculateField_management("punten_profielen", "afstand", 'round(!afstand!, 0)', "PYTHON")
+
+    # set centerline values to 0
+    with arcpy.da.UpdateCursor('punten_profielen', ['afstand']) as cursor:
+        for row in cursor:
+            if row[0] == None:
+                row[0] = 0
+                cursor.updateRow(row)
 
     print 'points located on routes'
 
