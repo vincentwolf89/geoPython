@@ -467,25 +467,51 @@ def kruinhoogte_ma(uitvoerpunten,stapgrootte_punten):
     # Vervang niet-gesorteerede puntenset
     arcpy.CopyFeatures_management("sorted", uitvoerpunten)
 
-
+def test_ma(uitvoerpunten):
     # feature class to numpy array
     array = arcpy.da.FeatureClassToNumPyArray(uitvoerpunten, ('OBJECTID', 'profielnummer', 'dv_nummer', 'afstand', 'z_ahn','groep'))
     df = pd.DataFrame(array)
     sorted = df.sort_values(['profielnummer', 'afstand'], ascending=[True, True])
 
-    grouped = sorted.groupby('groep')
-    max_kr = []
-    for name, group in grouped:
-        group['max_kr'] = group.iloc[:, 4].rolling(window=3).mean()
-        # print group
-        # for item in group['pandas_SMA_3']:
-        #     if item is not 'nan':
-        #         ma.append(item)
-        gr = group.dropna()
-        for item in gr['max_kr']:
-            max_kr.append(item)
+    groep_profiel = sorted.groupby('profielnummer')
+
+
+    for name, groep in groep_profiel:
+        groep_punten = groep.groupby(["groep"])
+        for groep, groep_binnen_profiel in groep_punten:
+            groep_binnen_profiel['max_kr'] = groep_binnen_profiel.iloc[:, 4].rolling(window=3).mean()
+
+            print groep_binnen_profiel
+
+        break
+
+
+
+        # kr_gr = [] # kruinhoogtes per profiel
+        # profielnummer = group.iloc[0]['profielnummer']
+        # group['max_kr'] = group.iloc[:, 4].rolling(window=3).mean()
+        # # print group
+        # # for item in group['pandas_SMA_3']:
+        # #     if item is not 'nan':
+        # #         ma.append(item)
+        #
+        # max = group['max_kr'].max()
+        # print max
+        # gr = group.dropna()
+
+        # for item in gr['max_kr']:
+        #     kr_gr.append(item)
+        #
+        #
+        # if kr_gr:
+        #     max_kr[profielnummer] = max(kr_gr)
+        # else:
+        #     pass
+
+
+
     # per profiel max kruinhoogte, dct opbouwen met profiel- max_kruinhoogte
-    print max_kr
+    # print max_kr
     # join results to profiles
     #
 
