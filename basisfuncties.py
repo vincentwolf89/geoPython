@@ -6,7 +6,8 @@ from arcpy.sa import *
 import xlwt
 import pandas as pd
 from itertools import groupby
-
+# uitzetten melding pandas
+pd.set_option('mode.chained_assignment', None)
 
 arcpy.env.overwriteOutput = True
 
@@ -475,15 +476,25 @@ def test_ma(uitvoerpunten):
 
     groep_profiel = sorted.groupby('profielnummer')
 
-
+    max_kr = {}
     for name, groep in groep_profiel:
+
+        max_kr_profiel = []
         groep_punten = groep.groupby(["groep"])
         for groep, groep_binnen_profiel in groep_punten:
             groep_binnen_profiel['max_kr'] = groep_binnen_profiel.iloc[:, 4].rolling(window=3).mean()
 
-            print groep_binnen_profiel
+            # print groep_binnen_profiel
+            max_groep = groep_binnen_profiel['max_kr'].max()
 
-        break
+            max_kr_profiel.append(max_groep)
+
+        if max_kr_profiel:
+            max_kr[name] = max(max_kr_profiel)
+        else:
+            pass
+
+    print max_kr
 
 
 
