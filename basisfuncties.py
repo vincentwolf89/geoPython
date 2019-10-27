@@ -476,7 +476,7 @@ def kruinhoogte_ma(uitvoerpunten,stapgrootte_punten):
     grouped = sorted.groupby('groep')
     max_kr = []
     for name, group in grouped:
-        group['max_kr'] = group.iloc[:, 3].rolling(window=3).mean()
+        group['max_kr'] = group.iloc[:, 4].rolling(window=3).mean()
         # print group
         # for item in group['pandas_SMA_3']:
         #     if item is not 'nan':
@@ -484,8 +484,7 @@ def kruinhoogte_ma(uitvoerpunten,stapgrootte_punten):
         gr = group.dropna()
         for item in gr['max_kr']:
             max_kr.append(item)
-        break
-    # print ma
+    # per profiel max kruinhoogte, dct opbouwen met profiel- max_kruinhoogte
     print max_kr
     # join results to profiles
     #
