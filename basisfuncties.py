@@ -4,6 +4,9 @@ import arcpy
 import math
 from arcpy.sa import *
 import xlwt
+import pandas as pd
+from itertools import groupby
+
 
 arcpy.env.overwriteOutput = True
 
@@ -21,16 +24,28 @@ resultfile = "C:/Users/vince/Desktop/testprofielen.xls"
 
 
 
+def average(lijst):
+    return sum(lijst) / len(lijst)
 
 
 
-
-
-
-
-
-
-
+def set_trajectory_right_left():
+    test = test
+    #afmaken
+    # fc = r'C:\Users\OWNER\Documents\ArcGIS\Default.gdb\samplePolyline'
+    #
+    # fields = ['x1', 'x2', 'y1', 'y2']
+    #
+    # # Add fields to your FC
+    # for field in fields:
+    #     arcpy.AddField_management(fc, str(field), "DOUBLE")
+    #
+    # with arcpy.da.UpdateCursor(fc, ('x1', 'x2', 'y1', 'y2', "SHAPE@")) as cursor:
+    #     for row in cursor:
+    #         row[0] = row[4].firstPoint.X
+    #         row[1] = row[4].lastPoint.X
+    #         row[2] = row[4].firstPoint.Y
+    #         row[3] = row[4].lastPoint.Y
 
 
 
@@ -95,7 +110,7 @@ def copy_trajectory_lr(trajectlijn):
             cursor.updateRow((RightLine, w))
     print "river and land parts created"
 
-def set_measurements_trajectory(profielen,trajectlijn,code): #trajectlijn van links naar rechts, profielen van binnen naar buiten
+def set_measurements_trajectory(profielen,trajectlijn,code): #rechts = rivier, profielen van binnen naar buiten
     # clean feature
     existing_fields = arcpy.ListFields(profielen)
     needed_fields = ['OBJECTID', 'SHAPE', 'SHAPE_Length','Shape','Shape_Length']
@@ -392,8 +407,87 @@ def snap_to_contour(puntenset,contour,output_tabel):
     arcpy.Snap_edit(puntenset, "contour_copy EDGE '3 Meters'")
     arcpy.CopyFeatures_management(puntenset, puntenset+"_snap")
 
-# copy_trajectory_lr(trajectlijn)
-# set_measurements_trajectory(profielen,trajectlijn,code)
-# extract_z_arcpy(invoerpunten,uitvoerpunten,raster)
-# add_xy(uitvoerpunten)
-# to_excel(uitvoerpunten)
+
+def kruinhoogte_ma(uitvoerpunten,stapgrootte_punten):
+
+    # Verwijder punten zonder z_waarde en rond afstand af
+    with arcpy.da.UpdateCursor(uitvoerpunten, ['afstand', 'z_ahn'],sql_clause = (None,"ORDER BY afstand ASC")) as cursor:
+        for row in cursor:
+            if row[1] is None:
+                cursor.deleteRow()
+            else:
+                row[0] = round(row[0])
+                cursor.updateRow(row)
+    del cursor
+
+    existing_fields = arcpy.ListFields(uitvoerpunten)
+    needed_fields = ['OBJECTID', 'SHAPE', 'SHAPE_Length', 'Shape', 'Shape_Length','afstand','z_ahn','profielnummer', 'dv_nummer','x','y']
+    for field in existing_fields:
+        if field.name not in needed_fields:
+            arcpy.DeleteField_management(uitvoerpunten, field.name)
+
+    # add needed fields
+    arcpy.AddField_management(uitvoerpunten, "groep", "DOUBLE", 2, field_is_nullable="NULLABLE")
+
+    # Sorteer punten op profielnummer, afstand
+    sort_fields = [["profielnummer", "ASCENDING"], ["afstand", "ASCENDING"]]
+    arcpy.Sort_management(uitvoerpunten, "sorted", sort_fields)
+
+    # Bepaal groepsnummer
+    with arcpy.da.UpdateCursor('sorted', ['afstand', 'z_ahn', 'groep', 'profielnummer']) as cursor:
+            for k, g in groupby(cursor, lambda x: x[3]):
+                p = g.next()[0] # eerste waarde
+
+                value = 1
+
+                for row in g:
+                    c = row[0] # volgende waarde
+                    if abs(c-p) <= stapgrootte_punten:
+                        row[2] = value
+                        cursor.updateRow(row)
+                    else:
+                        value+=1
+                        # print "Nieuwe volumegroep gemaakt op profiel, g"
+                        # pass
+
+                    p = row[0]
+
+                    row[2] = value
+                    cursor.updateRow(row)
+
+    del cursor
+
+    # Aanpassen eerste groepwaardes (van None naar 1)
+    with arcpy.da.UpdateCursor('sorted', ['groep']) as cursor:
+        for row in cursor:
+            if row[0] == None:
+                row[0] = 1
+                cursor.updateRow(row)
+    del cursor
+    # Vervang niet-gesorteerede puntenset
+    arcpy.CopyFeatures_management("sorted", uitvoerpunten)
+
+
+    # feature class to numpy array
+    array = arcpy.da.FeatureClassToNumPyArray(uitvoerpunten, ('OBJECTID', 'profielnummer', 'dv_nummer', 'afstand', 'z_ahn','groep'))
+    df = pd.DataFrame(array)
+    sorted = df.sort_values(['profielnummer', 'afstand'], ascending=[True, True])
+
+    grouped = sorted.groupby('groep')
+    max_kr = []
+    for name, group in grouped:
+        group['max_kr'] = group.iloc[:, 3].rolling(window=3).mean()
+        # print group
+        # for item in group['pandas_SMA_3']:
+        #     if item is not 'nan':
+        #         ma.append(item)
+        gr = group.dropna()
+        for item in gr['max_kr']:
+            max_kr.append(item)
+        break
+    # print ma
+    print max_kr
+    # join results to profiles
+    #
+
+
