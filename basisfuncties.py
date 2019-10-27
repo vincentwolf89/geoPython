@@ -9,19 +9,19 @@ from itertools import groupby
 # uitzetten melding pandas
 pd.set_option('mode.chained_assignment', None)
 
-arcpy.env.overwriteOutput = True
+# arcpy.env.overwriteOutput = True
 
 
-arcpy.env.workspace = r'C:\Users\vince\Desktop\GIS\test.gdb'
+# arcpy.env.workspace = r'C:\Users\vince\Desktop\GIS\test.gdb'
 
-profielen = 'test_profielen'
-invoerpunten = 'punten_profielen'
-uitvoerpunten = 'punten_profielen_z'
-stapgrootte_punten = 2
-raster = r'C:\Users\vince\Desktop\GIS\losse rasters\ahn3clip\ahn3clip_2m'
-trajectlijn = 'test_trajectlijn'
-code = 'dv_nummer'
-resultfile = "C:/Users/vince/Desktop/testprofielen.xls"
+# profielen = 'test_profielen'
+# invoerpunten = 'punten_profielen'
+# uitvoerpunten = 'punten_profielen_z'
+# stapgrootte_punten = 2
+# raster = r'C:\Users\vince\Desktop\GIS\losse rasters\ahn3clip\ahn3clip_2m'
+# trajectlijn = 'test_trajectlijn'
+# code = 'dv_nummer'
+# resultfile = "C:/Users/vince/Desktop/testprofielen.xls"
 
 
 
@@ -84,7 +84,7 @@ def CopyParallelR(plyP,sLength):
     section=arcpy.Polyline(array)
     return section
 
-def copy_trajectory_lr(trajectlijn):
+def copy_trajectory_lr(trajectlijn,code):
     existing_fields = arcpy.ListFields(trajectlijn)
     needed_fields = ['OBJECTID','Shape','Shape_Length','SHAPE', 'SHAPE_Length',code]
     for field in existing_fields:
@@ -111,7 +111,7 @@ def copy_trajectory_lr(trajectlijn):
             cursor.updateRow((RightLine, w))
     print "river and land parts created"
 
-def set_measurements_trajectory(profielen,trajectlijn,code): #rechts = rivier, profielen van binnen naar buiten
+def set_measurements_trajectory(profielen,trajectlijn,code,stapgrootte_punten): #rechts = rivier, profielen van binnen naar buiten
     # clean feature
     existing_fields = arcpy.ListFields(profielen)
     needed_fields = ['OBJECTID', 'SHAPE', 'SHAPE_Length','Shape','Shape_Length']
@@ -186,7 +186,7 @@ def set_measurements_trajectory(profielen,trajectlijn,code): #rechts = rivier, p
                                fieldmappings,
                                match_option="INTERSECT")
 
-
+    # generate points
     arcpy.GeneratePointsAlongLines_management('routes_land', 'punten_land', 'DISTANCE', Distance= stapgrootte_punten)
     arcpy.GeneratePointsAlongLines_management('routes_rivier', 'punten_rivier', 'DISTANCE', Distance=stapgrootte_punten)
 
@@ -257,7 +257,7 @@ def extract_z_arcpy(invoerpunten, uitvoerpunten, raster): #
     arcpy.AlterField_management(uitvoerpunten, 'RASTERVALU', 'z_ahn')
     print "elevation added to points"
 
-def add_xy(uitvoerpunten):
+def add_xy(uitvoerpunten,code):
 
     existing_fields = arcpy.ListFields(uitvoerpunten)
     needed_fields = ['OBJECTID', 'Shape', 'profielnummer', 'afstand', 'z_ahn', code]
@@ -283,7 +283,7 @@ def add_xy(uitvoerpunten):
 
     print "x and y added"
 
-def to_excel(uitvoerpunten):
+def to_excel(uitvoerpunten,resultfile):
 
 
     fields = ['profielnummer', 'afstand', 'z_ahn', 'x', 'y']
