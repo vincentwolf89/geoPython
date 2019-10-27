@@ -409,7 +409,7 @@ def snap_to_contour(puntenset,contour,output_tabel):
     arcpy.CopyFeatures_management(puntenset, puntenset+"_snap")
 
 
-def kruinhoogte_ma(uitvoerpunten,stapgrootte_punten):
+def kruinhoogte_groepen(uitvoerpunten,stapgrootte_punten):
 
     # Verwijder punten zonder z_waarde en rond afstand af
     with arcpy.da.UpdateCursor(uitvoerpunten, ['afstand', 'z_ahn'],sql_clause = (None,"ORDER BY afstand ASC")) as cursor:
@@ -468,7 +468,7 @@ def kruinhoogte_ma(uitvoerpunten,stapgrootte_punten):
     # Vervang niet-gesorteerede puntenset
     arcpy.CopyFeatures_management("sorted", uitvoerpunten)
 
-def test_ma(uitvoerpunten):
+def max_kruinhoogte(uitvoerpunten,profielen):
     # feature class to numpy array
     array = arcpy.da.FeatureClassToNumPyArray(uitvoerpunten, ('OBJECTID', 'profielnummer', 'dv_nummer', 'afstand', 'z_ahn','groep'))
     df = pd.DataFrame(array)
@@ -494,36 +494,25 @@ def test_ma(uitvoerpunten):
         else:
             pass
 
-    print max_kr
-
-
-
-        # kr_gr = [] # kruinhoogtes per profiel
-        # profielnummer = group.iloc[0]['profielnummer']
-        # group['max_kr'] = group.iloc[:, 4].rolling(window=3).mean()
-        # # print group
-        # # for item in group['pandas_SMA_3']:
-        # #     if item is not 'nan':
-        # #         ma.append(item)
-        #
-        # max = group['max_kr'].max()
-        # print max
-        # gr = group.dropna()
-
-        # for item in gr['max_kr']:
-        #     kr_gr.append(item)
-        #
-        #
-        # if kr_gr:
-        #     max_kr[profielnummer] = max(kr_gr)
-        # else:
-        #     pass
-
-
-
-    # per profiel max kruinhoogte, dct opbouwen met profiel- max_kruinhoogte
     # print max_kr
-    # join results to profiles
-    #
+    # update profielen met maximale kruinhoogte
+
+    existing_fields = arcpy.ListFields(profielen)
+    needed_fields = ['OBJECTID', 'SHAPE', 'SHAPE_Length', 'Shape','profielnummer', 'dv_nummer']
+    for field in existing_fields:
+        if field.name not in needed_fields:
+            arcpy.DeleteField_management(profielen, field.name)
+
+    arcpy.AddField_management(profielen, "max_kruinhoogte", "DOUBLE", 2, field_is_nullable="NULLABLE")
+
+    with arcpy.da.UpdateCursor(profielen, ['profielnummer','max_kruinhoogte']) as cursor:
+        for row in cursor:
+            if row[0] in max_kr:
+                # print max_kr[row[0]]
+                row[1] = round(max_kr[row[0]],2)
+                cursor.updateRow(row)
+
+
+
 
 
