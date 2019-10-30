@@ -38,8 +38,6 @@ for field in existing_fields:
 
 
 # koppel hoogtepunten
-
-
 punten_ahn3 = "nwo_grensprofielzone_punten"
 bufferzones_ahn3 = "nwo_grensprofielzone_punten_zone"
 distanceField = "20 Meters"
@@ -73,8 +71,8 @@ with arcpy.da.UpdateCursor(punten_temp, ['nummer_nwo']) as cursor1:
             cursor1.deleteRow()
         else:
             continue
-#
-# # bereken statistieken voor iedere bufferzone
+
+# bereken statistieken voor iedere bufferzone
 array = arcpy.da.FeatureClassToNumPyArray(punten_temp, ('nummer_nwo', 'grid_code'))
 df = pd.DataFrame(array)
 df_1 = df.dropna()
