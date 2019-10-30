@@ -11,8 +11,8 @@ arcpy.env.workspace = 'C:/Users/vince/Desktop/GIS/temp.gdb'
 
 raster = r"C:\Users\vince\Desktop\wolfwater\HHNK\data\ahn3_kust_nh_tx_1m.tif"
 
-zone = "zone"
-nwo = "vlakken"
+zone = r'C:\Users\vince\Desktop\GIS\13_1_ds_temp.gdb\grensprofielzone_13_1_iiv'
+nwo = "nwo_13_1"
 hr = r"C:\Users\vince\Desktop\GIS\duinscript.gdb\hr_ref_13_1_iiv"
 
 # selecteer nwo in zone
@@ -27,7 +27,7 @@ arcpy.AddField_management('nwo_grensprofielzone', "maaiveldhoogte", "DOUBLE", 2,
 arcpy.FeatureToPoint_management("nwo_grensprofielzone", "nwo_grensprofielzone_punten", "CENTROID")
 
 existing_fields = arcpy.ListFields(nwo)
-needed_fields = ['OBJECTID', 'SHAPE', 'SHAPE_Length', 'Shape','SHAPE_Area','nummer_nwo','soort_nwo']
+needed_fields = ['OBJECTID', 'SHAPE', 'SHAPE_Length', 'Shape','SHAPE_Area','nummer_nwo','Type_NWO']
 
 for field in existing_fields:
     if field.name not in needed_fields:
@@ -89,7 +89,7 @@ for index, row in means.iterrows():
 
 
 # update profielen met nieuwe ahn
-velden = ['nummer_nwo', 'maaiveldhoogte','soort_nwo']
+velden = ['nummer_nwo', 'maaiveldhoogte','Type_NWO']
 with arcpy.da.UpdateCursor("nwo_grensprofielzone", velden) as cursor:
     for row in cursor:
         id = row[0]
@@ -111,7 +111,7 @@ arcpy.AddField_management('nwo_grensprofielzone', "resthoogte_nwo", "DOUBLE", 2,
 arcpy.AddField_management('nwo_grensprofielzone', "oppervlakte_tekort", "DOUBLE", 2, field_is_nullable="NULLABLE")
 arcpy.AddField_management('nwo_grensprofielzone', "situatie", "TEXT")
 
-velden = ['nummer_nwo', 'Rp', 'maaiveldhoogte','soort_nwo','resthoogte','situatie','resthoogte_nwo','oppervlakte_tekort','SHAPE_Area']
+velden = ['nummer_nwo', 'Rp', 'maaiveldhoogte','Type_NWO','resthoogte','situatie','resthoogte_nwo','oppervlakte_tekort','Shape_Area']
 with arcpy.da.UpdateCursor("nwo_grensprofielzone", velden) as cursor:
     for row in cursor:
         if row[2] is not None:
@@ -129,7 +129,7 @@ with arcpy.da.UpdateCursor("nwo_grensprofielzone", velden) as cursor:
                 row[6] = row[4]-8
 
             else:
-                if type == "overig":
+                if type == "pand" or type =="strandpaviljoen":
                     row[6] = row[4]-3
             cursor.updateRow(row)
         else:
@@ -147,6 +147,5 @@ with arcpy.da.UpdateCursor("nwo_grensprofielzone", velden) as cursor:
             cursor.updateRow(row)
         else:
             pass
-
 
 
