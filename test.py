@@ -1,9 +1,10 @@
 import arcpy
 
-arcpy.env.workspace = 'C:/Users/vince/Desktop/GIS/temp.gdb'
+# arcpy.env.workspace = 'C:/Users/vince/Desktop/GIS/temp.gdb'
 
 mxd = r'C:\Users\vince\Desktop\test.mxd'
 out_gdb = r'C:\Users\vince\Desktop\GIS\temp.gdb'
+zone = "grensprofielzone"
 
 mxd = arcpy.mapping.MapDocument(mxd)
 # df = arcpy.mapping.ListDataFrames(mxd)
