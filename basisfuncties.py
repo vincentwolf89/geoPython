@@ -480,12 +480,20 @@ def max_kruinhoogte(uitvoerpunten,profielen):
     for name, groep in groep_profiel:
 
         max_kr_profiel = []
+        id_max = []
         groep_punten = groep.groupby(["groep"])
         for groep, groep_binnen_profiel in groep_punten:
             groep_binnen_profiel['max_kr'] = groep_binnen_profiel.iloc[:, 4].rolling(window=3).mean()
-
-            # print groep_binnen_profiel
+            groep_binnen_profiel['middelpunt_max'] = groep_binnen_profiel['max_kr'].shift(-1)
+            # zoeken naar middelste waarde rolling mean voor maken centerline max_kruinhoogte
             max_groep = groep_binnen_profiel['max_kr'].max()
+            if type(max_groep) is not float:
+                test = groep_binnen_profiel.loc[groep_binnen_profiel['max_kr'].idxmax(), 'OBJECTID']
+                print test
+            print groep_binnen_profiel
+            midden = groep_binnen_profiel['middelpunt_max'].argmax()
+
+
 
             max_kr_profiel.append(max_groep)
 
