@@ -5,16 +5,16 @@ from basisfuncties import *
 arcpy.env.overwriteOutput = True
 
 
-arcpy.env.workspace = r'C:\Users\vince\Desktop\GIS\test.gdb'
+arcpy.env.workspace = r'D:\GIS\test.gdb'
 
 profielen = 'profielen_reg'
 invoerpunten = 'punten_profielen'
 uitvoerpunten = 'punten_profielen_z'
 stapgrootte_punten = 1
-raster = r'C:\Users\vince\Desktop\GIS\losse rasters\ahn3clip\ahn3clip_safe'
+raster = r'D:\GIS\losse rasters\ahn3clip\ahn3clip_safe'
 trajectlijn = 'lijn_regionaal'
 code = 'dv_nummer'
-resultfile = "C:/Users/vince/Desktop/testprofielen.xls"
+resultfile = "C:/Users/Vincent/Desktop/testprofielen.xls"
 
 
 
