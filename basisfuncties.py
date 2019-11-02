@@ -477,8 +477,9 @@ def max_kruinhoogte(uitvoerpunten,profielen):
     groep_profiel = sorted.groupby('profielnummer')
 
     max_kr = {}
-    for name, groep in groep_profiel:
 
+    for name, groep in groep_profiel:
+        df_groep = pd.DataFrame(columns=['lib', 'qty1', 'qty2'])
         max_kr_profiel = []
         id_max = []
         groep_punten = groep.groupby(["groep"])
@@ -486,10 +487,11 @@ def max_kruinhoogte(uitvoerpunten,profielen):
             groep_binnen_profiel['max_kr'] = groep_binnen_profiel.iloc[:, 4].rolling(window=3).mean()
             groep_binnen_profiel['middelpunt_max'] = groep_binnen_profiel['max_kr'].shift(-1)
             # zoeken naar middelste waarde rolling mean voor maken centerline max_kruinhoogte
-            max_groep = groep_binnen_profiel['max_kr'].max()
+            max_groep = groep_binnen_profiel['middelpunt_max'].max()
             if type(max_groep) is not float:
-                test = groep_binnen_profiel.loc[groep_binnen_profiel['max_kr'].idxmax(), 'OBJECTID']
-                print test
+                id_midden_max = groep_binnen_profiel.loc[groep_binnen_profiel['middelpunt_max'].idxmax(), 'OBJECTID']
+                max = max_groep
+                print id_midden_max,max
             print groep_binnen_profiel
             midden = groep_binnen_profiel['middelpunt_max'].argmax()
 
@@ -524,3 +526,7 @@ def max_kruinhoogte(uitvoerpunten,profielen):
 
 
 
+
+
+# df maken globaal, df maken per groep, max df groep koppelen met df globaal
+# df.set_index('month')
