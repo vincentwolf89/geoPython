@@ -468,192 +468,74 @@ def kruinhoogte_groepen(uitvoerpunten,stapgrootte_punten):
     # Vervang niet-gesorteerede puntenset
     arcpy.CopyFeatures_management("sorted", uitvoerpunten)
 
+
+
+
 def max_kruinhoogte(uitvoerpunten,profielen):
     # feature class to numpy array
     array = arcpy.da.FeatureClassToNumPyArray(uitvoerpunten, ('OBJECTID', 'profielnummer', 'dv_nummer', 'afstand', 'z_ahn','groep'))
+    # dataframe, algemeen
     df = pd.DataFrame(array)
     sorted = df.sort_values(['profielnummer', 'afstand'], ascending=[True, True])
 
-    groep_profiel = sorted.groupby('profielnummer')
-
-    max_kr = {}
+    # dataframe voor maximale kruinhoogtes over 1.5m voor alle profielen
     df_maxwaardes = pd.DataFrame(columns=['profielnummer', 'max_kruinhoogte'])
 
+    # sorteer op profielnummer
+    groep_profiel = sorted.groupby('profielnummer')
+
+    # itereer over profielen
     for name, groep in groep_profiel:
+        # dataframe voor maximale kruinhoogtes over 1.5 m voor alle groepen per profiel
         df_profiel = pd.DataFrame(columns=['profielnummer', 'max_kruinhoogte'])
 
-        max_kr_profiel = []
-        id_max = []
+        # itereer over groepen binnen profielen
         groep_punten = groep.groupby(["groep"])
 
-        max_kruinhoogtes = []
-        profielnummers = []
-        OBJECTIDs = []
         for groep, groep_binnen_profiel in groep_punten:
+            # bepaal gemiddelde kruinhoogte over 1.5 m(3 meetpunten), extra kolom 'max_kr'
             groep_binnen_profiel['max_kr'] = groep_binnen_profiel.iloc[:, 4].rolling(window=3).mean()
+            # shift kolom 'max_kr' om middenpunt voor ieder rolling mean te verkrijgen (punt 2 van 3 meetpunten)
             groep_binnen_profiel['middelpunt_max'] = groep_binnen_profiel['max_kr'].shift(-1)
 
-            # zoeken naar middelste waarde rolling mean voor maken centerline max_kruinhoogte
+            # zoeken naar middelpunt rolling mean voor maken centerline max_kruinhoogte
             max_groep = groep_binnen_profiel['middelpunt_max'].max()
 
+            # als rolling mean aanwezig is: opbouwen van dataframe
             if type(max_groep) is not float:
+                # koppel_id voor OBJECTID puntenlaag
                 id_midden_max = groep_binnen_profiel.loc[groep_binnen_profiel['middelpunt_max'].idxmax(), 'OBJECTID']
+                # maximale kruinhoogte (rolling mean)
                 max_kruin = max_groep
-
-                max_kruinhoogtes.append(max_kruin)
-                profielnummers.append(name)
-                OBJECTIDs.append(id_midden_max)
+                # vul dataframe van het profiel aan met max-waardes
                 df_profiel.loc[id_midden_max] = name, max_kruin
 
-                # print max_kruin, id_midden_max
-
-                # df_profiel.loc[id_midden_max] = name, max_kruin
-
-
-
-            # print groep_binnen_profiel
-
-            midden = groep_binnen_profiel['middelpunt_max'].argmax()
-
-
-
-
-            max_kr_profiel.append(max_groep)
-
-        if max_kr_profiel:
-            max_kr[name] = max(max_kr_profiel)
-        else:
-            pass
-
-
-        # print max_kruinhoogtes,profielnummers,OBJECTIDs
-
-
         # print df_profiel
+
+        # bepaal maximale waardes per profiel en vul dataframe voor maximale kruinhoogtes alle profielen
         kr_max = df_profiel['max_kruinhoogte'].max()
         OID_max = df_profiel['max_kruinhoogte'].idxmax()
 
         df_maxwaardes.loc[OID_max] = name, kr_max
 
+    # print per profiel de gevonden resultaten
     print df_maxwaardes
         # break
 
-
-    # print max_kr
     # update profielen met maximale kruinhoogte
-
     existing_fields = arcpy.ListFields(profielen)
     needed_fields = ['OBJECTID', 'SHAPE', 'SHAPE_Length', 'Shape','profielnummer', 'dv_nummer']
     for field in existing_fields:
         if field.name not in needed_fields:
             arcpy.DeleteField_management(profielen, field.name)
 
+    # voeg veld voor maximale kruinhoogte toe aan lijn-laag profielen
     arcpy.AddField_management(profielen, "max_kruinhoogte", "DOUBLE", 2, field_is_nullable="NULLABLE")
-
-    with arcpy.da.UpdateCursor(profielen, ['profielnummer','max_kruinhoogte']) as cursor:
-        for row in cursor:
-            if row[0] in max_kr:
-                # print max_kr[row[0]]
-                row[1] = round(max_kr[row[0]],2)
-                cursor.updateRow(row)
-
-
-
-
-
-
-
-# df maken globaal, df maken per groep, max df groep koppelen met df globaal
-# df.set_index('month')
-
-def max_kruinhoogte_test(uitvoerpunten,profielen):
-    # feature class to numpy array
-    array = arcpy.da.FeatureClassToNumPyArray(uitvoerpunten, ('OBJECTID', 'profielnummer', 'dv_nummer', 'afstand', 'z_ahn','groep'))
-    df = pd.DataFrame(array)
-    sorted = df.sort_values(['profielnummer', 'afstand'], ascending=[True, True])
-
-    groep_profiel = sorted.groupby('profielnummer')
-
-    max_kr = {}
-    df_maxwaardes = pd.DataFrame(columns=['profielnummer', 'max_kruinhoogte'])
-
-    for name, groep in groep_profiel:
-        df_profiel = pd.DataFrame(columns=['profielnummer', 'max_kruinhoogte'])
-
-        max_kr_profiel = []
-        id_max = []
-        groep_punten = groep.groupby(["groep"])
-
-        max_kruinhoogtes = []
-        profielnummers = []
-        OBJECTIDs = []
-        for groep, groep_binnen_profiel in groep_punten:
-            groep_binnen_profiel['max_kr'] = groep_binnen_profiel.iloc[:, 4].rolling(window=3).mean()
-            groep_binnen_profiel['middelpunt_max'] = groep_binnen_profiel['max_kr'].shift(-1)
-
-            # zoeken naar middelste waarde rolling mean voor maken centerline max_kruinhoogte
-            max_groep = groep_binnen_profiel['middelpunt_max'].max()
-
-            if type(max_groep) is not float:
-                id_midden_max = groep_binnen_profiel.loc[groep_binnen_profiel['middelpunt_max'].idxmax(), 'OBJECTID']
-                max_kruin = max_groep
-
-                max_kruinhoogtes.append(max_kruin)
-                profielnummers.append(name)
-                OBJECTIDs.append(id_midden_max)
-                df_profiel.loc[id_midden_max] = name, max_kruin
-
-                # print max_kruin, id_midden_max
-
-                # df_profiel.loc[id_midden_max] = name, max_kruin
-
-
-
-            # print groep_binnen_profiel
-
-            midden = groep_binnen_profiel['middelpunt_max'].argmax()
-
-
-
-
-            max_kr_profiel.append(max_groep)
-
-        if max_kr_profiel:
-            max_kr[name] = max(max_kr_profiel)
-        else:
-            pass
-
-
-        # print max_kruinhoogtes,profielnummers,OBJECTIDs
-
-
-        # print df_profiel
-        kr_max = df_profiel['max_kruinhoogte'].max()
-        OID_max = df_profiel['max_kruinhoogte'].idxmax()
-
-        df_maxwaardes.loc[OID_max] = name, kr_max
-
-    print df_maxwaardes
-        # break
-
-
-    # print max_kr
-    # update profielen met maximale kruinhoogte
-
-    existing_fields = arcpy.ListFields(profielen)
-    needed_fields = ['OBJECTID', 'SHAPE', 'SHAPE_Length', 'Shape','profielnummer', 'dv_nummer']
-    for field in existing_fields:
-        if field.name not in needed_fields:
-            arcpy.DeleteField_management(profielen, field.name)
-
-    arcpy.AddField_management(profielen, "max_kruinhoogte", "DOUBLE", 2, field_is_nullable="NULLABLE")
-
     with arcpy.da.UpdateCursor(profielen, ['profielnummer','max_kruinhoogte']) as cursor:
         for row in cursor:
             profielnummer = row[0]
             for i, row in df_maxwaardes.iterrows():
                 if row['profielnummer'] == profielnummer:
-                    print profielnummer
                     row[1] = round(row['max_kruinhoogte'],2)
                     cursor.updateRow(row)
 
@@ -662,10 +544,11 @@ def max_kruinhoogte_test(uitvoerpunten,profielen):
     arcpy.CopyFeatures_management(uitvoerpunten, "kruinhoogte_max_punten")
     list_oid = df_maxwaardes.index.values.tolist()
 
+    # selecteer middelpunten maximale kruinhoogte over 1.5 m
     with arcpy.da.UpdateCursor("kruinhoogte_max_punten", ("OBJECTID")) as cursor:
         for row in cursor:
             if row[0] in list_oid:
-                print row[0]
+                pass
             else:
                 cursor.deleteRow()
 
