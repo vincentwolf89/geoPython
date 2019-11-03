@@ -233,7 +233,7 @@ def set_measurements_trajectory(profielen,trajectlijn,code,stapgrootte_punten): 
     arcpy.FeatureToPoint_management("snijpunten_centerline", "punten_centerline")
     arcpy.Merge_management(['punten_land', 'punten_rivier','punten_centerline'], 'punten_profielen', fieldmappings)
 
-    arcpy.CalculateField_management("punten_profielen", "afstand", 'round(!afstand!, 0)', "PYTHON")
+    arcpy.CalculateField_management("punten_profielen", "afstand", 'round(!afstand!, 1)', "PYTHON")
 
     # set centerline values to 0
     with arcpy.da.UpdateCursor('punten_profielen', ['afstand']) as cursor:
@@ -409,7 +409,7 @@ def snap_to_contour(puntenset,contour,output_tabel):
     arcpy.CopyFeatures_management(puntenset, puntenset+"_snap")
 
 
-def kruinhoogte_groepen(uitvoerpunten,stapgrootte_punten):
+def kruinhoogte_groepen(uitvoerpunten,stapgrootte_punten,afronding):
 
     # Verwijder punten zonder z_waarde en rond afstand af
     with arcpy.da.UpdateCursor(uitvoerpunten, ['afstand', 'z_ahn'],sql_clause = (None,"ORDER BY afstand ASC")) as cursor:
@@ -417,7 +417,7 @@ def kruinhoogte_groepen(uitvoerpunten,stapgrootte_punten):
             if row[1] is None:
                 cursor.deleteRow()
             else:
-                row[0] = round(row[0])
+                row[0] = round(row[0],afronding)
                 cursor.updateRow(row)
     del cursor
 
