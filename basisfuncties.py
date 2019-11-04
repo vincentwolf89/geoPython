@@ -114,7 +114,7 @@ def copy_trajectory_lr(trajectlijn,code):
 def set_measurements_trajectory(profielen,trajectlijn,code,stapgrootte_punten): #rechts = rivier, profielen van binnen naar buiten
     # clean feature
     existing_fields = arcpy.ListFields(profielen)
-    needed_fields = ['OBJECTID', 'SHAPE', 'SHAPE_Length','Shape','Shape_Length']
+    needed_fields = ['OBJECTID', 'SHAPE', 'SHAPE_Length','Shape','Shape_Length',code]
     for field in existing_fields:
         if field.name not in needed_fields:
             arcpy.DeleteField_management(profielen, field.name)
@@ -409,7 +409,7 @@ def snap_to_contour(puntenset,contour,output_tabel):
     arcpy.CopyFeatures_management(puntenset, puntenset+"_snap")
 
 
-def kruinhoogte_groepen(uitvoerpunten,stapgrootte_punten,afronding):
+def kruinhoogte_groepen(uitvoerpunten,stapgrootte_punten,afronding,code):
 
     # Verwijder punten zonder z_waarde en rond afstand af
     with arcpy.da.UpdateCursor(uitvoerpunten, ['afstand', 'z_ahn'],sql_clause = (None,"ORDER BY afstand ASC")) as cursor:
@@ -422,7 +422,7 @@ def kruinhoogte_groepen(uitvoerpunten,stapgrootte_punten,afronding):
     del cursor
 
     existing_fields = arcpy.ListFields(uitvoerpunten)
-    needed_fields = ['OBJECTID', 'SHAPE', 'SHAPE_Length', 'Shape', 'Shape_Length','afstand','z_ahn','profielnummer', 'dv_nummer','x','y']
+    needed_fields = ['OBJECTID', 'SHAPE', 'SHAPE_Length', 'Shape', 'Shape_Length','afstand','z_ahn','profielnummer', code,'x','y']
     for field in existing_fields:
         if field.name not in needed_fields:
             arcpy.DeleteField_management(uitvoerpunten, field.name)
@@ -471,9 +471,9 @@ def kruinhoogte_groepen(uitvoerpunten,stapgrootte_punten,afronding):
 
 
 
-def max_kruinhoogte(uitvoerpunten,profielen):
+def max_kruinhoogte(uitvoerpunten,profielen,code):
     # feature class to numpy array
-    array = arcpy.da.FeatureClassToNumPyArray(uitvoerpunten, ('OBJECTID', 'profielnummer', 'dv_nummer', 'afstand', 'z_ahn','groep'))
+    array = arcpy.da.FeatureClassToNumPyArray(uitvoerpunten, ('OBJECTID', 'profielnummer', code, 'afstand', 'z_ahn','groep'))
     # dataframe, algemeen
     df = pd.DataFrame(array)
     sorted = df.sort_values(['profielnummer', 'afstand'], ascending=[True, True])
@@ -524,7 +524,7 @@ def max_kruinhoogte(uitvoerpunten,profielen):
 
     # update profielen met maximale kruinhoogte
     existing_fields = arcpy.ListFields(profielen)
-    needed_fields = ['OBJECTID', 'SHAPE', 'SHAPE_Length', 'Shape','profielnummer', 'dv_nummer']
+    needed_fields = ['OBJECTID', 'SHAPE', 'SHAPE_Length','Shape_Length','Shape','profielnummer', code]
     for field in existing_fields:
         if field.name not in needed_fields:
             arcpy.DeleteField_management(profielen, field.name)
@@ -553,7 +553,8 @@ def max_kruinhoogte(uitvoerpunten,profielen):
                 cursor.deleteRow()
 
 
-def generate_profiles(profiel_interval,profiel_lengte,trajectlijn,code):
+
+def generate_profiles(profiel_interval,profiel_lengte,trajectlijn,code,profielen):
     # traject to points
     arcpy.GeneratePointsAlongLines_management(trajectlijn, 'traject_punten', 'DISTANCE', Distance=profiel_interval)
     arcpy.AddField_management('traject_punten', "profielnummer", "DOUBLE", 2, field_is_nullable="NULLABLE")
@@ -562,7 +563,20 @@ def generate_profiles(profiel_interval,profiel_lengte,trajectlijn,code):
     arcpy.CalculateField_management('traject_punten', "lengte_profiel", (profiel_lengte/2), "PYTHON")
 
     # route voor trajectlijn
-    arcpy.CreateRoutes_lr(trajectlijn, code, "route_traject", "LENGTH", "", "", "UPPER_LEFT", "1", "0", "IGNORE", "INDEX")
+    # arcpy.CreateRoutes_lr(trajectlijn, code, "route_traject", "LENGTH", "", "", "UPPER_LEFT", "1", "0", "IGNORE", "INDEX")
+
+    existing_fields = arcpy.ListFields(trajectlijn)
+    needed_fields = ['OBJECTID', 'SHAPE', 'SHAPE_Length','Shape','Shape_Length',code]
+    for field in existing_fields:
+        if field.name not in needed_fields:
+            arcpy.DeleteField_management(trajectlijn, field.name)
+    arcpy.AddField_management(trajectlijn, "van", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.AddField_management(trajectlijn, "tot", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.CalculateField_management(trajectlijn, "van", 0, "PYTHON")
+    arcpy.CalculateField_management(trajectlijn, "tot", "!Shape_Length!", "PYTHON")
+    arcpy.CreateRoutes_lr(trajectlijn, code, 'route_traject', "TWO_FIELDS", "van", "tot", "", "1",
+                          "0", "IGNORE", "INDEX")
+
 
     # locate profielpunten
     arcpy.LocateFeaturesAlongRoutes_lr('traject_punten', 'route_traject', code, "0 Meters", 'tabel_traject_punten',
@@ -571,15 +585,32 @@ def generate_profiles(profiel_interval,profiel_lengte,trajectlijn,code):
 
     # offset rivierdeel profiel
     arcpy.MakeRouteEventLayer_lr('route_traject', code, 'tabel_traject_punten', "rid POINT meas", 'deel_rivier',
-                                 "lengte_profiel", "NO_ERROR_FIELD", "NO_ANGLE_FIELD", "NORMAL", "ANGLE", "LEFT",
+                                 "lengte_profiel", "NO_ERROR_FIELD", "NO_ANGLE_FIELD", "NORMAL", "ANGLE", "RIGHT",
                                  "POINT")
 
     arcpy.MakeRouteEventLayer_lr('route_traject', code, 'tabel_traject_punten', "rid POINT meas", 'deel_land',
-                                 "lengte_profiel", "NO_ERROR_FIELD", "NO_ANGLE_FIELD", "NORMAL", "ANGLE", "RIGHT",
+                                 "lengte_profiel", "NO_ERROR_FIELD", "NO_ANGLE_FIELD", "NORMAL", "ANGLE", "LEFT",
                                  "POINT")
-    arcpy.Merge_management("'deel_land';'deel_rivier'", 'merge_profielpunten')
-    arcpy.PointsToLine_management('merge_profielpunten', 'profielen_regionaal', "profielnummer", "", "NO_CLOSE")
+    # temp inzicht layer
+    arcpy.CopyFeatures_management('deel_rivier', "temp_rivierdeel")
+    arcpy.CopyFeatures_management('deel_land', "temp_landdeel")
+    arcpy.AddField_management('temp_rivierdeel', "id", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.AddField_management('temp_landdeel', "id", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.CalculateField_management('temp_rivierdeel', "id", 2, "PYTHON")
+    arcpy.CalculateField_management('temp_landdeel', "id", 1, "PYTHON")
 
+
+
+
+
+    arcpy.Merge_management("'temp_rivierdeel';'temp_landdeel'", 'merge_profielpunten')
+    arcpy.PointsToLine_management('merge_profielpunten', profielen, "profielnummer", "id", "NO_CLOSE")
+
+    arcpy.SpatialJoin_analysis(profielen, trajectlijn, 'profielen_temp', "JOIN_ONE_TO_ONE", "KEEP_ALL", match_option="INTERSECT")
+    arcpy.CopyFeatures_management('profielen_temp', profielen)
+    # arcpy.FlipLine_edit(profielen)
+
+    print 'profielen gemaakt op trajectlijn'
 
 
 
