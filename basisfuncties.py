@@ -553,7 +553,32 @@ def max_kruinhoogte(uitvoerpunten,profielen):
                 cursor.deleteRow()
 
 
+def generate_profiles(profiel_interval,profiel_lengte,trajectlijn,code):
+    # traject to points
+    arcpy.GeneratePointsAlongLines_management(trajectlijn, 'traject_punten', 'DISTANCE', Distance=profiel_interval)
+    arcpy.AddField_management('traject_punten', "profielnummer", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.AddField_management('traject_punten', "lengte_profiel", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.CalculateField_management('traject_punten', "profielnummer", '!OBJECTID!', "PYTHON")
+    arcpy.CalculateField_management('traject_punten', "lengte_profiel", (profiel_lengte/2), "PYTHON")
 
+    # route voor trajectlijn
+    arcpy.CreateRoutes_lr(trajectlijn, code, "route_traject", "LENGTH", "", "", "UPPER_LEFT", "1", "0", "IGNORE", "INDEX")
+
+    # locate profielpunten
+    arcpy.LocateFeaturesAlongRoutes_lr('traject_punten', 'route_traject', code, "0 Meters", 'tabel_traject_punten',
+                                       "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS",
+                                       "M_DIRECTON")
+
+    # offset rivierdeel profiel
+    arcpy.MakeRouteEventLayer_lr('route_traject', code, 'tabel_traject_punten', "rid POINT meas", 'deel_rivier',
+                                 "lengte_profiel", "NO_ERROR_FIELD", "NO_ANGLE_FIELD", "NORMAL", "ANGLE", "LEFT",
+                                 "POINT")
+
+    arcpy.MakeRouteEventLayer_lr('route_traject', code, 'tabel_traject_punten', "rid POINT meas", 'deel_land',
+                                 "lengte_profiel", "NO_ERROR_FIELD", "NO_ANGLE_FIELD", "NORMAL", "ANGLE", "RIGHT",
+                                 "POINT")
+    arcpy.Merge_management("'deel_land';'deel_rivier'", 'merge_profielpunten')
+    arcpy.PointsToLine_management('merge_profielpunten', 'profielen_regionaal', "profielnummer", "", "NO_CLOSE")
 
 
 
