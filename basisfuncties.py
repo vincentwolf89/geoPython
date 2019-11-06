@@ -471,7 +471,7 @@ def kruinhoogte_groepen(uitvoerpunten,stapgrootte_punten,afronding,code):
 
 
 
-def max_kruinhoogte(uitvoerpunten,profielen,code):
+def max_kruinhoogte(uitvoerpunten,profielen,code,uitvoer_maxpunten):
     # feature class to numpy array
     array = arcpy.da.FeatureClassToNumPyArray(uitvoerpunten, ('OBJECTID', 'profielnummer', code, 'afstand', 'z_ahn','groep'))
     # dataframe, algemeen
@@ -541,11 +541,11 @@ def max_kruinhoogte(uitvoerpunten,profielen,code):
 
 
     # genereer puntenlijn met maximale gemiddelde kruinhoogte
-    arcpy.CopyFeatures_management(uitvoerpunten, "kruinhoogte_max_punten")
+    arcpy.CopyFeatures_management(uitvoerpunten, uitvoer_maxpunten)
     list_oid = df_maxwaardes.index.values.tolist()
 
     # selecteer middelpunten maximale kruinhoogte over 1.5 m
-    with arcpy.da.UpdateCursor("kruinhoogte_max_punten", ("OBJECTID")) as cursor:
+    with arcpy.da.UpdateCursor(uitvoer_maxpunten, ("OBJECTID")) as cursor:
         for row in cursor:
             if row[0] in list_oid:
                 pass
@@ -556,7 +556,7 @@ def max_kruinhoogte(uitvoerpunten,profielen,code):
 
 def generate_profiles(profiel_interval,profiel_lengte,trajectlijn,code,profielen):
     # traject to points
-    arcpy.GeneratePointsAlongLines_management(trajectlijn, 'traject_punten', 'DISTANCE', Distance=profiel_interval)
+    arcpy.GeneratePointsAlongLines_management(trajectlijn, 'traject_punten', 'DISTANCE', Distance=profiel_interval, Include_End_Points='END_POINTS')
     arcpy.AddField_management('traject_punten', "profielnummer", "DOUBLE", 2, field_is_nullable="NULLABLE")
     arcpy.AddField_management('traject_punten', "lengte_profiel", "DOUBLE", 2, field_is_nullable="NULLABLE")
     arcpy.CalculateField_management('traject_punten', "profielnummer", '!OBJECTID!', "PYTHON")
@@ -579,7 +579,7 @@ def generate_profiles(profiel_interval,profiel_lengte,trajectlijn,code,profielen
 
 
     # locate profielpunten
-    arcpy.LocateFeaturesAlongRoutes_lr('traject_punten', 'route_traject', code, "0 Meters", 'tabel_traject_punten',
+    arcpy.LocateFeaturesAlongRoutes_lr('traject_punten', 'route_traject', code, "1.5 Meters", 'tabel_traject_punten',
                                        "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS",
                                        "M_DIRECTON")
 
