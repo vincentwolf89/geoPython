@@ -13,7 +13,7 @@ arcpy.env.overwriteOutput = True
 
 
 profiel_interval = 15
-profiel_lengte = 35
+profiel_lengte = 30
 invoerpunten = 'punten_profielen'
 stapgrootte_punten = 0.5
 afronding = 1
@@ -30,6 +30,7 @@ with arcpy.da.SearchCursor(trajecten,['SHAPE@','SUBSECT_ID']) as cursor:
         trajectlijn = 'deeltraject_'+str(row[1])
         profielen = 'profielen_'+str(row[1])
         uitvoerpunten = 'punten_profielen_z_'+str(row[1])
+        uitvoer_maxpunten = 'max_kruinhoogte_'+str(row[1])
         resultfile = 'C:/Users/Vincent/Desktop/xls_uitvoer/'+str(row[1])+'.xls'
         where = '"' + code + '" = ' + "'" + str(id) + "'"
 
@@ -44,4 +45,4 @@ with arcpy.da.SearchCursor(trajecten,['SHAPE@','SUBSECT_ID']) as cursor:
         add_xy(uitvoerpunten, code)
         to_excel(uitvoerpunten, resultfile)
         kruinhoogte_groepen(uitvoerpunten, stapgrootte_punten, afronding, code)
-        max_kruinhoogte(uitvoerpunten, profielen, code)
+        max_kruinhoogte(uitvoerpunten, profielen, code,uitvoer_maxpunten)
