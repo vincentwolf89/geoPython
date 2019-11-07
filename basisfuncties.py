@@ -513,10 +513,14 @@ def max_kruinhoogte(uitvoerpunten,profielen,code,uitvoer_maxpunten):
         # print df_profiel
 
         # bepaal maximale waardes per profiel en vul dataframe voor maximale kruinhoogtes alle profielen
-        kr_max = df_profiel['max_kruinhoogte'].max()
-        OID_max = df_profiel['max_kruinhoogte'].idxmax()
+        # check of profiel een maximale kruinhoogte heeft
+        if df_profiel.empty == True:
+            pass
+        else:
+            kr_max = df_profiel['max_kruinhoogte'].max()
+            OID_max = df_profiel['max_kruinhoogte'].idxmax()
 
-        df_maxwaardes.loc[OID_max] = name, kr_max
+            df_maxwaardes.loc[OID_max] = name, kr_max
 
     # print per profiel de gevonden resultaten
     print df_maxwaardes
@@ -554,13 +558,18 @@ def max_kruinhoogte(uitvoerpunten,profielen,code,uitvoer_maxpunten):
 
 
 
-def generate_profiles(profiel_interval,profiel_lengte,trajectlijn,code,profielen):
+
+
+
+def generate_profiles(profiel_interval,profiel_lengte_land,profiel_lengte_rivier,trajectlijn,code,profielen):
     # traject to points
     arcpy.GeneratePointsAlongLines_management(trajectlijn, 'traject_punten', 'DISTANCE', Distance=profiel_interval, Include_End_Points='END_POINTS')
     arcpy.AddField_management('traject_punten', "profielnummer", "DOUBLE", 2, field_is_nullable="NULLABLE")
-    arcpy.AddField_management('traject_punten', "lengte_profiel", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.AddField_management('traject_punten', "lengte_landzijde", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.AddField_management('traject_punten', "lengte_rivierzijde", "DOUBLE", 2, field_is_nullable="NULLABLE")
     arcpy.CalculateField_management('traject_punten', "profielnummer", '!OBJECTID!', "PYTHON")
-    arcpy.CalculateField_management('traject_punten', "lengte_profiel", (profiel_lengte/2), "PYTHON")
+    arcpy.CalculateField_management('traject_punten', "lengte_landzijde", profiel_lengte_land, "PYTHON")
+    arcpy.CalculateField_management('traject_punten', "lengte_rivierzijde", profiel_lengte_rivier, "PYTHON")
 
     # route voor trajectlijn
     # arcpy.CreateRoutes_lr(trajectlijn, code, "route_traject", "LENGTH", "", "", "UPPER_LEFT", "1", "0", "IGNORE", "INDEX")
@@ -585,11 +594,11 @@ def generate_profiles(profiel_interval,profiel_lengte,trajectlijn,code,profielen
 
     # offset rivierdeel profiel
     arcpy.MakeRouteEventLayer_lr('route_traject', code, 'tabel_traject_punten', "rid POINT meas", 'deel_rivier',
-                                 "lengte_profiel", "NO_ERROR_FIELD", "NO_ANGLE_FIELD", "NORMAL", "ANGLE", "RIGHT",
+                                 "lengte_rivierzijde", "NO_ERROR_FIELD", "NO_ANGLE_FIELD", "NORMAL", "ANGLE", "RIGHT",
                                  "POINT")
 
     arcpy.MakeRouteEventLayer_lr('route_traject', code, 'tabel_traject_punten', "rid POINT meas", 'deel_land',
-                                 "lengte_profiel", "NO_ERROR_FIELD", "NO_ANGLE_FIELD", "NORMAL", "ANGLE", "LEFT",
+                                 "lengte_landzijde", "NO_ERROR_FIELD", "NO_ANGLE_FIELD", "NORMAL", "ANGLE", "LEFT",
                                  "POINT")
     # temp inzicht layer
     arcpy.CopyFeatures_management('deel_rivier', "temp_rivierdeel")
@@ -611,6 +620,3 @@ def generate_profiles(profiel_interval,profiel_lengte,trajectlijn,code,profielen
     # arcpy.FlipLine_edit(profielen)
 
     print 'profielen gemaakt op trajectlijn'
-
-
-
