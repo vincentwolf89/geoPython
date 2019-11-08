@@ -7,26 +7,20 @@ from scipy.interpolate import UnivariateSpline
 import scipy.signal
 # from rdp import rdp
 
-stapgrootte_punten = 2
-max_talud = 0.2
-
-max_voorland = -75
-min_voorland = -25
-max_achterland = 75
-min_achterland = 25
-
-
+arcpy.env.workspace = r'D:\Projecten\HDSR\data\test_batch.gdb'
+arcpy.env.overwriteOutput = True
 
 def average(lijst):
     return sum(lijst) / len(lijst)
 
-
-
-arcpy.env.workspace = r'D:\Projecten\HDSR\data\test_batch.gdb'
-arcpy.env.overwriteOutput = True
+stapgrootte_punten = 2
+max_talud = 0.2
+max_voorland = -75
+min_voorland = -25
+max_achterland = 10
+min_achterland = 5
 code = 'SUBSECT_ID'
-
-invoer = 'punten_profielen_z_122'
+invoer = 'punten_profielen_z_125E'
 
 
 array = arcpy.da.FeatureClassToNumPyArray(invoer, ('OBJECTID','profielnummer',code, 'afstand', 'z_ahn'))
@@ -38,24 +32,16 @@ grouped = sorted.groupby('profielnummer')
 list_id_bik = []
 list_id_buk = []
 list_id_bit = []
-list_id_but = []
+# list_id_but = []
 
 afstand_bik = 5
 afstand_buk = -5
 afstand_maxkruin = 0.2
 for name, group in grouped:
-    # maximale hoogte
+    # maximale kruinhoogte
     max_kruin = max(group['z_ahn'])
 
-
-
     landzijde = group.sort_values(['afstand'], ascending=False) #afnemend, landzijde
-
-    rivierzijde = group.sort_values(['afstand'], ascending=True) #toenemend, rivierzijde
-
-
-    landzijde = group.sort_values(['afstand'], ascending=False) #afnemend, landzijde
-
     rivierzijde = group.sort_values(['afstand'], ascending=True) #toenemend, rivierzijde
 
 
@@ -77,8 +63,33 @@ for name, group in grouped:
             list_id_buk.append(row['OBJECTID'])
             break
 
-
+    # # bit
+    # # maaiveldhoogte achterland
+    # mv_achterland_lijst = []
+    # for index, row in landzijde.iterrows():
+    #     if row['afstand'] > min_achterland and row['afstand'] < max_achterland :
+    #         mv_achterland_lijst.append(row['z_ahn'])
+    # mv_achterland = average(mv_achterland_lijst)
+    # # print mv_achterland
+    # row_iterator = rivierzijde.iterrows()
+    # _, last = row_iterator.next()  # take first item from row_iterator
+    # for i, row in row_iterator:
     #
+    #     hoogte1 = last['z_ahn']
+    #     hoogte2 = row['z_ahn']
+    #     afstand1 = last['afstand']
+    #     afstand2 = row['afstand']
+    #     delta_h = abs(hoogte1 - hoogte2)
+    #     delta_a = abs(afstand1 - afstand2)
+    #     talud = delta_h / delta_a
+    #     if afstand2 > 0 and afstand2 < max_achterland and hoogte2 < mv_achterland + 0.5 and talud < max_talud:
+    #         x_bit = row['afstand']
+    #         y_bit = row['z_ahn']
+    #         list_id_bit.append(row['OBJECTID'])
+    #         print row['afstand']
+    #         break
+    #     last = row
+
     # x1 = group['afstand']
     # y1 = group['z_ahn']
     #
@@ -115,45 +126,52 @@ for name, group in grouped:
     #     pass
     # plt.show()
     #
+    #
+    #
+    #
+    #
+    #
+    #
+    # try:
+    #     x_buk
+    #     del x_buk, y_buk
+    # except NameError:
+    #     pass
+    #
+    # try:
+    #     x_bik
+    #     del x_bik, y_bik
+    # except NameError:
+    #     pass
+    # try:
+    #     x_but
+    #     del x_but, y_but
+    # except NameError:
+    #     pass
+    # try:
+    #     x_bit
+    #     del x_bit, y_bit
+    # except NameError:
+    #     pass
 
 
 
 
+# wegschrijven naar gis
 
-
-    try:
-        x_buk
-        del x_buk, y_buk
-    except NameError:
-        pass
-
-    try:
-        x_bik
-        del x_bik, y_bik
-    except NameError:
-        pass
-    try:
-        x_but
-        del x_but, y_but
-    except NameError:
-        pass
-    try:
-        x_bit
-        del x_bit, y_bit
-    except NameError:
-        pass
-
-
-
-
-
+# binnenkruin
 arcpy.MakeFeatureLayer_management(invoer, 'punten_binnenkruin_temp')
-punten_bik = arcpy.SelectLayerByAttribute_management('punten_binnenkruin_temp', "ADD_TO_SELECTION",
-                                                     "OBJECTID in (" + str(list_id_bik)[1:-1] + ")")
+punten_bik = arcpy.SelectLayerByAttribute_management('punten_binnenkruin_temp', "ADD_TO_SELECTION","OBJECTID in (" + str(list_id_bik)[1:-1] + ")")
 arcpy.CopyFeatures_management('punten_binnenkruin_temp', 'punten_binnenkruin')
-# #
 
+# buitenkruin
 arcpy.MakeFeatureLayer_management(invoer, 'punten_buitenkruin_temp')
-punten_buk = arcpy.SelectLayerByAttribute_management('punten_buitenkruin_temp', "ADD_TO_SELECTION",
-                                                     "OBJECTID in (" + str(list_id_buk)[1:-1] + ")")
+punten_buk = arcpy.SelectLayerByAttribute_management('punten_buitenkruin_temp', "ADD_TO_SELECTION","OBJECTID in (" + str(list_id_buk)[1:-1] + ")")
 arcpy.CopyFeatures_management('punten_buitenkruin_temp', 'punten_buitenkruin')
+
+
+
+# arcpy.MakeFeatureLayer_management(invoer, 'punten_binnenteen_temp')
+# punten_bit = arcpy.SelectLayerByAttribute_management('punten_binnenteen_temp', "ADD_TO_SELECTION",
+#                                                      "OBJECTID in (" + str(list_id_bit)[1:-1] + ")")
+# arcpy.CopyFeatures_management('punten_binnenteen_temp', 'punten_binnenteen')
