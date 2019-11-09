@@ -23,20 +23,17 @@ raster = 'ahn3clip_test'
 
 
 def knip_sloten(profielen,slootlijn):
-    # intersect op snijpunten met gridlijnen
-    intersects = [profielen,contour_ahn]
-    arcpy.Intersect_analysis(intersects, 'knip_sloten_punt', "", 0, "point")
-    # knip profiellijnen met intersects
-
-    searchRadius = "0.2 Meters"
-    arcpy.SplitLineAtPoint_management(profielen, 'knip_sloten_punt', 'knip_profielen', searchRadius)
-
     # verwijder profiel indien middelpunt op niet-nan data ligt
-    arcpy.Intersect_analysis([profielen,slootlijn], 'middelpunten_profielen', "", 0.5, "point")
+    existing_fields = arcpy.ListFields(profielen)
+    needed_fields = ['RASTERVALU']
+    for field in existing_fields:
+        if field.name in needed_fields:
+            arcpy.DeleteField_management(profielen, field.name)
+    arcpy.Intersect_analysis([profielen, slootlijn], 'middelpunten_profielen', "", 0.5, "point")
 
     arcpy.FeatureToPoint_management('middelpunten_profielen', 'middelpunten_profielen_', "CENTROID")
     ExtractValuesToPoints('middelpunten_profielen_', raster, 'middelpunten_profielen_z', "INTERPOLATE", "VALUE_ONLY")
-    arcpy.JoinField_management(profielen, "profielnummer", "middelpunten_profielen_z", "profielnummer",["RASTERVALU"])
+    arcpy.JoinField_management(profielen, "profielnummer", "middelpunten_profielen_z", "profielnummer", ["RASTERVALU"])
 
     with arcpy.da.UpdateCursor(profielen, ['RASTERVALU']) as cursor:
         for row in cursor:
@@ -45,11 +42,25 @@ def knip_sloten(profielen,slootlijn):
             else:
                 continue
 
+
+    # intersect op snijpunten met gridlijnen
+    intersects = [profielen,contour_ahn]
+    arcpy.Intersect_analysis(intersects, 'knip_sloten_punt', "", 0, "point")
+    # knip profiellijnen met intersects
+
+    searchRadius = "0.2 Meters"
+    arcpy.SplitLineAtPoint_management(profielen, 'knip_sloten_punt', 'knip_profielen', searchRadius)
+
+
+
     # selecteer lijndeel dat intersect met sloten
     arcpy.MakeFeatureLayer_management('knip_profielen', 'knip_profielen_temp')
     arcpy.SelectLayerByLocation_management('knip_profielen_temp', 'intersect', slootlijn)
     arcpy.CopyFeatures_management('knip_profielen_temp', 'slootbreedtes')
 
+    # bereken gemiddelde breedte
+    # koppel gemiddelde breedte aan sloot
+    # smooth contourlines?
 
 
 profielen = 'profielen_sloot_16'
