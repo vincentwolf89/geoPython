@@ -14,7 +14,7 @@ arcpy.env.overwriteOutput = True
 
 arcpy.env.workspace = r'D:\Projecten\WSRL\werk.gdb'
 
-sloten = 'waterlopen_test'
+sloten = 'waterlopen_test_2'
 contour_ahn = 'smooth_contour_2m'
 profiel_interval = 10
 profiel_lengte_land = 10
@@ -192,16 +192,16 @@ def knip_sloten_test(profielen,slootlijn,code):
         pass
 
 
-def koppel_gem_lengtes():
-    existing_fields = arcpy.ListFields('waterlopen_test')
+def koppel_gem_lengtes(sloten):
+    existing_fields = arcpy.ListFields(sloten)
     needed_fields = ['gem_breedte']
     for field in existing_fields:
         if field.name in needed_fields:
-            arcpy.DeleteField_management('waterlopen_test', field.name)
+            arcpy.DeleteField_management(sloten, field.name)
 
-    arcpy.AddField_management('waterlopen_test', "gem_breedte", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.AddField_management(sloten, "gem_breedte", "DOUBLE", 2, field_is_nullable="NULLABLE")
 
-    with arcpy.da.UpdateCursor('waterlopen_test', ['sloot_id', 'gem_breedte']) as cursor:
+    with arcpy.da.UpdateCursor(sloten, ['sloot_id', 'gem_breedte']) as cursor:
         for row in cursor:
             slootnummer = row[0]
             for i, row in df_breedtes.iterrows():
