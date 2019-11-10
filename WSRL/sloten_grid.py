@@ -15,13 +15,13 @@ arcpy.env.overwriteOutput = True
 arcpy.env.workspace = r'D:\Projecten\WSRL\werk.gdb'
 
 sloten = 'waterlopen_test'
-contour_ahn = 'contour_test'
+contour_ahn = 'smooth_contour_2m'
 profiel_interval = 10
 profiel_lengte_land = 10
 profiel_lengte_rivier = 10
 min_breedte = 0.6
 raster = 'ahn3clip_test'
-dct_sloot = {}
+df_breedtes = pd.DataFrame(columns=['sloot_id', 'gem_breedte'])
 factor_lengte = 0.5
 
 def knip_sloten(profielen,slootlijn,code):
@@ -186,7 +186,7 @@ def knip_sloten_test(profielen,slootlijn,code):
                 if row[1] is None or row[1] > bovengrens:
                     cursor.deleteRow()
                 else:
-                    dct_sloot[row[0]]= row[1]
+                    df_breedtes.loc[row[0]] = row[0], gemiddelde
                     continue
     except NameError:
         pass
@@ -203,10 +203,12 @@ def koppel_gem_lengtes():
 
     with arcpy.da.UpdateCursor('waterlopen_test', ['sloot_id', 'gem_breedte']) as cursor:
         for row in cursor:
-            if row[0] in dct_sloot:
-                row[1] = dct_sloot[row[1]]
-            else:
-                dct_sloot[row[0]] = row[1]
+            slootnummer = row[0]
+            for i, row in df_breedtes.iterrows():
+                if row['sloot_id'] == slootnummer:
+                    row[1] = round(row['gem_breedte'], 2)
+                    cursor.updateRow(row)
+
 
 
 
@@ -236,7 +238,11 @@ def iterate_sloten():
             knip_sloten_test(profielen,slootlijn,code)
 
 
-# profielen = 'profielen_sloot_18'
-# slootlijn = 'sloot_18'
+# profielen = 'profielen_sloot_52'
+# slootlijn = 'sloot_52'
 # code = 'sloot_id'
-# # knip_sloten_test(profielen,slootlijn,code)
+# knip_sloten_test(profielen,slootlijn,code)
+
+iterate_sloten()
+koppel_gem_lengtes()
+# print df_breedtes
