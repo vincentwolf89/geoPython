@@ -504,6 +504,7 @@ def max_kruinhoogte(uitvoerpunten,profielen,code,uitvoer_maxpunten):
             # als rolling mean aanwezig is: opbouwen van dataframe
             if type(max_groep) is not float:
                 # koppel_id voor OBJECTID puntenlaag
+                ## inbouwen maximale afstand tot referentielijn? (if idxmax-afstand loop)
                 id_midden_max = groep_binnen_profiel.loc[groep_binnen_profiel['middelpunt_max'].idxmax(), 'OBJECTID']
                 # maximale kruinhoogte (rolling mean)
                 max_kruin = max_groep
@@ -622,7 +623,7 @@ def generate_profiles(profiel_interval,profiel_lengte_land,profiel_lengte_rivier
     print 'profielen gemaakt op trajectlijn'
 
 
-def kruinbepalen(invoer, code, uitvoer_binnenkruin, uitvoer_buitenkruin):
+def kruinbepalen(invoer, code, uitvoer_binnenkruin, uitvoer_buitenkruin,verschil_maxkruin):
     array = arcpy.da.FeatureClassToNumPyArray(invoer, ('OBJECTID', 'profielnummer', code, 'afstand', 'z_ahn'))
     df = pd.DataFrame(array)
     df2 = df.dropna()
@@ -634,7 +635,6 @@ def kruinbepalen(invoer, code, uitvoer_binnenkruin, uitvoer_buitenkruin):
 
     afstand_bik = 5
     afstand_buk = -5
-    afstand_maxkruin = 0.2
 
     for name, group in grouped:
         # maximale kruinhoogte
@@ -645,7 +645,7 @@ def kruinbepalen(invoer, code, uitvoer_binnenkruin, uitvoer_buitenkruin):
 
         # bik
         for index, row in landzijde.iterrows():
-            if row['z_ahn'] > max_kruin - afstand_maxkruin and row['afstand'] < afstand_bik and row['afstand'] > 0:
+            if row['z_ahn'] > max_kruin - verschil_maxkruin and row['afstand'] < afstand_bik and row['afstand'] > 0:
                 x_bik = row['afstand']
                 y_bik = row['z_ahn']
                 list_id_bik.append(row['OBJECTID'])
@@ -653,7 +653,7 @@ def kruinbepalen(invoer, code, uitvoer_binnenkruin, uitvoer_buitenkruin):
 
         # buk
         for index, row in rivierzijde.iterrows():
-            if row['z_ahn'] > max_kruin - afstand_maxkruin and row['afstand'] > afstand_buk and row['afstand'] < 0:
+            if row['z_ahn'] > max_kruin - verschil_maxkruin and row['afstand'] > afstand_buk and row['afstand'] < 0:
                 x_buk = row['afstand']
                 y_buk = row['z_ahn']
                 list_id_buk.append(row['OBJECTID'])
