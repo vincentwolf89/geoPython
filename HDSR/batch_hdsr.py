@@ -19,9 +19,13 @@ stapgrootte_punten = 0.5
 profiel_lengte_land = 20
 profiel_lengte_rivier = 10
 afronding = 1
+min_afstand = -5
+max_afstand = 5
 raster = r'D:\Projecten\HDSR\data\ahn_hdsr.gdb\AHN3grondfilter'
 code = 'SUBSECT_ID'
 trajecten = 'trajecten_voorbeeld'
+# specifieke invoer bepaling bit/but
+verschil_maxkruin = 0.2
 
 
 with arcpy.da.SearchCursor(trajecten,['SHAPE@','SUBSECT_ID']) as cursor:
@@ -41,7 +45,7 @@ with arcpy.da.SearchCursor(trajecten,['SHAPE@','SUBSECT_ID']) as cursor:
         # selecteer betreffend traject
         arcpy.Select_analysis(trajecten, trajectlijn, where)
 
-        doorlopen stappen
+        # doorlopen stappen
         generate_profiles(profiel_interval, profiel_lengte_land, profiel_lengte_rivier, trajectlijn, code, profielen)
         copy_trajectory_lr(trajectlijn, code)
         set_measurements_trajectory(profielen, trajectlijn, code, stapgrootte_punten)
@@ -49,5 +53,5 @@ with arcpy.da.SearchCursor(trajecten,['SHAPE@','SUBSECT_ID']) as cursor:
         add_xy(uitvoerpunten, code)
         to_excel(uitvoerpunten, resultfile)
         kruinhoogte_groepen(uitvoerpunten, stapgrootte_punten, afronding, code)
-        max_kruinhoogte(uitvoerpunten, profielen, code,uitvoer_maxpunten)
-        kruinbepalen(uitvoerpunten,code,uitvoer_binnenkruin,uitvoer_buitenkruin)
+        max_kruinhoogte_test(uitvoerpunten, profielen, code,uitvoer_maxpunten,min_afstand,max_afstand)
+        kruinbepalen(uitvoerpunten,code,uitvoer_binnenkruin,uitvoer_buitenkruin,verschil_maxkruin)
