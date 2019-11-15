@@ -505,11 +505,14 @@ def max_kruinhoogte(uitvoerpunten,profielen,code,uitvoer_maxpunten):
             if type(max_groep) is not float:
                 # koppel_id voor OBJECTID puntenlaag
                 ## inbouwen maximale afstand tot referentielijn? (if idxmax-afstand loop)
+
                 id_midden_max = groep_binnen_profiel.loc[groep_binnen_profiel['middelpunt_max'].idxmax(), 'OBJECTID']
+
                 # maximale kruinhoogte (rolling mean)
                 max_kruin = max_groep
                 # vul dataframe van het profiel aan met max-waardes
                 df_profiel.loc[id_midden_max] = name, max_kruin
+
 
         # print df_profiel
 
@@ -558,8 +561,88 @@ def max_kruinhoogte(uitvoerpunten,profielen,code,uitvoer_maxpunten):
                 cursor.deleteRow()
 
 
+def max_kruinhoogte_test(uitvoerpunten, profielen, code, uitvoer_maxpunten,min_afstand,max_afstand):
+    # feature class to numpy array
+    array = arcpy.da.FeatureClassToNumPyArray(uitvoerpunten,
+                                              ('OBJECTID', 'profielnummer', code, 'afstand', 'z_ahn', 'groep'))
+    # dataframe, algemeen
+    df = pd.DataFrame(array)
+    sorted = df.sort_values(['profielnummer', 'afstand'], ascending=[True, True])
+
+    # dataframe voor maximale kruinhoogtes over 1.5m voor alle profielen
+    df_maxwaardes = pd.DataFrame(columns=['profielnummer', 'max_kruinhoogte'])
+
+    # sorteer op profielnummer
+    groep_profiel = sorted.groupby('profielnummer')
+
+    # itereer over profielen
+    for name, groep in groep_profiel:
+        # dataframe voor maximale kruinhoogtes over 1.5 m voor alle groepen per profiel
+        df_profiel = pd.DataFrame(columns=['profielnummer', 'max_kruinhoogte'])
+        df_profiel_tester = pd.DataFrame(columns=['profielnummer', 'max_kruinhoogte'])
+        # itereer over groepen binnen profielen
+        groep_punten = groep.groupby(["groep"])
+
+        for groep, groep_binnen_profiel in groep_punten:
+            # bepaal gemiddelde kruinhoogte over 1.5 m(3 meetpunten), extra kolom 'max_kr'
+            groep_binnen_profiel['max_kr'] = groep_binnen_profiel.iloc[:, 4].rolling(window=3).mean()
+            # shift kolom 'max_kr' om middenpunt voor ieder rolling mean te verkrijgen (punt 2 van 3 meetpunten)
+            groep_binnen_profiel['middelpunt_max'] = groep_binnen_profiel['max_kr'].shift(-1)
+
+            # zoeken naar middelpunt rolling mean voor maken centerline max_kruinhoogte
 
 
+            for i, row in groep_binnen_profiel.iterrows():
+                afstand = row['afstand']
+                if afstand > min_afstand and afstand < max_afstand:
+                    df_profiel_tester.loc[row['OBJECTID']] = name, row['middelpunt_max']
+        if df_profiel_tester.empty == True:
+            pass
+        else:
+            df_profielmax = df_profiel_tester.max()[1]
+            id_df_profielmax = df_profiel_tester.idxmax()[1]
+            df_profiel.loc[id_df_profielmax] = name, df_profielmax
+
+        # check of profiel een maximale kruinhoogte heeft
+        if df_profiel.empty == True:
+            pass
+        else:
+            kr_max = df_profiel['max_kruinhoogte'].max()
+            OID_max = df_profiel['max_kruinhoogte'].idxmax()
+
+            df_maxwaardes.loc[OID_max] = name, kr_max
+
+    # print per profiel de gevonden resultaten
+    print df_maxwaardes
+
+    # update profielen met maximale kruinhoogte
+    existing_fields = arcpy.ListFields(profielen)
+    needed_fields = ['OBJECTID', 'SHAPE', 'SHAPE_Length', 'Shape_Length', 'Shape', 'profielnummer', code]
+    for field in existing_fields:
+        if field.name not in needed_fields:
+            arcpy.DeleteField_management(profielen, field.name)
+
+    # voeg veld voor maximale kruinhoogte toe aan lijn-laag profielen
+    arcpy.AddField_management(profielen, "max_kruinhoogte", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    with arcpy.da.UpdateCursor(profielen, ['profielnummer', 'max_kruinhoogte']) as cursor:
+        for row in cursor:
+            profielnummer = row[0]
+            for i, row in df_maxwaardes.iterrows():
+                if row['profielnummer'] == profielnummer:
+                    row[1] = round(row['max_kruinhoogte'], 2)
+                    cursor.updateRow(row)
+
+    # genereer puntenlijn met maximale gemiddelde kruinhoogte
+    arcpy.CopyFeatures_management(uitvoerpunten, uitvoer_maxpunten)
+    list_oid = df_maxwaardes.index.values.tolist()
+
+    # selecteer middelpunten maximale kruinhoogte over 1.5 m
+    with arcpy.da.UpdateCursor(uitvoer_maxpunten, ("OBJECTID")) as cursor:
+        for row in cursor:
+            if row[0] in list_oid:
+                pass
+            else:
+                cursor.deleteRow()
 
 
 def generate_profiles(profiel_interval,profiel_lengte_land,profiel_lengte_rivier,trajectlijn,code,profielen):
