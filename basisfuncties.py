@@ -283,7 +283,7 @@ def add_xy(uitvoerpunten,code):
 
     print "x and y added"
 
-def to_excel(uitvoerpunten,resultfile):
+def to_excel(uitvoerpunten,resultfile,sorteervelden):
 
 
     fields = ['profielnummer', 'afstand', 'z_ahn', 'x', 'y']
@@ -292,8 +292,7 @@ def to_excel(uitvoerpunten,resultfile):
     list_z_ahn = []
     list_x = []
     list_y =[]
-
-    with arcpy.da.SearchCursor(uitvoerpunten, fields) as cur:
+    with arcpy.da.SearchCursor(uitvoerpunten, fields,'#', '#', sorteervelden) as cur:
         for row in cur:
             if row[2] is None:
                 pass
