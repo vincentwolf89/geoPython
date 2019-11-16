@@ -6,6 +6,7 @@ from arcpy.sa import *
 import xlwt
 import pandas as pd
 from itertools import groupby
+from xlsxwriter.workbook import Workbook
 # uitzetten melding pandas
 pd.set_option('mode.chained_assignment', None)
 
@@ -611,6 +612,7 @@ def max_kruinhoogte_test(uitvoerpunten, profielen, code, uitvoer_maxpunten,min_a
 
             df_maxwaardes.loc[OID_max] = name, kr_max
 
+
     # print per profiel de gevonden resultaten
     print df_maxwaardes
 
@@ -850,3 +852,85 @@ def kruinbepalen(invoer, code, uitvoer_binnenkruin, uitvoer_buitenkruin,verschil
     # punten_bit = arcpy.SelectLayerByAttribute_management('punten_binnenteen_temp', "ADD_TO_SELECTION",
     #                                                      "OBJECTID in (" + str(list_id_bit)[1:-1] + ")")
     # arcpy.CopyFeatures_management('punten_binnenteen_temp', 'punten_binnenteen')
+
+def excel_writer(uitvoerpunten,code,excel,id):
+    # binnenhalen van dataframe
+    array = arcpy.da.FeatureClassToNumPyArray(uitvoerpunten,('OBJECTID', 'profielnummer', code, 'afstand', 'z_ahn', 'x', 'y'))
+
+    df = pd.DataFrame(array)
+    df = df.dropna()
+    sorted = df.sort_values(['profielnummer', 'afstand'], ascending=[True, True])
+
+    # opbouw xlsx
+    workbook = Workbook(excel)
+    worksheet = workbook.add_worksheet()
+
+    # stijl toevoegen voor headers
+    bold = workbook.add_format({'bold': True})
+
+
+    # schrijf kolomnamen
+    worksheet.write(0, 0, "Profielnummer", bold)
+    worksheet.write(0, 1, "Afstand [m]", bold)
+    worksheet.write(0, 2, "Hoogte AHN3 [m NAP]", bold)
+    worksheet.write(0, 3, "x [RD]", bold)
+    worksheet.write(0, 4, "y [RD]", bold)
+
+    # schrijf kolommen vanuit df
+    worksheet.write_column('A2', sorted['profielnummer'])
+    worksheet.write_column('B2', sorted['afstand'])
+    worksheet.write_column('C2', sorted['z_ahn'])
+    worksheet.write_column('D2', sorted['x'])
+    worksheet.write_column('E2', sorted['y'])
+
+    # groepeer per profielnummer
+    grouped = sorted.groupby('profielnummer')
+
+    # definieer startrij
+    startpunt = 2
+
+
+    # lege lijngrafiek invoegen met zowel afstand als hoogte als invoer
+    line_chart1 = workbook.add_chart({'type': 'scatter',
+                                 'subtype': 'straight'})
+
+    # lijnen toevoegen aan lijngrafiek
+    count = 0
+    for name, group in grouped:
+        profielnaam = str(int(name))
+        meetpunten = len(group['profielnummer'])
+
+        # eerste profiel
+        if count == 0:
+            line_chart1.add_series({
+                'name': 'profiel ' + profielnaam,
+
+                'categories': '=Sheet1!B' + str(startpunt) + ':B' + str(meetpunten + 1),
+                'values': '=Sheet1!C' + str(startpunt) + ':C' + str(meetpunten + 1),
+                'line': {'width': 1}
+            })
+            count +=1
+        # opvolgende profielen
+        else:
+            if count is not 0:
+                line_chart1.add_series({
+                    'name': 'profiel '+profielnaam,
+
+                    'categories': '=Sheet1!B'+str(startpunt)+':B' + str(startpunt+meetpunten-1),
+                    'values':     '=Sheet1!C'+str(startpunt)+':C' + str(startpunt+meetpunten-1),
+                    'line': {'width': 1}
+                })
+        # startpunt verzetten
+        startpunt += (meetpunten)
+
+
+    # kolommen aanpassen
+    line_chart1.set_title({'name': 'Overzicht profielen '+id})
+    line_chart1.set_x_axis({'name': 'Afstand [m]'})
+    line_chart1.set_y_axis({'name': 'Hoogte [m NAP]'})
+    line_chart1.set_x_axis({'interval_tick': 0.5})
+    line_chart1.set_x_axis({'min': -10, 'max': 20})
+    line_chart1.set_size({'width': 1000, 'height': 400})
+    # line_chart1.set_style(1)
+    worksheet.insert_chart('G3', line_chart1)
+    workbook.close()
