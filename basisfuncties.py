@@ -939,7 +939,7 @@ def excel_writer(uitvoerpunten,code,excel,id):
 
 
 def binnenteenbepalen(invoer, code, min_achterland, max_achterland, uitvoer_binnenteen, min_afstand,
-                      max_afstand):
+                      max_afstand,uitvoer_binnenkruin):
     array = arcpy.da.FeatureClassToNumPyArray(invoer, ('OBJECTID', 'profielnummer', code, 'afstand', 'z_ahn'))
     df = pd.DataFrame(array)
     df2 = df.dropna()
@@ -949,7 +949,19 @@ def binnenteenbepalen(invoer, code, min_achterland, max_achterland, uitvoer_binn
     # lijst OBJECTIDs
     list_id_bit = []
 
+    # binnenhalen binnenkruindata
+    array_bik = arcpy.da.FeatureClassToNumPyArray(uitvoer_binnenkruin, ('OBJECTID', 'profielnummer', code, 'afstand', 'z_ahn'))
+    df_bik = pd.DataFrame(array_bik)
+
+    # print df_bik
+    # print(df_bik.loc[df_bik['afstand'] == 4.5])
+
     for name, group in grouped:
+
+        bik_afstand = df_bik.loc[df_bik['profielnummer'] == name, 'afstand']
+        for item in bik_afstand.values:
+            bik = item
+
         # maximale kruinhoogte
         max_kruin = max(group['z_ahn'])
         landzijde = group.sort_values(['afstand'], ascending=False)  # afnemend, landzijde
@@ -998,11 +1010,20 @@ def binnenteenbepalen(invoer, code, min_achterland, max_achterland, uitvoer_binn
         df['max_talud'] = df.iloc[:, 7].rolling(window=3).mean()
         df['next_max_talud'] = df['max_talud'].shift(-1)
 
+
+        # for index, row in df.iterrows():
+        #     print df_bik.loc['afstand']
+            # if df_bik.loc[df_bik['afstand'] == row['afstand']]:
+            #     print row['afstand']
+            # afstand = row['afstand']
+            # if afstand > min_afstand and afstand < max_afstand:
+            #     df_profiel_tester.loc[row['OBJECTID']] = name, row['middelpunt_max']
+
         try:
             mv_dijk, mv_achterland
             for index, row in df.iterrows():
                 if mv_dijk > mv_achterland and row['afstand'] - row['next_afstand'] <= 2 and row['afstand'] > 3 and \
-                        row['next_max_talud'] < row['max_talud']:
+                        row['next_max_talud'] < row['max_talud'] and row['afstand'] > bik:
                     list_id_bit.append(row['OBJECTID'])
                     # ax.plot(row['next_afstand'], row['next_z'], 'o', markersize=12)
                     break
