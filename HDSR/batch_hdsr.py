@@ -49,15 +49,15 @@ with arcpy.da.SearchCursor(trajecten,['SHAPE@','SUBSECT_ID']) as cursor:
         # selecteer betreffend traject
         arcpy.Select_analysis(trajecten, trajectlijn, where)
 
-        doorlopen stappen
-        generate_profiles(profiel_interval, profiel_lengte_land, profiel_lengte_rivier, trajectlijn, code, profielen)
-        copy_trajectory_lr(trajectlijn, code)
-        set_measurements_trajectory(profielen, trajectlijn, code, stapgrootte_punten)
-        extract_z_arcpy(invoerpunten, uitvoerpunten, raster)
-        add_xy(uitvoerpunten, code)
-        # to_excel(uitvoerpunten, resultfile,sorteervelden='profielnummer A; afstand A')
-        excel_writer(uitvoerpunten, code, excel, id)
-        kruinhoogte_groepen(uitvoerpunten, stapgrootte_punten, afronding, code)
-        max_kruinhoogte_test(uitvoerpunten, profielen, code,uitvoer_maxpunten,min_afstand,max_afstand)
-        kruinbepalen(uitvoerpunten,code,uitvoer_binnenkruin,uitvoer_buitenkruin,verschil_maxkruin,min_afstand,max_afstand)
-        binnenteenbepalen(uitvoerpunten, code, min_achterland, max_achterland, uitvoer_binnenteen, min_afstand,max_afstand)
+        # doorlopen stappen
+        # generate_profiles(profiel_interval, profiel_lengte_land, profiel_lengte_rivier, trajectlijn, code, profielen)
+        # copy_trajectory_lr(trajectlijn, code)
+        # set_measurements_trajectory(profielen, trajectlijn, code, stapgrootte_punten)
+        # extract_z_arcpy(invoerpunten, uitvoerpunten, raster)
+        # add_xy(uitvoerpunten, code)
+        # # to_excel(uitvoerpunten, resultfile,sorteervelden='profielnummer A; afstand A')
+        # excel_writer(uitvoerpunten, code, excel, id)
+        # kruinhoogte_groepen(uitvoerpunten, stapgrootte_punten, afronding, code)
+        # max_kruinhoogte_test(uitvoerpunten, profielen, code,uitvoer_maxpunten,min_afstand,max_afstand)
+        # kruinbepalen(uitvoerpunten,code,uitvoer_binnenkruin,uitvoer_buitenkruin,verschil_maxkruin,min_afstand,max_afstand)
+        binnenteenbepalen(uitvoerpunten, code, min_achterland, max_achterland, uitvoer_binnenteen, min_afstand,max_afstand,uitvoer_binnenkruin)
