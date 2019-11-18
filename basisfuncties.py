@@ -7,6 +7,7 @@ import xlwt
 import pandas as pd
 from itertools import groupby
 from xlsxwriter.workbook import Workbook
+import matplotlib.pyplot as plt
 # uitzetten melding pandas
 pd.set_option('mode.chained_assignment', None)
 
@@ -707,7 +708,7 @@ def generate_profiles(profiel_interval,profiel_lengte_land,profiel_lengte_rivier
     print 'profielen gemaakt op trajectlijn'
 
 
-def kruinbepalen(invoer, code, uitvoer_binnenkruin, uitvoer_buitenkruin,verschil_maxkruin):
+def kruinbepalen(invoer, code, uitvoer_binnenkruin, uitvoer_buitenkruin,verschil_maxkruin,min_afstand,max_afstand):
     array = arcpy.da.FeatureClassToNumPyArray(invoer, ('OBJECTID', 'profielnummer', code, 'afstand', 'z_ahn'))
     df = pd.DataFrame(array)
     df2 = df.dropna()
@@ -717,8 +718,8 @@ def kruinbepalen(invoer, code, uitvoer_binnenkruin, uitvoer_buitenkruin,verschil
     list_id_bik = []
     list_id_buk = []
 
-    afstand_bik = 5
-    afstand_buk = -5
+    afstand_bik = max_afstand
+    afstand_buk = min_afstand
 
     for name, group in grouped:
         # maximale kruinhoogte
@@ -853,6 +854,7 @@ def kruinbepalen(invoer, code, uitvoer_binnenkruin, uitvoer_buitenkruin,verschil
     #                                                      "OBJECTID in (" + str(list_id_bit)[1:-1] + ")")
     # arcpy.CopyFeatures_management('punten_binnenteen_temp', 'punten_binnenteen')
 
+    print 'kruin bepaald'
 def excel_writer(uitvoerpunten,code,excel,id):
     # binnenhalen van dataframe
     array = arcpy.da.FeatureClassToNumPyArray(uitvoerpunten,('OBJECTID', 'profielnummer', code, 'afstand', 'z_ahn', 'x', 'y'))
@@ -934,3 +936,104 @@ def excel_writer(uitvoerpunten,code,excel,id):
     # line_chart1.set_style(1)
     worksheet.insert_chart('G3', line_chart1)
     workbook.close()
+
+
+def binnenteenbepalen(invoer, code, min_achterland, max_achterland, uitvoer_binnenteen, min_afstand,
+                      max_afstand):
+    array = arcpy.da.FeatureClassToNumPyArray(invoer, ('OBJECTID', 'profielnummer', code, 'afstand', 'z_ahn'))
+    df = pd.DataFrame(array)
+    df2 = df.dropna()
+    sorted = df2.sort_values(['profielnummer', 'afstand'], ascending=[True, True])
+    grouped = sorted.groupby('profielnummer')
+
+    # lijst OBJECTIDs
+    list_id_bit = []
+
+    for name, group in grouped:
+        # maximale kruinhoogte
+        max_kruin = max(group['z_ahn'])
+        landzijde = group.sort_values(['afstand'], ascending=False)  # afnemend, landzijde
+        rivierzijde = group.sort_values(['afstand'], ascending=True)  # toenemend, rivierzijde
+
+        # maaiveldhoogte dijk
+        mv_dijk_lijst = []
+        for index, row in landzijde.iterrows():
+            if row['afstand'] > min_afstand and row['afstand'] < max_afstand:
+                mv_dijk_lijst.append(row['z_ahn'])
+
+        if mv_dijk_lijst:
+            mv_dijk = average(mv_dijk_lijst)
+            # print mv_dijk
+
+        # maaiveldhoogte achterland
+        mv_achterland_lijst = []
+        for index, row in landzijde.iterrows():
+            if row['afstand'] > min_achterland and row['afstand'] < max_achterland:
+                mv_achterland_lijst.append(row['z_ahn'])
+
+        if mv_achterland_lijst:
+            mv_achterland = average(mv_achterland_lijst)
+            # print mv_achterland
+
+        x1 = group['afstand']
+        y1 = group['z_ahn']
+
+        # extra, toevoegen indien nodig
+        # f = interp1d(x1, y1, kind='linear')
+        # x_new = np.linspace(min(x1), max(x1), 200)
+
+        # plot, standaard uit
+        # fig = plt.figure(figsize=(25, 2))
+        # ax = fig.add_subplot(111)
+        # ax.plot(x1, y1, linewidth=2, color="red")
+        # ax.plot(x_new, f(x_new), linewidth=2, color="blue")
+        # ax.plot(x_new, f(x_new), 'o', color="blue")
+        # ax.plot(x1, y1, 'o', color="red")
+
+        # aanpassen van dataframe voor bepaling binnenteen
+        df = rivierzijde
+        df['next_afstand'] = df['afstand'].shift(-1)
+        df['next_z'] = df['z_ahn'].shift(-1)
+        df['talud'] = abs((df['z_ahn'] - df['next_z']) / (df['afstand'] - df['next_afstand']))
+        df['max_talud'] = df.iloc[:, 7].rolling(window=3).mean()
+        df['next_max_talud'] = df['max_talud'].shift(-1)
+
+        try:
+            mv_dijk, mv_achterland
+            for index, row in df.iterrows():
+                if mv_dijk > mv_achterland and row['afstand'] - row['next_afstand'] <= 2 and row['afstand'] > 3 and \
+                        row['next_max_talud'] < row['max_talud']:
+                    list_id_bit.append(row['OBJECTID'])
+                    # ax.plot(row['next_afstand'], row['next_z'], 'o', markersize=12)
+                    break
+        except NameError:
+            list_id_bit = []
+
+
+        # extra, knikpunten o.b.v. RDP
+        # tolerance = 0.1
+        # min_angle = np.pi * 0.02
+        # points = np.c_[x1, y1]
+        # simplified_trajectory = np.array(rdp.rdp(points.tolist(), tolerance))
+        # sx, sy = simplified_trajectory.T
+
+        # vectoren berekenen
+        # directions = np.diff(simplified_trajectory, axis=0)
+        # theta = angle(directions)
+
+        # selecteer index van punten met grootste theta, hoge theta > maximale verandering in richting
+        # idx = np.where(theta > min_angle)[0] + 1
+
+        # plot knikpunten met versimpeld profiel
+
+        # ax.plot(sx, sy, 'gx-', label='simplified trajectory')
+        # ax.plot(sx[idx], sy[idx], 'ro', markersize=10, label='turning points'
+
+        # plt.show()
+
+    # wegschrijven naar gis
+    arcpy.MakeFeatureLayer_management(invoer, 'punten_binnenteen_temp')
+    punten_bit = arcpy.SelectLayerByAttribute_management('punten_binnenteen_temp', "ADD_TO_SELECTION",
+                                                         "OBJECTID in (" + str(list_id_bit)[1:-1] + ")")
+    arcpy.CopyFeatures_management('punten_binnenteen_temp', uitvoer_binnenteen)
+    print 'binnenteen bepaald'
