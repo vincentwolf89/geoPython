@@ -255,7 +255,7 @@ with arcpy.da.UpdateCursor(watergangen, ['SHAPE@', code_waterloop,'SHAPE@LENGTH'
 
 
             arcpy.Merge_management([profielen_a, profielen_b], profielen)
-            arcpy.Delete_management(profielen_a,profielen_b)
-
+            arcpy.Delete_management(profielen_a)
+            arcpy.Delete_management(profielen_b)
 
 
