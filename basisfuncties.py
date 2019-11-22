@@ -113,10 +113,10 @@ def copy_trajectory_lr(trajectlijn,code):
             cursor.updateRow((RightLine, w))
     print "river and land parts created"
 
-def set_measurements_trajectory(profielen,trajectlijn,code,stapgrootte_punten): #rechts = rivier, profielen van binnen naar buiten
+def set_measurements_trajectory(profielen,trajectlijn,code,stapgrootte_punten,toetspeil): #rechts = rivier, profielen van binnen naar buiten
     # clean feature
     existing_fields = arcpy.ListFields(profielen)
-    needed_fields = ['OBJECTID', 'SHAPE', 'SHAPE_Length','Shape','Shape_Length',code]
+    needed_fields = ['OBJECTID', 'SHAPE', 'SHAPE_Length','Shape','Shape_Length',code,toetspeil]
     for field in existing_fields:
         if field.name not in needed_fields:
             arcpy.DeleteField_management(profielen, field.name)
@@ -472,7 +472,7 @@ def kruinhoogte_groepen(uitvoerpunten,stapgrootte_punten,afronding,code):
 
 
 
-def max_kruinhoogte(uitvoerpunten,profielen,code,uitvoer_maxpunten):
+def max_kruinhoogte(uitvoerpunten,profielen,code,uitvoer_maxpunten,toetspeil):
     # feature class to numpy array
     array = arcpy.da.FeatureClassToNumPyArray(uitvoerpunten, ('OBJECTID', 'profielnummer', code, 'afstand', 'z_ahn','groep'))
     # dataframe, algemeen
@@ -533,7 +533,7 @@ def max_kruinhoogte(uitvoerpunten,profielen,code,uitvoer_maxpunten):
 
     # update profielen met maximale kruinhoogte
     existing_fields = arcpy.ListFields(profielen)
-    needed_fields = ['OBJECTID', 'SHAPE', 'SHAPE_Length','Shape_Length','Shape','profielnummer', code]
+    needed_fields = ['OBJECTID', 'SHAPE', 'SHAPE_Length','Shape_Length','Shape','profielnummer', code, toetspeil]
     for field in existing_fields:
         if field.name not in needed_fields:
             arcpy.DeleteField_management(profielen, field.name)
@@ -562,7 +562,7 @@ def max_kruinhoogte(uitvoerpunten,profielen,code,uitvoer_maxpunten):
                 cursor.deleteRow()
 
 
-def max_kruinhoogte_test(uitvoerpunten, profielen, code, uitvoer_maxpunten,min_afstand,max_afstand):
+def max_kruinhoogte_test(uitvoerpunten, profielen, code, uitvoer_maxpunten,min_afstand,max_afstand,toetspeil):
     # feature class to numpy array
     array = arcpy.da.FeatureClassToNumPyArray(uitvoerpunten,
                                               ('OBJECTID', 'profielnummer', code, 'afstand', 'z_ahn', 'groep'))
@@ -619,7 +619,7 @@ def max_kruinhoogte_test(uitvoerpunten, profielen, code, uitvoer_maxpunten,min_a
 
     # update profielen met maximale kruinhoogte
     existing_fields = arcpy.ListFields(profielen)
-    needed_fields = ['OBJECTID', 'SHAPE', 'SHAPE_Length', 'Shape_Length', 'Shape', 'profielnummer', code]
+    needed_fields = ['OBJECTID', 'SHAPE', 'SHAPE_Length', 'Shape_Length', 'Shape', 'profielnummer', code,toetspeil]
     for field in existing_fields:
         if field.name not in needed_fields:
             arcpy.DeleteField_management(profielen, field.name)
@@ -647,7 +647,7 @@ def max_kruinhoogte_test(uitvoerpunten, profielen, code, uitvoer_maxpunten,min_a
                 cursor.deleteRow()
 
 
-def generate_profiles(profiel_interval,profiel_lengte_land,profiel_lengte_rivier,trajectlijn,code,profielen):
+def generate_profiles(profiel_interval,profiel_lengte_land,profiel_lengte_rivier,trajectlijn,code,toetspeil,profielen):
     # traject to points
     arcpy.GeneratePointsAlongLines_management(trajectlijn, 'traject_punten', 'DISTANCE', Distance=profiel_interval, Include_End_Points='END_POINTS')
     arcpy.AddField_management('traject_punten', "profielnummer", "DOUBLE", 2, field_is_nullable="NULLABLE")
@@ -661,7 +661,7 @@ def generate_profiles(profiel_interval,profiel_lengte_land,profiel_lengte_rivier
     # arcpy.CreateRoutes_lr(trajectlijn, code, "route_traject", "LENGTH", "", "", "UPPER_LEFT", "1", "0", "IGNORE", "INDEX")
 
     existing_fields = arcpy.ListFields(trajectlijn)
-    needed_fields = ['OBJECTID', 'SHAPE', 'SHAPE_Length','Shape','Shape_Length',code]
+    needed_fields = ['OBJECTID', 'SHAPE', 'SHAPE_Length','Shape','Shape_Length',code,toetspeil]
     for field in existing_fields:
         if field.name not in needed_fields:
             arcpy.DeleteField_management(trajectlijn, field.name)
@@ -706,6 +706,7 @@ def generate_profiles(profiel_interval,profiel_lengte_land,profiel_lengte_rivier
     # arcpy.FlipLine_edit(profielen)
 
     print 'profielen gemaakt op trajectlijn'
+
 
 
 def kruinbepalen(invoer, code, uitvoer_binnenkruin, uitvoer_buitenkruin,verschil_maxkruin,min_afstand,max_afstand):
@@ -1058,3 +1059,21 @@ def binnenteenbepalen(invoer, code, min_achterland, max_achterland, uitvoer_binn
                                                          "OBJECTID in (" + str(list_id_bit)[1:-1] + ")")
     arcpy.CopyFeatures_management('punten_binnenteen_temp', uitvoer_binnenteen)
     print 'binnenteen bepaald'
+
+def koppeling_hbn_hdsr(profielen,toetspeil):
+    arcpy.AddField_management(profielen, "kruin_hbn2024", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    with arcpy.da.UpdateCursor(profielen, ['max_kruinhoogte', toetspeil, 'kruin_hbn2024']) as cursor:
+        for row in cursor:
+            if row[0] < row[1] and row[0] is not None and row[1] is not None:
+                verschil = -abs(row[0]-row[1])
+                row[2] = verschil
+                cursor.updateRow(row)
+            elif row[0] > row[1] and row[0] is not None and row[1] is not None:
+                verschil = abs(row[0]-row[1])
+                row[2] = verschil
+                cursor.updateRow(row)
+            else:
+                if row[0] is not None and row[1] is not None:
+                    row[2] = 0
+                    cursor.updateRow(row)
+    print "kruinhoogte-hbn berekend"
