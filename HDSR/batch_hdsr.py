@@ -25,7 +25,8 @@ min_achterland = 5
 max_achterland = 20
 raster = r'D:\Projecten\HDSR\data\ahn_hdsr.gdb\AHN3grondfilter'
 code_hdsr = 'Naam'
-trajecten = 'RWK_areaal_2024'
+toetspeil = 'TP2024'
+trajecten = 'test'
 # specifieke invoer bepaling bit/but
 verschil_maxkruin = 0.2
 excelmap = 'C:/Users/Vincent/Desktop/xlsx_uitvoer/'
@@ -50,14 +51,15 @@ with arcpy.da.SearchCursor(trajecten,['SHAPE@',code_hdsr]) as cursor:
         arcpy.Select_analysis(trajecten, trajectlijn, where)
 
         # doorlopen stappen
-        generate_profiles(profiel_interval, profiel_lengte_land, profiel_lengte_rivier, trajectlijn, code_hdsr, profielen)
+        generate_profiles(profiel_interval, profiel_lengte_land, profiel_lengte_rivier, trajectlijn, code_hdsr,toetspeil, profielen)
         copy_trajectory_lr(trajectlijn, code_hdsr)
-        set_measurements_trajectory(profielen, trajectlijn, code_hdsr, stapgrootte_punten)
+        set_measurements_trajectory(profielen, trajectlijn, code_hdsr, stapgrootte_punten,toetspeil)
         extract_z_arcpy(invoerpunten, uitvoerpunten, raster)
         add_xy(uitvoerpunten, code_hdsr)
         # to_excel(uitvoerpunten, resultfile,sorteervelden='profielnummer A; afstand A')
         excel_writer(uitvoerpunten, code, excel, id)
         kruinhoogte_groepen(uitvoerpunten, stapgrootte_punten, afronding, code_hdsr)
-        max_kruinhoogte_test(uitvoerpunten, profielen, code_hdsr,uitvoer_maxpunten,min_afstand,max_afstand)
+        max_kruinhoogte_test(uitvoerpunten, profielen, code_hdsr,uitvoer_maxpunten,min_afstand,max_afstand,toetspeil)
         kruinbepalen(uitvoerpunten,code_hdsr,uitvoer_binnenkruin,uitvoer_buitenkruin,verschil_maxkruin,min_afstand,max_afstand)
         binnenteenbepalen(uitvoerpunten, code_hdsr, min_achterland, max_achterland, uitvoer_binnenteen, min_afstand,max_afstand,uitvoer_binnenkruin)
+        koppeling_hbn_hdsr(profielen,toetspeil)
