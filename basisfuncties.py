@@ -600,8 +600,14 @@ def max_kruinhoogte_test(uitvoerpunten, profielen, code, uitvoer_maxpunten,min_a
         if df_profiel_tester.empty == True:
             pass
         else:
-            df_profielmax = df_profiel_tester.max()[1]
-            id_df_profielmax = df_profiel_tester.idxmax()[1]
+            # oude code, vervangen door nieuwe sectie
+            # df_profielmax = df_profiel_tester.max()[1]
+            # id_df_profielmax = df_profiel_tester.idxmax()[1]
+
+            df_profielmax = df_profiel_tester['max_kruinhoogte'].max()
+            id_df_profielmax = df_profiel_tester['max_kruinhoogte'].idxmax()
+
+
             df_profiel.loc[id_df_profielmax] = name, df_profielmax
 
         # check of profiel een maximale kruinhoogte heeft
@@ -612,7 +618,7 @@ def max_kruinhoogte_test(uitvoerpunten, profielen, code, uitvoer_maxpunten,min_a
             OID_max = df_profiel['max_kruinhoogte'].idxmax()
 
             df_maxwaardes.loc[OID_max] = name, kr_max
-
+            # print df_profiel
 
     # print per profiel de gevonden resultaten
     print df_maxwaardes
