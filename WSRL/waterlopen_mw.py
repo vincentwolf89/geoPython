@@ -1,15 +1,18 @@
 import arcpy
+import pandas as pd
 
 
-arcpy.env.workspace = r'D:\Projecten\WSRL\batchtest.gdb'
+arcpy.env.workspace = r'D:\Projecten\WSRL\test_25_11.gdb'
 arcpy.env.overwriteOutput = True
 
-code_waterloop = 'CODE'
-watergangen = 'watergangen_inmeten_dissolve_test'
+code_waterloop = 'code'
+watergangen = 'unsplit_1'
 profiel_lengte_land = 10
 profiel_lengte_rivier = 10
 profiel_interval = 5
+profiel_interval_3 = 10
 objecten = r'D:\Projecten\WSRL\test.gdb\waterlijnen_minselectie_intersect'
+
 
 def generate_waterprofielen_1(profiel_lengte_land,profiel_lengte_rivier,trajectlijn,code,profielen):
     # traject to points
@@ -65,7 +68,7 @@ def generate_waterprofielen_1(profiel_lengte_land,profiel_lengte_rivier,trajectl
 
     arcpy.Merge_management("'temp_rivierdeel';'temp_landdeel'", 'merge_profielpunten')
     arcpy.PointsToLine_management('merge_profielpunten', profielen, "profielnummer", "id", "NO_CLOSE")
-
+    arcpy.JoinField_management(profielen, 'profielnummer', 'merge_profielpunten', 'profielnummer', 'MEAS')
     arcpy.SpatialJoin_analysis(profielen, trajectlijn, 'profielen_temp', "JOIN_ONE_TO_ONE", "KEEP_ALL", match_option="INTERSECT")
     arcpy.CopyFeatures_management('profielen_temp', profielen)
     # arcpy.FlipLine_edit(profielen)
@@ -283,8 +286,7 @@ def generate_waterprofielen_2(profiel_lengte_land,profiel_lengte_rivier,trajectl
     arcpy.SpatialJoin_analysis(profielen, trajectlijn, 'profielen_temp', "JOIN_ONE_TO_ONE", "KEEP_ALL", match_option="INTERSECT")
     arcpy.CopyFeatures_management('profielen_temp', profielen)
 
-
-
+    arcpy.JoinField_management(profielen, 'profielnummer', 'merge_profielpunten', 'profielnummer', 'MEAS')
     arcpy.MakeFeatureLayer_management(profielen, 'profielen_lyr')
     arcpy.SelectLayerByLocation_management('profielen_lyr', 'WITHIN_A_DISTANCE', objecten, search_distance=10,  invert_spatial_relationship="INVERT")
 
@@ -316,10 +318,104 @@ def generate_waterprofielen_2(profiel_lengte_land,profiel_lengte_rivier,trajectl
             else:
                 cursor.deleteRow()
 
+def generate_waterprofielen_3(profiel_lengte_land,profiel_lengte_rivier,trajectlijn,code,profielen, profiel_interval):
+    lijst3 = []
+    # traject to points
+    # arcpy.FeatureToPoint_management(trajectlijn, 'traject_punten',"CENTROID")
+    arcpy.GeneratePointsAlongLines_management(trajectlijn, 'traject_punten', 'DISTANCE', Distance=profiel_interval)
+    # arcpy.GeneratePointsAlongLines_management(trajectlijn, 'traject_punten', 'DISTANCE', Distance=25)
+    arcpy.AddField_management('traject_punten', "profielnummer", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.AddField_management('traject_punten', "lengte_landzijde", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.AddField_management('traject_punten', "lengte_rivierzijde", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.CalculateField_management('traject_punten', "profielnummer", '!OBJECTID!', "PYTHON")
+    arcpy.CalculateField_management('traject_punten', "lengte_landzijde", profiel_lengte_land, "PYTHON")
+    arcpy.CalculateField_management('traject_punten', "lengte_rivierzijde", profiel_lengte_rivier, "PYTHON")
+
+    # route voor trajectlijn
+    # arcpy.CreateRoutes_lr(trajectlijn, code, "route_traject", "LENGTH", "", "", "UPPER_LEFT", "1", "0", "IGNORE", "INDEX")
+
+    existing_fields = arcpy.ListFields(trajectlijn)
+    needed_fields = ['OBJECTID', 'SHAPE', 'SHAPE_Length','Shape','Shape_Length',code]
+    for field in existing_fields:
+        if field.name not in needed_fields:
+            arcpy.DeleteField_management(trajectlijn, field.name)
+    arcpy.AddField_management(trajectlijn, "van", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.AddField_management(trajectlijn, "tot", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.CalculateField_management(trajectlijn, "van", 0, "PYTHON")
+    arcpy.CalculateField_management(trajectlijn, "tot", "!Shape_Length!", "PYTHON")
+    arcpy.CreateRoutes_lr(trajectlijn, code, 'route_traject', "TWO_FIELDS", "van", "tot", "", "1",
+                          "0", "IGNORE", "INDEX")
+
+
+    # locate profielpunten
+    arcpy.LocateFeaturesAlongRoutes_lr('traject_punten', 'route_traject', code, "1.5 Meters", 'tabel_traject_punten',
+                                       "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS",
+                                       "M_DIRECTON")
+
+    # offset rivierdeel profiel
+    arcpy.MakeRouteEventLayer_lr('route_traject', code, 'tabel_traject_punten', "rid POINT meas", 'deel_rivier',
+                                 "lengte_rivierzijde", "NO_ERROR_FIELD", "NO_ANGLE_FIELD", "NORMAL", "ANGLE", "RIGHT",
+                                 "POINT")
+
+    arcpy.MakeRouteEventLayer_lr('route_traject', code, 'tabel_traject_punten', "rid POINT meas", 'deel_land',
+                                 "lengte_landzijde", "NO_ERROR_FIELD", "NO_ANGLE_FIELD", "NORMAL", "ANGLE", "LEFT",
+                                 "POINT")
+    # temp inzicht layer
+    arcpy.CopyFeatures_management('deel_rivier', "temp_rivierdeel")
+    arcpy.CopyFeatures_management('deel_land', "temp_landdeel")
+    arcpy.AddField_management('temp_rivierdeel', "id", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.AddField_management('temp_landdeel', "id", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.CalculateField_management('temp_rivierdeel', "id", 2, "PYTHON")
+    arcpy.CalculateField_management('temp_landdeel', "id", 1, "PYTHON")
 
 
 
 
+
+    arcpy.Merge_management("'temp_rivierdeel';'temp_landdeel'", 'merge_profielpunten')
+    arcpy.PointsToLine_management('merge_profielpunten', profielen, "profielnummer", "id", "NO_CLOSE")
+
+    arcpy.SpatialJoin_analysis(profielen, trajectlijn, 'profielen_temp', "JOIN_ONE_TO_ONE", "KEEP_ALL", match_option="INTERSECT")
+    arcpy.CopyFeatures_management('profielen_temp', profielen)
+    arcpy.JoinField_management(profielen, 'profielnummer', 'merge_profielpunten', 'profielnummer', 'MEAS')
+
+
+    arcpy.MakeFeatureLayer_management(profielen, 'profielen_lyr')
+    arcpy.SelectLayerByLocation_management('profielen_lyr', 'WITHIN_A_DISTANCE', objecten, search_distance=10,  invert_spatial_relationship="INVERT")
+
+    arcpy.CopyFeatures_management('profielen_lyr', 'test')
+
+    arcpy.CopyFeatures_management('test', profielen)
+
+    array = arcpy.da.FeatureClassToNumPyArray(profielen, ('OBJECTID', 'profielnummer', code_waterloop, 'MEAS'))
+    df = pd.DataFrame(array)
+    df= df.sort_values(['MEAS'], ascending=True)
+    df['next_meas'] = df['MEAS'].shift(-1)
+    df['difference'] = abs(df['MEAS']-df['next_meas'])
+    # print df
+    som = 0
+    for index, row in df.iterrows():
+        som += row['difference']
+        if som < 50:
+            pass
+        else:
+            lijst3.append(row['profielnummer'])
+            som = 0
+
+    with arcpy.da.UpdateCursor(profielen,['profielnummer']) as cursor:
+        for row in cursor:
+            if row[0] in lijst3:
+                pass
+            else:
+                cursor.deleteRow()
+
+    arcpy.FeatureVerticesToPoints_management(trajectlijn, 'temp_eindpunten', 'BOTH_ENDS')
+    arcpy.MakeFeatureLayer_management(profielen, 'profielen_lyr')
+    arcpy.SelectLayerByLocation_management('profielen_lyr', 'WITHIN_A_DISTANCE', 'temp_eindpunten', search_distance=10,
+                                           invert_spatial_relationship="INVERT")
+    arcpy.CopyFeatures_management('profielen_lyr', 'test')
+
+    arcpy.CopyFeatures_management('test', profielen)
 
 
 
@@ -350,23 +446,19 @@ with arcpy.da.UpdateCursor(watergangen, ['SHAPE@', code_waterloop,'SHAPE@LENGTH'
             generate_waterprofielen_2(profiel_lengte_land, profiel_lengte_rivier, waterloop, code_waterloop, profielen,
                                       profiel_interval)
 
+        else:
+            generate_waterprofielen_3(profiel_lengte_land, profiel_lengte_rivier, waterloop, code_waterloop, profielen,
+                                      profiel_interval)
 
+#             # if lengte >= 350:
+#             #     # iedere 50 m, beginnen op 25 m
 
-
-
-
-
-
-
-            # generate_waterprofielen_2a(profiel_lengte_land, profiel_lengte_rivier, waterloop, code_waterloop, profielen_a)
-            # arcpy.FlipLine_edit(waterloop)
-            # generate_waterprofielen_2b(profiel_lengte_land, profiel_lengte_rivier, waterloop, code_waterloop, profielen_b)
-            #
-            #
-            #
-            #
-            # arcpy.Merge_management([profielen_a, profielen_b], profielen)
-            # arcpy.Delete_management(profielen_a)
-            # arcpy.Delete_management(profielen_b)
-
-
+# counter = 0
+# with arcpy.da.UpdateCursor(watergangen, ['SHAPE@', code_waterloop,'SHAPE@LENGTH']) as cursor:
+#     for row in cursor:
+#         n = row[2]
+#         if counter > 0:
+#             print row[2]
+#         oldN = n
+#         counter = counter + 1
+        # print row[2]
