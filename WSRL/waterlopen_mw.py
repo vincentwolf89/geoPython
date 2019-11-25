@@ -12,10 +12,11 @@ profiel_lengte_rivier = 10
 profiel_interval = 5
 profiel_interval_3 = 10
 min_breedte = 0.6
-objecten = r'D:\Projecten\WSRL\test.gdb\waterlijnen_minselectie_intersect'
+objecten = 'objecten_selectie'
 contour_ahn = r'D:\Projecten\WSRL\A5H watergangen\watervlakkent.shp'
 watergangen_totaal = r'D:\Projecten\WSRL\shp\waterlijnen_mw.shp'
 watergangen_geselecteerd = r'D:\Projecten\WSRL\shp\watergangen_inmeten.shp'
+kunstwerken = r'D:\Projecten\WSRL\A5H watergangen\watervlakkent.shp'
 
 def maak_objecten():
     # totale waterlopen-geselecteerde waterlopen
@@ -23,7 +24,37 @@ def maak_objecten():
     arcpy.SelectLayerByLocation_management('watergangen_totaal_lyr', 'contains', watergangen_geselecteerd,invert_spatial_relationship='INVERT')
     arcpy.CopyFeatures_management('watergangen_totaal_lyr', 'watergangen_minselectie')
     # intersect van totale waterlopen met geselecteerde waterlopen
-    arcpy.Intersect_analysis([watergangen_geselecteerd, 'watergangen_minselectie'], 'objecten_deel_1', "", "", "point")
+    arcpy.Intersect_analysis([watergangen_geselecteerd, 'watergangen_minselectie'], 'watergangen_t_', "", 0.1, "point")
+    arcpy.FeatureToPoint_management("watergangen_t_", "watergangen_t")
+
+
+    arcpy.CopyFeatures_management(kunstwerken, 'kunstwerken_selectie')
+    with arcpy.da.UpdateCursor('kunstwerken_selectie', ['CATEGORIE']) as cursor:
+        for row in cursor:
+            left_text = 'Kunstwerk'
+            left_row = str(row[0].partition(" ")[0])
+            if left_text == left_row:
+                pass
+            else:
+                cursor.deleteRow()
+
+    arcpy.FeatureToPoint_management("kunstwerken_selectie", "kunstwerken_selectie_punt",
+                                    "CENTROID")
+
+    # # verwijder onnodige velden
+    # existing_fields = arcpy.ListFields('kunstwerken_selectie')
+    # needed_fields = ['CATEGORIE','CODE','OBJECTID','OBJECTID_1','Shape','SHAPE']
+    # for field in existing_fields:
+    #     if field.name not in needed_fields:
+    #         arcpy.DeleteField_management('kunstwerken_selectie', field.name)
+    #
+    # existing_fields = arcpy.ListFields('watergangen_t')
+    # needed_fields = ['CATEGORIE','CODE','OBJECTID','OBJECTID_1','Shape','SHAPE']
+    # for field in existing_fields:
+    #     if field.name not in needed_fields:
+    #         arcpy.DeleteField_management('watergangen_t', field.name)
+
+    arcpy.Merge_management(['watergangen_t','kunstwerken_selectie_punt'], 'objecten_selectie')
 def knip_sloten(profielen,slootlijn,code):
 
 
