@@ -5,18 +5,22 @@ from arcpy.sa import *
 arcpy.env.workspace = r'D:\Projecten\WSRL\test_25_11.gdb'
 arcpy.env.overwriteOutput = True
 
-code_waterloop = 'code'
-watergangen = 'testset_25'
+code_waterloop = 'CODE'
+watergangen = 'unsplit_code_test'
 profiel_lengte_land = 10
 profiel_lengte_rivier = 10
 profiel_interval = 5
 profiel_interval_3 = 10
 min_breedte = 0.6
+tussenafstand_lang = 50
+marge = 20
+
 objecten = 'objecten_selectie'
 contour_ahn = r'D:\Projecten\WSRL\A5H watergangen\watervlakkent.shp'
 watergangen_totaal = r'D:\Projecten\WSRL\shp\waterlijnen_mw.shp'
 watergangen_geselecteerd = r'D:\Projecten\WSRL\shp\watergangen_inmeten.shp'
 kunstwerken = r'D:\Projecten\WSRL\A5H watergangen\watervlakkent.shp'
+totaal_meetprofielen = []
 
 def maak_objecten():
     # totale waterlopen-geselecteerde waterlopen
@@ -41,43 +45,30 @@ def maak_objecten():
     arcpy.FeatureToPoint_management("kunstwerken_selectie", "kunstwerken_selectie_punt",
                                     "CENTROID")
 
-    # # verwijder onnodige velden
-    # existing_fields = arcpy.ListFields('kunstwerken_selectie')
-    # needed_fields = ['CATEGORIE','CODE','OBJECTID','OBJECTID_1','Shape','SHAPE']
-    # for field in existing_fields:
-    #     if field.name not in needed_fields:
-    #         arcpy.DeleteField_management('kunstwerken_selectie', field.name)
-    #
-    # existing_fields = arcpy.ListFields('watergangen_t')
-    # needed_fields = ['CATEGORIE','CODE','OBJECTID','OBJECTID_1','Shape','SHAPE']
-    # for field in existing_fields:
-    #     if field.name not in needed_fields:
-    #         arcpy.DeleteField_management('watergangen_t', field.name)
 
     arcpy.Merge_management(['watergangen_t','kunstwerken_selectie_punt'], 'objecten_selectie')
-def knip_sloten(profielen,slootlijn,code):
+
+def knip_sloten(profielen,slootlijn,code,meetprofielen,waterloop):
 
 
-
-
-    # verwijder profiel indien middelpunt op niet-nan data ligt
-    existing_fields = arcpy.ListFields(profielen)
-    needed_fields = ['RASTERVALU']
-    for field in existing_fields:
-        if field.name in needed_fields:
-            arcpy.DeleteField_management(profielen, field.name)
-    arcpy.Intersect_analysis([profielen, slootlijn], 'middelpunten_profielen', "", 0.5, "point")
-
-    arcpy.FeatureToPoint_management('middelpunten_profielen', 'middelpunten_profielen_', "CENTROID")
-    ExtractValuesToPoints('middelpunten_profielen_', raster, 'middelpunten_profielen_z', "INTERPOLATE", "VALUE_ONLY")
-    arcpy.JoinField_management(profielen, "profielnummer", "middelpunten_profielen_z", "profielnummer", ["RASTERVALU"])
-
-    with arcpy.da.UpdateCursor(profielen, ['RASTERVALU']) as cursor:
-        for row in cursor:
-            if row[0] is not None:
-                cursor.deleteRow()
-            else:
-                continue
+    # # verwijder profiel indien middelpunt op niet-nan data ligt
+    # existing_fields = arcpy.ListFields(profielen)
+    # needed_fields = ['RASTERVALU']
+    # for field in existing_fields:
+    #     if field.name in needed_fields:
+    #         arcpy.DeleteField_management(profielen, field.name)
+    # arcpy.Intersect_analysis([profielen, slootlijn], 'middelpunten_profielen', "", 0.5, "point")
+    #
+    # arcpy.FeatureToPoint_management('middelpunten_profielen', 'middelpunten_profielen_', "CENTROID")
+    # ExtractValuesToPoints('middelpunten_profielen_', raster, 'middelpunten_profielen_z', "INTERPOLATE", "VALUE_ONLY")
+    # arcpy.JoinField_management(profielen, "profielnummer", "middelpunten_profielen_z", "profielnummer", ["RASTERVALU"])
+    #
+    # with arcpy.da.UpdateCursor(profielen, ['RASTERVALU']) as cursor:
+    #     for row in cursor:
+    #         if row[0] is not None:
+    #             cursor.deleteRow()
+    #         else:
+    #             continue
 
 
 
@@ -93,7 +84,7 @@ def knip_sloten(profielen,slootlijn,code):
     arcpy.MakeFeatureLayer_management('knip_profielen', 'knip_profielen_temp')
     arcpy.SelectLayerByLocation_management('knip_profielen_temp', 'intersect', slootlijn,"0,1 Meters", "NEW_SELECTION", "NOT_INVERT")
     # arcpy.CopyFeatures_management('knip_profielen_temp', 'slootbreedtes')
-    arcpy.CopyFeatures_management('knip_profielen_temp', 'profielen_' + str(waterloop))
+    arcpy.CopyFeatures_management('knip_profielen_temp', meetprofielen)
 
     print "waterspiegel-profielen gemaakt voor "+str(waterloop)
 
@@ -115,7 +106,7 @@ def generate_waterprofielen_1(profiel_lengte_land,profiel_lengte_rivier,trajectl
     # arcpy.CreateRoutes_lr(trajectlijn, code, "route_traject", "LENGTH", "", "", "UPPER_LEFT", "1", "0", "IGNORE", "INDEX")
 
     existing_fields = arcpy.ListFields(trajectlijn)
-    needed_fields = ['OBJECTID', 'SHAPE', 'SHAPE_Length','Shape','Shape_Length',code]
+    needed_fields = ['OBJECTID_12','OBJECTID','OBJECTID_1', 'SHAPE', 'SHAPE_Length','Shape','Shape_Length',code]
     for field in existing_fields:
         if field.name not in needed_fields:
             arcpy.DeleteField_management(trajectlijn, field.name)
@@ -159,7 +150,7 @@ def generate_waterprofielen_1(profiel_lengte_land,profiel_lengte_rivier,trajectl
     arcpy.CopyFeatures_management('profielen_temp', profielen)
     # arcpy.FlipLine_edit(profielen)
 
-    print "profielen gemaakt op waterloop kort dan 100 m"
+    print "profielen gemaakt op waterloop korter dan 100 m"
 
 def generate_waterprofielen_2(profiel_lengte_land,profiel_lengte_rivier,trajectlijn,code,profielen, profiel_interval):
     # traject to points
@@ -177,7 +168,7 @@ def generate_waterprofielen_2(profiel_lengte_land,profiel_lengte_rivier,trajectl
     # arcpy.CreateRoutes_lr(trajectlijn, code, "route_traject", "LENGTH", "", "", "UPPER_LEFT", "1", "0", "IGNORE", "INDEX")
 
     existing_fields = arcpy.ListFields(trajectlijn)
-    needed_fields = ['OBJECTID', 'SHAPE', 'SHAPE_Length','Shape','Shape_Length',code]
+    needed_fields = ['OBJECTID_12','OBJECTID','OBJECTID_1', 'SHAPE', 'SHAPE_Length','Shape','Shape_Length',code]
     for field in existing_fields:
         if field.name not in needed_fields:
             arcpy.DeleteField_management(trajectlijn, field.name)
@@ -274,7 +265,7 @@ def generate_waterprofielen_3(profiel_lengte_land,profiel_lengte_rivier,trajectl
     # arcpy.CreateRoutes_lr(trajectlijn, code, "route_traject", "LENGTH", "", "", "UPPER_LEFT", "1", "0", "IGNORE", "INDEX")
 
     existing_fields = arcpy.ListFields(trajectlijn)
-    needed_fields = ['OBJECTID', 'SHAPE', 'SHAPE_Length','Shape','Shape_Length',code]
+    needed_fields = ['OBJECTID_12','OBJECTID','OBJECTID_1', 'SHAPE', 'SHAPE_Length','Shape','Shape_Length',code]
     for field in existing_fields:
         if field.name not in needed_fields:
             arcpy.DeleteField_management(trajectlijn, field.name)
@@ -326,20 +317,46 @@ def generate_waterprofielen_3(profiel_lengte_land,profiel_lengte_rivier,trajectl
 
     arcpy.CopyFeatures_management('test', profielen)
 
-    array = arcpy.da.FeatureClassToNumPyArray(profielen, ('OBJECTID', 'profielnummer', code_waterloop, 'MEAS'))
+    array = arcpy.da.FeatureClassToNumPyArray(profielen, ('OBJECTID', 'profielnummer', code_waterloop, 'MEAS','tot'))
     df = pd.DataFrame(array)
     df= df.sort_values(['MEAS'], ascending=True)
     df['next_meas'] = df['MEAS'].shift(-1)
     df['difference'] = abs(df['MEAS']-df['next_meas'])
     # print df
-    som = 0
-    for index, row in df.iterrows():
-        som += row['difference']
-        if som < 50:
-            pass
-        else:
+
+    counter = 0
+    row_iterator = df.iterrows()
+    _, last = row_iterator.next()  # take first item from row_iterator
+    for i, row in row_iterator:
+        huidig = last['MEAS']
+        volgende = row['MEAS']
+        verschil = abs(volgende-huidig)
+        counter += verschil
+        if counter > tussenafstand_lang and row['MEAS'] < (row['tot']-marge):
             lijst3.append(row['profielnummer'])
-            som = 0
+            # print row['MEAS']
+            counter = 0
+        else:
+            pass
+        # print(row['MEAS'])
+        # print(last['MEAS'])
+        last = row
+
+
+
+
+
+    # som = 0
+    # for index, row in df.iterrows():
+    #     som += row['difference']
+    #     if som < 80:
+    #         pass
+    #     else:
+    #         if som > 80:
+    #             lijst3.append(row['profielnummer'])
+    #             # print som, row['MEAS']
+    #         som = 0
+
 
     with arcpy.da.UpdateCursor(profielen,['profielnummer']) as cursor:
         for row in cursor:
@@ -362,11 +379,10 @@ def runner():
         for row in cursor:
             lengte = row[2]
             id = row[1]
-            waterloop = 'waterloop_' + str(row[1])
 
+            waterloop = 'waterloop_' + str(row[1])
+            meetprofielen = 'meetprofielen_' + str(row[1])
             profielen = 'profielen_' + str(row[1])
-            profielen_a = 'profielen_a' + str(row[1])
-            profielen_b = 'profielen_b' + str(row[1])
 
             where = '"' + code_waterloop + '" = ' + "'" + str(id) + "'"
 
@@ -390,6 +406,18 @@ def runner():
                 generate_waterprofielen_3(profiel_lengte_land, profiel_lengte_rivier, waterloop, code_waterloop, profielen,
                                           profiel_interval)
 
-            knip_sloten(profielen,waterloop,code_waterloop)
+            knip_sloten(profielen,waterloop,code_waterloop,meetprofielen,waterloop)
+            totaal_meetprofielen.append(meetprofielen)
 
-maak_objecten()
+# maak_objecten()
+runner()
+arcpy.Merge_management(totaal_meetprofielen, 'totaal_meetprofielen')
+existing_fields = arcpy.ListFields('totaal_meetprofielen')
+needed_fields = ['OBJECTID','Shape','Shape_Length','CODE']
+for field in existing_fields:
+    if field.name not in needed_fields:
+        arcpy.DeleteField_management('totaal_meetprofielen', field.name)
+
+
+arcpy.AddField_management('totaal_meetprofielen', "lengte_wl", "DOUBLE", 2, field_is_nullable="NULLABLE")
+arcpy.CalculateField_management('totaal_meetprofielen', "lengte_wl", '!Shape_Length!', "PYTHON")
