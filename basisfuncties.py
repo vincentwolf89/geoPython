@@ -1157,3 +1157,77 @@ def profielen_op_lijn(profiel_interval,profiel_lengte_land,profiel_lengte_rivier
     # arcpy.FlipLine_edit(profielen)
 
     print 'profielen gemaakt op trajectlijn'
+
+def generate_profiles_onpoints(traject_punten,trajectlijn,profielen,code):
+    # traject to points
+    traject_punten = traject_punten
+    trajectlijn = trajectlijn
+    profiel_lengte_rivier = 100
+    profiel_lengte_land = 100
+    profielen = profielen
+    code = code
+
+    existing_fields = arcpy.ListFields(profielen)
+    needed_fields = ["profielnummer","lengte_landzijde","lengte_rivierzijde")
+    for field in existing_fields:
+        if field.name in needed_fields:
+            arcpy.DeleteField_management(trajectlijn, field.name)
+    arcpy.AddField_management(traject_punten, "profielnummer", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.AddField_management(traject_punten, "lengte_landzijde", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.AddField_management(traject_punten, "lengte_rivierzijde", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.CalculateField_management(traject_punten, "profielnummer", '!OBJECTID!', "PYTHON")
+    arcpy.CalculateField_management(traject_punten, "lengte_landzijde", profiel_lengte_land, "PYTHON")
+    arcpy.CalculateField_management(traject_punten, "lengte_rivierzijde", profiel_lengte_rivier, "PYTHON")
+
+    # route voor trajectlijn
+    # arcpy.CreateRoutes_lr(trajectlijn, code, "route_traject", "LENGTH", "", "", "UPPER_LEFT", "1", "0", "IGNORE", "INDEX")
+
+    existing_fields = arcpy.ListFields(trajectlijn)
+    needed_fields = ['OBJECTID', 'SHAPE', 'SHAPE_Length','Shape','Shape_Length',code]
+    for field in existing_fields:
+        if field.name not in needed_fields:
+            arcpy.DeleteField_management(trajectlijn, field.name)
+    arcpy.AddField_management(trajectlijn, "van", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.AddField_management(trajectlijn, "tot", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.CalculateField_management(trajectlijn, "van", 0, "PYTHON")
+    arcpy.CalculateField_management(trajectlijn, "tot", "!Shape_Length!", "PYTHON")
+    arcpy.CreateRoutes_lr(trajectlijn, code, 'route_traject', "TWO_FIELDS", "van", "tot", "", "1",
+                          "0", "IGNORE", "INDEX")
+
+
+    # locate profielpunten
+    arcpy.LocateFeaturesAlongRoutes_lr(traject_punten, 'route_traject', code, "1.5 Meters", 'tabel_traject_punten',
+                                       "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS",
+                                       "M_DIRECTON")
+
+    # offset rivierdeel profiel
+    arcpy.MakeRouteEventLayer_lr('route_traject', code, 'tabel_traject_punten', "rid POINT meas", 'deel_rivier',
+                                 "lengte_rivierzijde", "NO_ERROR_FIELD", "NO_ANGLE_FIELD", "NORMAL", "ANGLE", "RIGHT",
+                                 "POINT")
+
+    arcpy.MakeRouteEventLayer_lr('route_traject', code, 'tabel_traject_punten', "rid POINT meas", 'deel_land',
+                                 "lengte_landzijde", "NO_ERROR_FIELD", "NO_ANGLE_FIELD", "NORMAL", "ANGLE", "LEFT",
+                                 "POINT")
+    # temp inzicht layer
+    arcpy.CopyFeatures_management('deel_rivier', "temp_rivierdeel")
+    arcpy.CopyFeatures_management('deel_land', "temp_landdeel")
+    arcpy.AddField_management('temp_rivierdeel', "id", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.AddField_management('temp_landdeel', "id", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.CalculateField_management('temp_rivierdeel', "id", 2, "PYTHON")
+    arcpy.CalculateField_management('temp_landdeel', "id", 1, "PYTHON")
+
+
+
+
+
+    arcpy.Merge_management("'temp_rivierdeel';'temp_landdeel'", 'merge_profielpunten')
+    arcpy.PointsToLine_management('merge_profielpunten', profielen, "profielnummer", "id", "NO_CLOSE")
+
+    # arcpy.CalculateField_management(profielen, "van", 0, "PYTHON")
+    # arcpy.CalculateField_management(profielen, "tot", "!Shape_Length!", "PYTHON")
+
+    # arcpy.SpatialJoin_analysis(profielen, trajectlijn, 'profielen_temp', "JOIN_ONE_TO_ONE", "KEEP_ALL", match_option="INTERSECT")
+    # arcpy.CopyFeatures_management('profielen_temp', profielen)
+    # arcpy.FlipLine_edit(profielen)
+
+    print 'profielen gemaakt op trajectlijn'
