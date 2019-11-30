@@ -1168,7 +1168,7 @@ def generate_profiles_onpoints(traject_punten,trajectlijn,profielen,code):
     code = code
 
     existing_fields = arcpy.ListFields(profielen)
-    needed_fields = ["profielnummer","lengte_landzijde","lengte_rivierzijde")
+    needed_fields = ["profielnummer","lengte_landzijde","lengte_rivierzijde"]
     for field in existing_fields:
         if field.name in needed_fields:
             arcpy.DeleteField_management(trajectlijn, field.name)
@@ -1231,3 +1231,49 @@ def generate_profiles_onpoints(traject_punten,trajectlijn,profielen,code):
     # arcpy.FlipLine_edit(profielen)
 
     print 'profielen gemaakt op trajectlijn'
+
+
+def bereken_restlevensduur(profielen,bodemdalingskaart):
+    # profiellijnen middenpunt
+    arcpy.FeatureToPoint_management(profielen, 'profielen_temp','CENTROID')
+
+    # middenpunt z-waarde bodemdaling
+    arcpy.CheckOutExtension("Spatial")
+    ExtractValuesToPoints('profielen_temp', bodemdalingskaart, 'profielen_temp_z',
+                          "INTERPOLATE", "VALUE_ONLY")
+
+    # Pas het veld 'RASTERVALU' aan naar 'z_ahn'
+    bestaande_velden = arcpy.ListFields('profielen_temp_z')
+    te_verwijderen = ['bd_mmy', 'rld_jaar']
+    for field in bestaande_velden:
+        if field.name in te_verwijderen:
+            arcpy.DeleteField_management('profielen_temp_z', field.name)
+    arcpy.AlterField_management('profielen_temp_z', 'RASTERVALU', 'bd_mmy')
+    del bestaande_velden
+
+    # punt toevoegen aan profielen
+    bestaande_velden = arcpy.ListFields(profielen)
+    te_verwijderen = ['bd_mmy', 'rld_jaar']
+    for field in bestaande_velden:
+        if field.name in te_verwijderen:
+            arcpy.DeleteField_management(profielen, field.name)
+    arcpy.JoinField_management(profielen, 'profielnummer', 'profielen_temp_z', 'profielnummer', 'bd_mmy')
+
+
+    # restlevensduur berekenen
+    arcpy.AddField_management(profielen, "rld_jaar", "DOUBLE")
+    with arcpy.da.UpdateCursor(profielen, ('bd_mmy','rld_jaar','kruin_hbn2024')) as cursor:
+        for row in cursor:
+            if row[2] is not None and row[0] is not None:
+                resthoogte = row[2]
+                if resthoogte <= 0:
+                    row[1] = 0
+                else:
+                    if row[0] < 0:
+                        resthoogte_mm = row[2]*1000
+                        bodemdaling_mm = abs(row[0])
+                        row[1] = round(resthoogte_mm/bodemdaling_mm,1)
+                cursor.updateRow(row)
+
+
+
