@@ -8,21 +8,23 @@ from arcpy.sa import *
 arcpy.env.overwriteOutput = True
 
 # definieer de werkomgeving
-arcpy.env.workspace = 'C:/Users/vince/Desktop/GIS/duinscript.gdb'
+arcpy.env.workspace = 'D:/GIS/13_1_temp.gdb'
 
 # invoer
-profielen = 'tussenraaien_test'  # profielen, zoals gegenereerd via ET-Tools/andere manier
+profielen = 'profielen_13_1_aanpassing'  # profielen, zoals gegenereerd via ET-Tools/andere manier
 profielen_hr = 'profielen_hr'  # werklaag, deze kan onaangepast blijven
 invoer = 'profielen_punten_z'  # werklaag, deze kan onaangepast blijven.
 stapgrootte_punten = 2  # stapgrootte tussen de punten vanuit de hoogtedata (niet kleiner dan gridgrootte)
+stapgrootte_punten_marge = 3.5
 # marge = 2   # marge tussen de punten, om enige ruimte te laten voor kleine laagtes die er niet direct toe doen ****
-maximale_beginwaarde = 48  # de maximale afstand waarop, t.o.v. de gedefinieerde landwaartse lijn, mag worden begonnen met de volume berekening
+maximale_beginwaarde = 15  # de maximale afstand waarop, t.o.v. de gedefinieerde landwaartse lijn, mag worden begonnen met de volume berekening
 hoogte_controle = 1  # een punt binnen de volumegroep moet dit niveau hebben (TRDA 2006: min 1 m boven Rp)
 maximaal_talud_zz = 1  # het maximale talud aan de zeezijde (TRDA 2006: 1:1)
-maximaal_talud_lz = 0.5  # het maximale talud aan de zeezijde (TRDA 2006: 1:2)
+maximaal_talud_lz = 5  # het maximale talud aan de zeezijde (TRDA 2006: 1:2)
 minimale_hoogte_boven_rp = 0.01  # minimale hoogte van alle punten die nodig is om een aaneengesloten volume te verkrijgen
-raster = r'C:\Users\vince\Desktop\wolfwater\HHNK\data\ahn3_kust_nh_tx_1m.tif'  # hoogtedata voor het ophalen van hoogte-waardes
-hr = 'hr_ref_13_2_iv'  # JARKUS-raaien op 0 m RSP met bijbehorende hr (Rp, Hs en Tp)
+max_gp_hoogte = 'max_h_gp' # veld voor het meenemen van profielen waarbij maximale grensprofielhoogte handmatig is aangepast
+raster = r'D:\GIS\AHN3_13_1_13_2.gdb\rc_1_AHN3_13_1_en_13_2'  # hoogtedata voor het ophalen van hoogte-waardes
+hr = r'D:\GIS\duinscript.gdb\hr_ref_13_1_iiv'  # JARKUS-raaien op 0 m RSP met bijbehorende hr (Rp, Hs en Tp)
 
 velden = ['afstand', 'z_ahn', 'groep', 'volume_groep', 'profielnummer', 'kenmerk']
 
@@ -38,7 +40,7 @@ def koppel_hr(): # hier worden de hr aan de profielen gekoppeld
 
     invoer_hr = profielen
     uitvoer_hr = profielen_hr
-    velden = ['profielnummer', 'Rp', 'Hs', 'Tp','van','tot']  # defineeer de te behouden velden
+    velden = ['profielnummer', 'Rp', 'Hs', 'Tp','van','tot',max_gp_hoogte]  # defineeer de te behouden velden
 
     # stel de fieldmapping in
     fieldmappings = arcpy.FieldMappings()
@@ -111,7 +113,7 @@ def afstanden_punten(): # hier worden routes gemaakt op de profielen, zodat de a
     print 'MEAS toegevoegd aan puntenlaag vanuit tabel en veldnaam aangepast naar afstand'
 
     # Koppelen van grensprofiel en rekenpeil velden aan puntenlaag
-    velden = ['Rp', 'Hs', 'Tp', 'min_grensprofiel']
+    velden = ['Rp', 'Hs', 'Tp', 'min_grensprofiel',max_gp_hoogte]
     arcpy.JoinField_management('punten_route', 'profielnummer', profielen_hr, 'profielnummer', velden)
     print "Velden voor grensprofiel en rekenpeil toegevoegd"
 
@@ -132,9 +134,16 @@ def values_points(): # hier wordt een hoogtewaarde aan ieder punt, op iedere rou
     arcpy.AlterField_management(uitvoer_punten, 'RASTERVALU', 'z_ahn')
     print "Hoogte-waarde aan punten gekoppeld en veld aangepast naar z_ahn"
 
-
-
-
+    # module voor het verwijderen van punten boven gewenste rekenpeil
+    with arcpy.da.UpdateCursor(uitvoer_punten,[max_gp_hoogte,'z_ahn']) as cursor:
+        for row in cursor:
+            if row[0] is None:
+                pass
+            else:
+                if row[1] > row[0]:
+                    row[1] = row[0]
+                    cursor.updateRow(row)
+    print "Maximale grensprofielhoogtes doorgevoerd voor betreffende profielen"
 def aanpassen_groepen(): # hier worden de groepen aangepast en groepen die aangesloten zijn voorzien van hetzelfde nummer
     # Voeg nodige velden toe aan definitieve puntenlaag
     arcpy.AddField_management(invoer, 'kenmerk', "TEXT", field_length=50)
@@ -177,7 +186,7 @@ def aanpassen_groepen(): # hier worden de groepen aangepast en groepen die aange
 
             for row in g:
                 c = row[0] # volgende waarde
-                if c-p <= stapgrootte_punten: # van 2 naar 5
+                if c-p <= stapgrootte_punten_marge: # van 2 naar 5
                     row[2] = value
                     cur1.updateRow(row)
                 else:
