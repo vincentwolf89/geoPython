@@ -674,7 +674,8 @@ def generate_profiles(profiel_interval,profiel_lengte_land,profiel_lengte_rivier
     arcpy.AddField_management(trajectlijn, "van", "DOUBLE", 2, field_is_nullable="NULLABLE")
     arcpy.AddField_management(trajectlijn, "tot", "DOUBLE", 2, field_is_nullable="NULLABLE")
     arcpy.CalculateField_management(trajectlijn, "van", 0, "PYTHON")
-    arcpy.CalculateField_management(trajectlijn, "tot", "!Shape_Length!", "PYTHON")
+    # arcpy.CalculateField_management(trajectlijn, "tot", "!Shape_Length!", "PYTHON")
+    arcpy.CalculateField_management(trajectlijn, "tot", "round(!shape.length!)", "PYTHON")
     arcpy.CreateRoutes_lr(trajectlijn, code, 'route_traject', "TWO_FIELDS", "van", "tot", "", "1",
                           "0", "IGNORE", "INDEX")
 
