@@ -30,10 +30,10 @@ hr = r'D:\GIS\duinscript.gdb\hr_ref_13_1_iiv'  # JARKUS-raaien op 0 m RSP met bi
 profiel_interval = 10
 profiel_lengte_land = 150
 profiel_lengte_rivier = 0
-trajectlijn = 'lijn_13_1_aangepast'
+trajectlijn = 'test'
 sectie_id = 'sectie'
 aantekeningen_bebouwing = 'grensprofiel_nabij_bebouwing'
-minimale_profiellengte = profiel_lengte_land-10
+minimale_profiellengte = 20
 
 velden = ['afstand', 'z_ahn', 'groep', 'volume_groep', 'profielnummer', 'kenmerk']
 def profielen_op_lijn(profiel_interval,profiel_lengte_land,profiel_lengte_rivier,trajectlijn,code, profielen):
@@ -96,7 +96,7 @@ def profielen_op_lijn(profiel_interval,profiel_lengte_land,profiel_lengte_rivier
     # arcpy.AddField_management(profielen, "van", "DOUBLE", 2, field_is_nullable="NULLABLE")
     # arcpy.AddField_management(trajectlijn, "tot", "DOUBLE", 2, field_is_nullable="NULLABLE")
     arcpy.CalculateField_management(profielen, "van", 0, "PYTHON")
-    arcpy.CalculateField_management(profielen, "tot", "!Shape_Length!", "PYTHON")
+    arcpy.CalculateField_management(profielen, "tot", "round(!shape.length!)", "PYTHON")
 
     arcpy.FlipLine_edit(profielen)
 
@@ -145,6 +145,8 @@ def aanpassing_ongeldige_profielen():
 
     del cursor
     arcpy.CopyFeatures_management('split_profielen', profielen)
+    arcpy.CalculateField_management(profielen, "van", 0, "PYTHON")
+    arcpy.CalculateField_management(profielen, "tot", "round(!shape.length!)", "PYTHON")
 
 def koppel_hr(): # hier worden de hr aan de profielen gekoppeld
 
