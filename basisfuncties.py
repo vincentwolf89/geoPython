@@ -1271,7 +1271,7 @@ def bereken_restlevensduur(profielen,bodemdalingskaart):
                     row[1] = 0
                 else:
                     if row[0] < 0:
-                        resthoogte_mm = row[2]*1000
+                        resthoogte_mm = row[2]*100
                         bodemdaling_mm = abs(row[0])
                         row[1] = round(resthoogte_mm/bodemdaling_mm,1)
                 cursor.updateRow(row)
