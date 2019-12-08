@@ -32,27 +32,11 @@ def average(lijst):
 
 
 
-def set_trajectory_right_left():
-    test = test
-    #afmaken
-    # fc = r'C:\Users\OWNER\Documents\ArcGIS\Default.gdb\samplePolyline'
-    #
-    # fields = ['x1', 'x2', 'y1', 'y2']
-    #
-    # # Add fields to your FC
-    # for field in fields:
-    #     arcpy.AddField_management(fc, str(field), "DOUBLE")
-    #
-    # with arcpy.da.UpdateCursor(fc, ('x1', 'x2', 'y1', 'y2', "SHAPE@")) as cursor:
-    #     for row in cursor:
-    #         row[0] = row[4].firstPoint.X
-    #         row[1] = row[4].lastPoint.X
-    #         row[2] = row[4].firstPoint.Y
-    #         row[3] = row[4].lastPoint.Y
 
 
 
-def CopyParallelL(plyP,sLength):
+
+def CopyParallelL(plyP,sLength): #functie voor profielen maken haaks op trajectlijn
     part=plyP.getPart(0)
     lArray=arcpy.Array()
     for ptX in part:
@@ -69,7 +53,7 @@ def CopyParallelL(plyP,sLength):
     section=arcpy.Polyline(array)
     return section
 
-def CopyParallelR(plyP,sLength):
+def CopyParallelR(plyP,sLength): #functie voor profielen maken haaks op trajectlijn
     part=plyP.getPart(0)
     rArray=arcpy.Array()
     for ptX in part:
@@ -111,7 +95,7 @@ def copy_trajectory_lr(trajectlijn,code):
         for shp, w in cursor:
             RightLine = CopyParallelR(shp, w)
             cursor.updateRow((RightLine, w))
-    print "river and land parts created"
+    print "Water-en landdelen gemaakt"
 
 def set_measurements_trajectory(profielen,trajectlijn,code,stapgrootte_punten,toetspeil): #rechts = rivier, profielen van binnen naar buiten
     # clean feature
@@ -244,7 +228,7 @@ def set_measurements_trajectory(profielen,trajectlijn,code,stapgrootte_punten,to
                 row[0] = 0
                 cursor.updateRow(row)
 
-    print 'points located on routes'
+    print 'Meetpunten op routes gelokaliseerd'
 
 def extract_z_arcpy(invoerpunten, uitvoerpunten, raster): #
 
@@ -257,7 +241,7 @@ def extract_z_arcpy(invoerpunten, uitvoerpunten, raster): #
 
     # Pas het veld 'RASTERVALU' aan naar 'z_ahn'
     arcpy.AlterField_management(uitvoerpunten, 'RASTERVALU', 'z_ahn')
-    print "elevation added to points"
+    print "Hoogtewaarde aan punten gekoppeld"
 
 def add_xy(uitvoerpunten,code):
 
@@ -283,8 +267,9 @@ def add_xy(uitvoerpunten,code):
     arcpy.AlterField_management(uitvoerpunten, 'POINT_X', 'x')
     arcpy.AlterField_management(uitvoerpunten, 'POINT_Y', 'y')
 
-    print "x and y added"
+    print "XY-coordinaten aan punten gekoppeld"
 
+# oude functie, niet gebruiken
 def to_excel(uitvoerpunten,resultfile,sorteervelden):
 
 
@@ -468,11 +453,11 @@ def kruinhoogte_groepen(uitvoerpunten,stapgrootte_punten,afronding,code):
     del cursor
     # Vervang niet-gesorteerede puntenset
     arcpy.CopyFeatures_management("sorted", uitvoerpunten)
+    print 'Kruinhoogte voor alle aaneengesloten groepen binnen profielen bepaald'
 
 
 
-
-def max_kruinhoogte(uitvoerpunten,profielen,code,uitvoer_maxpunten,toetspeil):
+def max_kruinhoogte_oud(uitvoerpunten,profielen,code,uitvoer_maxpunten,toetspeil):
     # feature class to numpy array
     array = arcpy.da.FeatureClassToNumPyArray(uitvoerpunten, ('OBJECTID', 'profielnummer', code, 'afstand', 'z_ahn','groep'))
     # dataframe, algemeen
@@ -562,7 +547,7 @@ def max_kruinhoogte(uitvoerpunten,profielen,code,uitvoer_maxpunten,toetspeil):
                 cursor.deleteRow()
 
 
-def max_kruinhoogte_test(uitvoerpunten, profielen, code, uitvoer_maxpunten,min_afstand,max_afstand,toetspeil):
+def max_kruinhoogte(uitvoerpunten, profielen, code, uitvoer_maxpunten,min_afstand,max_afstand,toetspeil):
     # feature class to numpy array
     array = arcpy.da.FeatureClassToNumPyArray(uitvoerpunten,
                                               ('OBJECTID', 'profielnummer', code, 'afstand', 'z_ahn', 'groep'))
@@ -652,7 +637,7 @@ def max_kruinhoogte_test(uitvoerpunten, profielen, code, uitvoer_maxpunten,min_a
             else:
                 cursor.deleteRow()
 
-
+    print 'Maximale kruinhoogte voor ieder profiel bepaald indien mogelijk'
 def generate_profiles(profiel_interval,profiel_lengte_land,profiel_lengte_rivier,trajectlijn,code,toetspeil,profielen):
     # traject to points
     arcpy.GeneratePointsAlongLines_management(trajectlijn, 'traject_punten', 'DISTANCE', Distance=profiel_interval, Include_End_Points='END_POINTS')
@@ -712,7 +697,7 @@ def generate_profiles(profiel_interval,profiel_lengte_land,profiel_lengte_rivier
     arcpy.CopyFeatures_management('profielen_temp', profielen)
     # arcpy.FlipLine_edit(profielen)
 
-    print 'profielen gemaakt op trajectlijn'
+    print 'Profielen gemaakt op trajectlijn'
 
 
 
@@ -752,97 +737,6 @@ def kruinbepalen(invoer, code, uitvoer_binnenkruin, uitvoer_buitenkruin,verschil
                 list_id_buk.append(row['OBJECTID'])
                 break
 
-        # # bit
-        # # maaiveldhoogte achterland
-        # mv_achterland_lijst = []
-        # for index, row in landzijde.iterrows():
-        #     if row['afstand'] > min_achterland and row['afstand'] < max_achterland :
-        #         mv_achterland_lijst.append(row['z_ahn'])
-        # mv_achterland = average(mv_achterland_lijst)
-        # # print mv_achterland
-        # row_iterator = rivierzijde.iterrows()
-        # _, last = row_iterator.next()  # take first item from row_iterator
-        # for i, row in row_iterator:
-        #
-        #     hoogte1 = last['z_ahn']
-        #     hoogte2 = row['z_ahn']
-        #     afstand1 = last['afstand']
-        #     afstand2 = row['afstand']
-        #     delta_h = abs(hoogte1 - hoogte2)
-        #     delta_a = abs(afstand1 - afstand2)
-        #     talud = delta_h / delta_a
-        #     if afstand2 > 0 and afstand2 < max_achterland and hoogte2 < mv_achterland + 0.5 and talud < max_talud:
-        #         x_bit = row['afstand']
-        #         y_bit = row['z_ahn']
-        #         list_id_bit.append(row['OBJECTID'])
-        #         print row['afstand']
-        #         break
-        #     last = row
-
-        # x1 = group['afstand']
-        # y1 = group['z_ahn']
-        #
-        #
-        #
-        #
-        #
-        #
-        #
-        # fig = plt.figure(figsize=(25, 2))
-        # ax = fig.add_subplot(111)
-        # ax.plot(x1, y1, linewidth=2, color="red")
-        #
-        # try:
-        #     x_bik
-        #     ax.plot(x_bik, y_bik, 'ro', markersize=6)
-        # except NameError:
-        #     pass
-        #
-        # try:
-        #     x_buk
-        #     ax.plot(x_buk, y_buk, 'ro', markersize=6)
-        # except NameError:
-        #     pass
-        # try:
-        #     x_bit
-        #     ax.plot(x_bit, y_bit, 'ro', markersize=6)
-        # except NameError:
-        #     pass
-        # try:
-        #     x_but
-        #     ax.plot(x_but, y_but, 'ro', markersize=6)
-        # except NameError:
-        #     pass
-        # plt.show()
-        #
-        #
-        #
-        #
-        #
-        #
-        #
-        # try:
-        #     x_buk
-        #     del x_buk, y_buk
-        # except NameError:
-        #     pass
-        #
-        # try:
-        #     x_bik
-        #     del x_bik, y_bik
-        # except NameError:
-        #     pass
-        # try:
-        #     x_but
-        #     del x_but, y_but
-        # except NameError:
-        #     pass
-        # try:
-        #     x_bit
-        #     del x_bit, y_bit
-        # except NameError:
-        #     pass
-
     # wegschrijven naar gis
 
     # binnenkruin
@@ -859,12 +753,8 @@ def kruinbepalen(invoer, code, uitvoer_binnenkruin, uitvoer_buitenkruin,verschil
                                                              "OBJECTID in (" + str(list_id_buk)[1:-1] + ")")
         arcpy.CopyFeatures_management('punten_buitenkruin_temp', uitvoer_buitenkruin)
 
-    # arcpy.MakeFeatureLayer_management(invoer, 'punten_binnenteen_temp')
-    # punten_bit = arcpy.SelectLayerByAttribute_management('punten_binnenteen_temp', "ADD_TO_SELECTION",
-    #                                                      "OBJECTID in (" + str(list_id_bit)[1:-1] + ")")
-    # arcpy.CopyFeatures_management('punten_binnenteen_temp', 'punten_binnenteen')
 
-    print 'kruin bepaald'
+    print 'Kruinpunten bepaald'
 def excel_writer(uitvoerpunten,code,excel,id):
     # binnenhalen van dataframe
     array = arcpy.da.FeatureClassToNumPyArray(uitvoerpunten,('OBJECTID', 'profielnummer', code, 'afstand', 'z_ahn', 'x', 'y'))
@@ -946,6 +836,8 @@ def excel_writer(uitvoerpunten,code,excel,id):
     # line_chart1.set_style(1)
     worksheet.insert_chart('G3', line_chart1)
     workbook.close()
+
+    print '.xlsx-bestand gemaakt voor profielset'
 
 
 def binnenteenbepalen(invoer, code, min_achterland, max_achterland, uitvoer_binnenteen, min_afstand,
@@ -1071,7 +963,7 @@ def binnenteenbepalen(invoer, code, min_achterland, max_achterland, uitvoer_binn
             punten_bit = arcpy.SelectLayerByAttribute_management('punten_binnenteen_temp', "ADD_TO_SELECTION",
                                                                  "OBJECTID in (" + str(list_id_bit)[1:-1] + ")")
             arcpy.CopyFeatures_management('punten_binnenteen_temp', uitvoer_binnenteen)
-        print 'binnenteen bepaald'
+        print 'Binnenteen bepaald'
     else:
         pass
 def koppeling_hbn_hdsr(profielen,toetspeil):
@@ -1090,7 +982,7 @@ def koppeling_hbn_hdsr(profielen,toetspeil):
                 if row[0] is not None and row[1] is not None:
                     row[2] = 0
                     cursor.updateRow(row)
-    print "kruinhoogte-hbn berekend"
+    print "Kruinhoogte-hbn berekend"
 
 
 def profielen_op_lijn(profiel_interval,profiel_lengte_land,profiel_lengte_rivier,trajectlijn,code, profielen):
@@ -1276,5 +1168,6 @@ def bereken_restlevensduur(profielen,bodemdalingskaart):
                         row[1] = round(resthoogte_mm/bodemdaling_mm,1)
                 cursor.updateRow(row)
 
+    print 'Restlevensduur berekend'
 
 
