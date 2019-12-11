@@ -1031,12 +1031,13 @@ def koppeling_hbn_hdsr(profielen,toetspeil):
     with arcpy.da.UpdateCursor(profielen, ['max_kruinhoogte', toetspeil, 'kruin_hbn2024']) as cursor:
 
         for row in cursor:
-            verschil = abs(row[0] - row[1])
             if row[0] is not None and row[0] >= row[1]:
+                verschil = abs(row[0] - row[1])
                 row[2] = round(verschil,2)
                 cursor.updateRow(row)
             else:
                 if row[0] is not None and row[0]<row[1]:
+                    verschil = abs(row[0] - row[1])
                     row[2] = -round(verschil,2)
                     cursor.updateRow(row)
 
@@ -1233,12 +1234,13 @@ def bereken_restlevensduur(profielen,bodemdalingskaart,afstand_zichtjaar,toetspe
     # bereken verschil maximale kruinhoogte-bodemdaling per x jaren met hbn
     with arcpy.da.UpdateCursor(profielen, [toetspeil,'bd_mmy','bd_max_kruinhoogte','bd_kruin_hbn2024']) as cursor:
         for row in cursor:
-            verschil = abs(row[2] - row[0])
             if row[2] is not None and row[2] >= row[0]:
+                verschil = abs(row[2] - row[0])
                 row[3] = round(verschil,2)
                 cursor.updateRow(row)
             else:
                 if row[2] is not None and row[2]<row[0]:
+                    verschil = abs(row[2] - row[0])
                     row[3] = -round(verschil,2)
                     cursor.updateRow(row)
 
