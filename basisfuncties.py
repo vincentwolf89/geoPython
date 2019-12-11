@@ -95,7 +95,7 @@ def copy_trajectory_lr(trajectlijn,code):
         for shp, w in cursor:
             RightLine = CopyParallelR(shp, w)
             cursor.updateRow((RightLine, w))
-    print "Water-en landdelen gemaakt"
+    print "Water- en landdelen gemaakt"
 
 def set_measurements_trajectory(profielen,trajectlijn,code,stapgrootte_punten,toetspeil): #rechts = rivier, profielen van binnen naar buiten
     # clean feature
@@ -755,9 +755,13 @@ def kruinbepalen(invoer, code, uitvoer_binnenkruin, uitvoer_buitenkruin,verschil
 
 
     print 'Kruinpunten bepaald'
-def excel_writer(uitvoerpunten,code,excel,id):
+
+def excel_writer(uitvoerpunten,code,excel,id,trajecten,toetspeil):
+    # toetshoogte aan uitvoerpunten koppelen
+    arcpy.JoinField_management(uitvoerpunten, 'Naam', trajecten, 'Naam', toetspeil)
+
     # binnenhalen van dataframe
-    array = arcpy.da.FeatureClassToNumPyArray(uitvoerpunten,('OBJECTID', 'profielnummer', code, 'afstand', 'z_ahn', 'x', 'y'))
+    array = arcpy.da.FeatureClassToNumPyArray(uitvoerpunten,('OBJECTID', 'profielnummer', code, 'afstand', 'z_ahn', 'x', 'y',toetspeil))
 
     df = pd.DataFrame(array)
     df = df.dropna()
@@ -796,6 +800,28 @@ def excel_writer(uitvoerpunten,code,excel,id):
     line_chart1 = workbook.add_chart({'type': 'scatter',
                                  'subtype': 'straight'})
 
+    # toetshoogte toevoegen als horizontale lijn, deel 1 voor legenda
+    minimum = min(sorted['afstand'])
+    maximum = max(sorted['afstand'])
+    th = sorted[toetspeil].iloc[0]
+
+    worksheet.write('K8', minimum)
+    worksheet.write('K9', maximum)
+    worksheet.write('K10', th)
+    worksheet.write('K11', th)
+
+    line_chart1.add_series({
+        'name': 'HBN: ' + str(th) + ' m NAP',
+
+        'categories': '=Sheet1!$K$8:$K$9',
+        'values': '=Sheet1!$K$10:$K$11',
+        'line': {
+            'color': 'red',
+            'width': 1.5,
+            'dash_type': 'long_dash'
+        }
+    })
+
     # lijnen toevoegen aan lijngrafiek
     count = 0
     for name, group in grouped:
@@ -825,6 +851,29 @@ def excel_writer(uitvoerpunten,code,excel,id):
         # startpunt verzetten
         startpunt += (meetpunten)
 
+
+
+    # toetshoogte toevoegen als horizontale lijn, deel 2 voor voorgrond-lijn
+    minimum = min(sorted['afstand'])
+    maximum = max(sorted['afstand'])
+    th = sorted[toetspeil].iloc[0]
+
+    worksheet.write('K8', minimum)
+    worksheet.write('K9', maximum)
+    worksheet.write('K10', th)
+    worksheet.write('K11', th)
+
+    line_chart1.add_series({
+        'name': 'HBN: ' + str(th) + ' m NAP',
+
+        'categories': '=Sheet1!$K$8:$K$9',
+        'values': '=Sheet1!$K$10:$K$11',
+        'line': {
+            'color': 'red',
+            'width': 1.5,
+            'dash_type': 'long_dash'
+        }
+    })
 
     # kolommen aanpassen
     line_chart1.set_title({'name': 'Overzicht profielen '+id})
@@ -967,21 +1016,30 @@ def binnenteenbepalen(invoer, code, min_achterland, max_achterland, uitvoer_binn
     else:
         pass
 def koppeling_hbn_hdsr(profielen,toetspeil):
+
+
+    bestaande_velden = arcpy.ListFields(profielen)
+    te_verwijderen = ['kruin_hbn2024']
+    for field in bestaande_velden:
+        if field.name in te_verwijderen:
+            arcpy.DeleteField_management(profielen, field.name)
+
     arcpy.AddField_management(profielen, "kruin_hbn2024", "DOUBLE", 2, field_is_nullable="NULLABLE")
+
+
+
     with arcpy.da.UpdateCursor(profielen, ['max_kruinhoogte', toetspeil, 'kruin_hbn2024']) as cursor:
+
         for row in cursor:
-            if row[0] < row[1] and row[0] is not None and row[1] is not None:
-                verschil = -abs(row[0]-row[1])
-                row[2] = verschil
-                cursor.updateRow(row)
-            elif row[0] > row[1] and row[0] is not None and row[1] is not None:
-                verschil = abs(row[0]-row[1])
-                row[2] = verschil
+            verschil = abs(row[0] - row[1])
+            if row[0] is not None and row[0] >= row[1]:
+                row[2] = round(verschil,2)
                 cursor.updateRow(row)
             else:
-                if row[0] is not None and row[1] is not None:
-                    row[2] = 0
+                if row[0] is not None and row[0]<row[1]:
+                    row[2] = -round(verschil,2)
                     cursor.updateRow(row)
+
     print "Kruinhoogte-hbn berekend"
 
 
@@ -1126,7 +1184,7 @@ def generate_profiles_onpoints(traject_punten,trajectlijn,profielen,code):
     print 'profielen gemaakt op trajectlijn'
 
 
-def bereken_restlevensduur(profielen,bodemdalingskaart):
+def bereken_restlevensduur(profielen,bodemdalingskaart,afstand_zichtjaar,toetspeil):
     # profiellijnen middenpunt
     arcpy.FeatureToPoint_management(profielen, 'profielen_temp','CENTROID')
 
@@ -1153,9 +1211,41 @@ def bereken_restlevensduur(profielen,bodemdalingskaart):
     arcpy.JoinField_management(profielen, 'profielnummer', 'profielen_temp_z', 'profielnummer', 'bd_mmy')
 
 
+
+    # maximale kruinhoogte aanpassen aan bodemdaling, 'bd_' voor velden
+    bestaande_velden = arcpy.ListFields(profielen)
+    te_verwijderen = ['bd_max_kruinhoogte','bd_kruin_hbn2024']
+    for field in bestaande_velden:
+        if field.name in te_verwijderen:
+            arcpy.DeleteField_management(profielen, field.name)
+    arcpy.AddField_management(profielen, "bd_max_kruinhoogte", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.AddField_management(profielen, "bd_kruin_hbn2024", "DOUBLE", 2, field_is_nullable="NULLABLE")
+
+    # bereken maximale kruinhoogte-bodemdaling per x jaren
+    with arcpy.da.UpdateCursor(profielen, ['profielnummer','bd_mmy','max_kruinhoogte', 'bd_max_kruinhoogte']) as cursor:
+        for row in cursor:
+            if row[2] is not None and row[1] < 0:
+                bd_meters = row[1]/1000
+                row[3] = round(row[2]-abs(afstand_zichtjaar*bd_meters),2)
+                cursor.updateRow(row)
+            else:
+                pass
+    # bereken verschil maximale kruinhoogte-bodemdaling per x jaren met hbn
+    with arcpy.da.UpdateCursor(profielen, [toetspeil,'bd_mmy','bd_max_kruinhoogte','bd_kruin_hbn2024']) as cursor:
+        for row in cursor:
+            verschil = abs(row[2] - row[0])
+            if row[2] is not None and row[2] >= row[0]:
+                row[3] = round(verschil,2)
+                cursor.updateRow(row)
+            else:
+                if row[2] is not None and row[2]<row[0]:
+                    row[3] = -round(verschil,2)
+                    cursor.updateRow(row)
+
+
     # restlevensduur berekenen
     arcpy.AddField_management(profielen, "rld_jaar", "DOUBLE")
-    with arcpy.da.UpdateCursor(profielen, ('bd_mmy','rld_jaar','kruin_hbn2024')) as cursor:
+    with arcpy.da.UpdateCursor(profielen, ('bd_mmy','rld_jaar','bd_kruin_hbn2024')) as cursor:
         for row in cursor:
             if row[2] is not None and row[0] is not None:
                 resthoogte = row[2]
@@ -1163,7 +1253,7 @@ def bereken_restlevensduur(profielen,bodemdalingskaart):
                     row[1] = 0
                 else:
                     if row[0] < 0:
-                        resthoogte_mm = row[2]*100
+                        resthoogte_mm = row[2]*1000
                         bodemdaling_mm = abs(row[0])
                         row[1] = round(resthoogte_mm/bodemdaling_mm,1)
                 cursor.updateRow(row)
