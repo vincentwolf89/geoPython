@@ -524,7 +524,7 @@ def max_kruinhoogte_oud(uitvoerpunten,profielen,code,uitvoer_maxpunten,toetspeil
             arcpy.DeleteField_management(profielen, field.name)
 
     # voeg veld voor maximale kruinhoogte toe aan lijn-laag profielen
-    arcpy.AddField_management(profielen, "max_kruinhoogte", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.AddField_management(profielen, "max_kruinhoogte2014", "DOUBLE", 2, field_is_nullable="NULLABLE")
     with arcpy.da.UpdateCursor(profielen, ['profielnummer','max_kruinhoogte']) as cursor:
         for row in cursor:
             profielnummer = row[0]
@@ -616,8 +616,8 @@ def max_kruinhoogte(uitvoerpunten, profielen, code, uitvoer_maxpunten,min_afstan
             arcpy.DeleteField_management(profielen, field.name)
 
     # voeg veld voor maximale kruinhoogte toe aan lijn-laag profielen
-    arcpy.AddField_management(profielen, "max_kruinhoogte", "DOUBLE", 2, field_is_nullable="NULLABLE")
-    with arcpy.da.UpdateCursor(profielen, ['profielnummer', 'max_kruinhoogte']) as cursor:
+    arcpy.AddField_management(profielen, "max_kruinhoogte2014", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    with arcpy.da.UpdateCursor(profielen, ['profielnummer', 'max_kruinhoogte2014']) as cursor:
         for row in cursor:
             profielnummer = row[0]
             for i, row in df_maxwaardes.iterrows():
@@ -1019,16 +1019,16 @@ def koppeling_hbn_hdsr(profielen,toetspeil):
 
 
     bestaande_velden = arcpy.ListFields(profielen)
-    te_verwijderen = ['kruin_hbn2024']
+    te_verwijderen = ['kruin2014_th']
     for field in bestaande_velden:
         if field.name in te_verwijderen:
             arcpy.DeleteField_management(profielen, field.name)
 
-    arcpy.AddField_management(profielen, "kruin_hbn2024", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.AddField_management(profielen, "kruin2014_th", "DOUBLE", 2, field_is_nullable="NULLABLE")
 
 
 
-    with arcpy.da.UpdateCursor(profielen, ['max_kruinhoogte', toetspeil, 'kruin_hbn2024']) as cursor:
+    with arcpy.da.UpdateCursor(profielen, ['max_kruinhoogte2014', toetspeil, 'kruin2014_th']) as cursor:
 
         for row in cursor:
             if row[0] is not None and row[0] >= row[1]:
@@ -1215,15 +1215,15 @@ def bereken_restlevensduur(profielen,bodemdalingskaart,afstand_zichtjaar,toetspe
 
     # maximale kruinhoogte aanpassen aan bodemdaling, 'bd_' voor velden
     bestaande_velden = arcpy.ListFields(profielen)
-    te_verwijderen = ['bd_max_kruinhoogte','bd_kruin_hbn2024']
+    te_verwijderen = ['max_kruinhoogte2024','kruin2024_th']
     for field in bestaande_velden:
         if field.name in te_verwijderen:
             arcpy.DeleteField_management(profielen, field.name)
-    arcpy.AddField_management(profielen, "bd_max_kruinhoogte", "DOUBLE", 2, field_is_nullable="NULLABLE")
-    arcpy.AddField_management(profielen, "bd_kruin_hbn2024", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.AddField_management(profielen, "max_kruinhoogte2024", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.AddField_management(profielen, "kruin2024_th", "DOUBLE", 2, field_is_nullable="NULLABLE")
 
     # bereken maximale kruinhoogte-bodemdaling per x jaren
-    with arcpy.da.UpdateCursor(profielen, ['profielnummer','bd_mmy','max_kruinhoogte', 'bd_max_kruinhoogte']) as cursor:
+    with arcpy.da.UpdateCursor(profielen, ['profielnummer','bd_mmy','max_kruinhoogte2014', 'max_kruinhoogte2024']) as cursor:
         for row in cursor:
             if row[2] is not None and row[1] < 0:
                 bd_meters = row[1]/1000
@@ -1232,7 +1232,7 @@ def bereken_restlevensduur(profielen,bodemdalingskaart,afstand_zichtjaar,toetspe
             else:
                 pass
     # bereken verschil maximale kruinhoogte-bodemdaling per x jaren met hbn
-    with arcpy.da.UpdateCursor(profielen, [toetspeil,'bd_mmy','bd_max_kruinhoogte','bd_kruin_hbn2024']) as cursor:
+    with arcpy.da.UpdateCursor(profielen, [toetspeil,'bd_mmy','max_kruinhoogte2024','kruin2024_th']) as cursor:
         for row in cursor:
             if row[2] is not None and row[2] >= row[0]:
                 verschil = abs(row[2] - row[0])
@@ -1247,7 +1247,7 @@ def bereken_restlevensduur(profielen,bodemdalingskaart,afstand_zichtjaar,toetspe
 
     # restlevensduur berekenen
     arcpy.AddField_management(profielen, "rld_jaar", "DOUBLE")
-    with arcpy.da.UpdateCursor(profielen, ('bd_mmy','rld_jaar','bd_kruin_hbn2024')) as cursor:
+    with arcpy.da.UpdateCursor(profielen, ('bd_mmy','rld_jaar','kruin2024_th')) as cursor:
         for row in cursor:
             if row[2] is not None and row[0] is not None:
                 resthoogte = row[2]
