@@ -811,7 +811,7 @@ def excel_writer(uitvoerpunten,code,excel,id,trajecten,toetspeil):
     worksheet.write('K11', th)
 
     line_chart1.add_series({
-        'name': 'HBN: ' + str(th) + ' m NAP',
+        'name': 'toetshoogte: ' + str(th) + ' m NAP',
 
         'categories': '=Sheet1!$K$8:$K$9',
         'values': '=Sheet1!$K$10:$K$11',
