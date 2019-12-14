@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 pd.set_option('mode.chained_assignment', None)
 
 
-# hulpfuncties voor copy_trajectory
+# hulpfuncties
 def CopyParallelL(plyP,sLength): #functie voor profielen maken haaks op trajectlijn
     part=plyP.getPart(0)
     lArray=arcpy.Array()
@@ -49,6 +49,8 @@ def CopyParallelR(plyP,sLength): #functie voor profielen maken haaks op trajectl
     array = arcpy.Array([rArray])
     section=arcpy.Polyline(array)
     return section
+def average(lijst):
+    return sum(lijst) / len(lijst)
 
 # functie voor het bepalen van land- en rivierzijde
 def copy_trajectory_lr(trajectlijn,code):
