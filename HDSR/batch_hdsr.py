@@ -27,8 +27,8 @@ raster = r'D:\Projecten\HDSR\data\ahn_hdsr.gdb\AHN3grondfilter'
 bodemdalingskaart = r'D:\GIS\losse rasters\bodemdalingskaart_app_data_geotiff_Bodemdalingskaart_10de_percentiel_mm_per_jaar_verticale_richting_v2018002.tif'
 afstand_zichtjaar = 10
 code_hdsr = 'Naam'
-toetspeil = 'TH_2024'
-trajecten = 'testtrajecten'
+toetspeil = 'th2024'
+trajecten = 'testset'
 # specifieke invoer bepaling bit/but
 verschil_maxkruin = 0.2
 excelmap = 'D:/Projecten/HDSR/xlsx_uitvoer/'
