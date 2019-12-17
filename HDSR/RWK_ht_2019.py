@@ -823,11 +823,15 @@ def bereken_restlevensduur(profielen,bodemdalingskaart,afstand_zichtjaar,toetspe
                 bd_meters = row[1]/1000
                 row[3] = round(row[2]-abs(afstand_zichtjaar*bd_meters),2)
                 cursor.updateRow(row)
+            elif row[2] is not None and row[1] >= 0:
+                row[3] = row[2]
+                row[1] = 0
+                cursor.updateRow(row)
+            elif row[2] is None and row[1] >= 0:
+                row[1] = 0
+                cursor.updateRow(row)
             else:
-                if row[2] is not None and row[1] >= 0:
-                    row[3] = row[2]
-                    row[1] = 0
-                    cursor.updateRow(row)
+                pass
     # bereken verschil maximale kruinhoogte-bodemdaling per x jaren met hbn
     with arcpy.da.UpdateCursor(profielen, [toetspeil,'bdMmj','maxKruinhoogte2024','kruin2024_th']) as cursor:
         for row in cursor:
