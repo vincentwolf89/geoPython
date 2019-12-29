@@ -14,7 +14,7 @@ os.chdir(r"D:\DL\sample_data_vincent\output")
 # bestandsnamen
 train_raster = r'D:\DL\sample_data_vincent\rasters\los_vast_clip.tif'
 trainvlakken = r'D:\DL\sample_data_vincent\rasters\schier_classify_clip.tif'
-test_raster = r'D:\DL\sample_data_vincent\rasters\los_vast_clip.tif'
+test_raster = r'D:\DL\sample_data_vincent\rasters\schier_test.tif'
 
 
 # Read the rasters as array
@@ -71,7 +71,7 @@ print(xTrain.shape, xTest.shape, test_raster.shape)
 # Define the parameters of the model
 model = keras.Sequential([
     keras.layers.Flatten(input_shape=(1, nBands)),
-    keras.layers.Dense(14, activation='relu'),
+    # keras.layers.Dense(14, activation='relu'),
     keras.layers.Dense(5, activation='softmax')])
 
 
@@ -104,7 +104,7 @@ predicted = predicted[:,1]
 
 y_proba = model.predict_classes(test_raster)
 
-print (y_proba)
+print (max(y_proba))
 
 
 # Predict new data and export the probability raster
