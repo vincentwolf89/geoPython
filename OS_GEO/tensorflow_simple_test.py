@@ -95,15 +95,16 @@ pScore = precision_score(yTest, yTestPredicted)
 rScore = recall_score(yTest, yTestPredicted)
 
 
+
 print("Confusion matrix: for 14 nodes\n", cMatrix)
 print("\nP-Score: %.3f, R-Score: %.3f" % (pScore, rScore))
 
 predicted = model.predict(test_raster)
 predicted = predicted[:,1]
 
-y_proba = model.predict(test_raster)
-y_classes = keras.np_utils.probas_to_classes(y_proba)
-print (y_classes)
+y_proba = model.predict_classes(test_raster)
+
+print (y_proba)
 
 
 # Predict new data and export the probability raster
