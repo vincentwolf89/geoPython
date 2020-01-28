@@ -36,11 +36,11 @@ raster = r'C:\Users\Vincent\Desktop\ahn3clip_safe' # hoogtegrid
 bodemdalingskaart = r'D:\GIS\losse rasters\bodemdalingskaart_app_data_geotiff_Bodemdalingskaart_10de_percentiel_mm_per_jaar_verticale_richting_v2018002.tif'
 afstand_zichtjaar = 10 # het aantal jaren waarmee de bodemdaling (per jaar) moet worden vermenigvuldigd.
 code_wsrl = 'prio_nummer' # naamgeving van traject
-# toetspeil = 'th2024' # naam van kolom met toetspeil/toetshoogte
+toetspeil = 999 # naam van kolom met toetspeil/toetshoogte, 999 voor uitvoer zonder toetspeil
 trajecten = 'priovakken' # door te rekenen trajecten
 
 naam_totaalprofielen = 'prioprofielen_safe_jan2020'
-toetspeil = 999
+
 
 totaal_profielen =[]
 
