@@ -256,89 +256,6 @@ def add_xy(uitvoerpunten,code):
 
     print "XY-coordinaten aan punten gekoppeld"
 
-# oude functie, niet gebruiken
-def to_excel(uitvoerpunten,resultfile,sorteervelden):
-
-
-    fields = ['profielnummer', 'afstand', 'z_ahn', 'x', 'y']
-    list_profielnummer = []
-    list_afstand = []
-    list_z_ahn = []
-    list_x = []
-    list_y =[]
-    with arcpy.da.SearchCursor(uitvoerpunten, fields,'#', '#', sorteervelden) as cur:
-        for row in cur:
-            if row[2] is None:
-                pass
-            elif row[1] == None:
-                profielnummer = row[0]
-                afstand = 0
-                z_ahn = row[2]
-                x = row[3]
-                y = row[4]
-
-
-                list_profielnummer.append(profielnummer)
-                list_afstand.append(round(afstand,1))
-                list_z_ahn.append(round(z_ahn,2))
-                list_x.append(round(x,2))
-                list_y.append(round(y,2))
-            else:
-                profielnummer = row[0]
-                afstand = row[1]
-                z_ahn = row[2]
-                x = row[3]
-                y = row[4]
-
-                list_profielnummer.append(profielnummer)
-                list_afstand.append(round(afstand,1))
-                list_z_ahn.append(round(z_ahn,2))
-                list_x.append(round(x,2))
-                list_y.append(round(y,2))
-        # define styles
-
-    style = xlwt.easyxf('font: bold 1')  # define style
-    wb = xlwt.Workbook()  # open new workbook
-    ws = wb.add_sheet("overzicht")  # add new sheet
-
-    # write headers
-    row = 0
-    ws.write(row, 0, "profielnummer", style=style)
-    ws.write(row, 1, "afstand buk [m, buitenkant -]", style=style)
-    ws.write(row, 2, "z_ahn [m NAP]", style=style)
-    ws.write(row, 3, "x", style=style)
-    ws.write(row, 4, "y", style=style)
-
-
-    # write colums
-    row = 1
-    for i in list_profielnummer:
-        ws.write(row, 0, i)
-        row += 1
-
-    row = 1
-    for i in list_afstand:
-        ws.write(row, 1, i)
-        row += 1
-
-    row = 1
-    for i in list_z_ahn:
-        ws.write(row, 2, i)
-        row += 1
-
-    row = 1
-    for i in list_x:
-        ws.write(row, 3, i)
-        row += 1
-
-    row = 1
-    for i in list_y:
-        ws.write(row, 4, i)
-        row += 1
-
-
-    wb.save(resultfile)
-    print "Excel file generated"
 
 def create_contour_lines(trajectlijn,raster,contourlines,distance):
     # buffer trajectlijn
@@ -537,6 +454,8 @@ def max_kruinhoogte(uitvoerpunten, profielen, code, uitvoer_maxpunten,min_afstan
     print 'Maximale kruinhoogte voor ieder profiel bepaald indien mogelijk'
 def generate_profiles(profiel_interval,profiel_lengte_land,profiel_lengte_rivier,trajectlijn,code,toetspeil,profielen):
     # traject to points
+
+
     arcpy.GeneratePointsAlongLines_management(trajectlijn, 'traject_punten', 'DISTANCE', Distance=profiel_interval, Include_End_Points='END_POINTS')
     arcpy.AddField_management('traject_punten', "profielnummer", "DOUBLE", 2, field_is_nullable="NULLABLE")
     arcpy.AddField_management('traject_punten', "lengte_landzijde", "DOUBLE", 2, field_is_nullable="NULLABLE")
@@ -655,10 +574,13 @@ def kruinbepalen(invoer, code, uitvoer_binnenkruin, uitvoer_buitenkruin,verschil
 
 def excel_writer(uitvoerpunten,code,excel,id,trajecten,toetspeil):
     # toetshoogte aan uitvoerpunten koppelen
-    arcpy.JoinField_management(uitvoerpunten, 'Naam', trajecten, 'Naam', toetspeil)
+    arcpy.JoinField_management(uitvoerpunten, code, trajecten, code, toetspeil)
 
     # binnenhalen van dataframe
-    array = arcpy.da.FeatureClassToNumPyArray(uitvoerpunten,('OBJECTID', 'profielnummer', code, 'afstand', 'z_ahn', 'x', 'y',toetspeil))
+    if toetspeil == 999:
+        array = arcpy.da.FeatureClassToNumPyArray(uitvoerpunten,('OBJECTID', 'profielnummer', code, 'afstand', 'z_ahn', 'x', 'y'))
+    else:
+        array = arcpy.da.FeatureClassToNumPyArray(uitvoerpunten, ('OBJECTID', 'profielnummer', code, 'afstand', 'z_ahn', 'x', 'y', toetspeil))
 
     df = pd.DataFrame(array)
     df = df.dropna()
@@ -697,27 +619,29 @@ def excel_writer(uitvoerpunten,code,excel,id,trajecten,toetspeil):
     line_chart1 = workbook.add_chart({'type': 'scatter',
                                  'subtype': 'straight'})
 
+    ## toetshoogte, aan/uit
     # toetshoogte toevoegen als horizontale lijn, deel 1 voor legenda
-    minimum = min(sorted['afstand'])
-    maximum = max(sorted['afstand'])
-    th = sorted[toetspeil].iloc[0]
+    # minimum = min(sorted['afstand'])
+    # maximum = max(sorted['afstand'])
+    # th = sorted[toetspeil].iloc[0]
+    #
+    # worksheet.write('K8', minimum)
+    # worksheet.write('K9', maximum)
+    # worksheet.write('K10', th)
+    # worksheet.write('K11', th)
 
-    worksheet.write('K8', minimum)
-    worksheet.write('K9', maximum)
-    worksheet.write('K10', th)
-    worksheet.write('K11', th)
 
-    line_chart1.add_series({
-        'name': 'toetshoogte: ' + str(th) + ' m NAP',
-
-        'categories': '=Sheet1!$K$8:$K$9',
-        'values': '=Sheet1!$K$10:$K$11',
-        'line': {
-            'color': 'red',
-            'width': 1.5,
-            'dash_type': 'long_dash'
-        }
-    })
+    # line_chart1.add_series({
+    #     'name': 'toetshoogte: ' + str(th) + ' m NAP',
+    #
+    #     'categories': '=Sheet1!$K$8:$K$9',
+    #     'values': '=Sheet1!$K$10:$K$11',
+    #     'line': {
+    #         'color': 'red',
+    #         'width': 1.5,
+    #         'dash_type': 'long_dash'
+    #     }
+    # })
 
     # lijnen toevoegen aan lijngrafiek
     count = 0
@@ -750,27 +674,27 @@ def excel_writer(uitvoerpunten,code,excel,id,trajecten,toetspeil):
 
 
 
-    # toetshoogte toevoegen als horizontale lijn, deel 2 voor voorgrond-lijn
-    minimum = min(sorted['afstand'])
-    maximum = max(sorted['afstand'])
-    th = sorted[toetspeil].iloc[0]
-
-    worksheet.write('K8', minimum)
-    worksheet.write('K9', maximum)
-    worksheet.write('K10', th)
-    worksheet.write('K11', th)
-
-    line_chart1.add_series({
-        'name': 'toetshoogte: ' + str(th) + ' m NAP',
-
-        'categories': '=Sheet1!$K$8:$K$9',
-        'values': '=Sheet1!$K$10:$K$11',
-        'line': {
-            'color': 'red',
-            'width': 1.5,
-            'dash_type': 'long_dash'
-        }
-    })
+    ## toetshoogte toevoegen als horizontale lijn, deel 2 voor voorgrond-lijn
+    # minimum = min(sorted['afstand'])
+    # maximum = max(sorted['afstand'])
+    # th = sorted[toetspeil].iloc[0]
+    #
+    # worksheet.write('K8', minimum)
+    # worksheet.write('K9', maximum)
+    # worksheet.write('K10', th)
+    # worksheet.write('K11', th)
+    #
+    # line_chart1.add_series({
+    #     'name': 'toetshoogte: ' + str(th) + ' m NAP',
+    #
+    #     'categories': '=Sheet1!$K$8:$K$9',
+    #     'values': '=Sheet1!$K$10:$K$11',
+    #     'line': {
+    #         'color': 'red',
+    #         'width': 1.5,
+    #         'dash_type': 'long_dash'
+    #     }
+    # })
 
     # kolommen aanpassen
     line_chart1.set_title({'name': 'Overzicht profielen '+id})
@@ -780,7 +704,7 @@ def excel_writer(uitvoerpunten,code,excel,id,trajecten,toetspeil):
     line_chart1.set_x_axis({'min': -10, 'max': 20})
     line_chart1.set_size({'width': 1000, 'height': 400})
     # line_chart1.set_style(1)
-    worksheet.insert_chart('G3', line_chart1)
+    worksheet.insert_chart('G3', line_chart1) # alleen toevoegen voor toetshoogte
     workbook.close()
 
     print '.xlsx-bestand gemaakt voor profielset'
