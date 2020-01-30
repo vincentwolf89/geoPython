@@ -87,17 +87,17 @@ def copy_trajectory_lr(trajectlijn,code):
 def set_measurements_trajectory(profielen,trajectlijn,code,stapgrootte_punten,toetspeil): #rechts = rivier, profielen van binnen naar buiten
     # clean feature
     existing_fields = arcpy.ListFields(profielen)
-    needed_fields = ['OBJECTID', 'SHAPE', 'SHAPE_Length','Shape','Shape_Length',code,toetspeil]
+    needed_fields = ['OBJECTID', 'SHAPE', 'SHAPE_Length','Shape','Shape_Length',code,toetspeil,'profielnummer']
     for field in existing_fields:
         if field.name not in needed_fields:
             arcpy.DeleteField_management(profielen, field.name)
 
     # add needed fields
-    arcpy.AddField_management(profielen, "profielnummer", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    #arcpy.AddField_management(profielen, "profielnummer", "DOUBLE", 2, field_is_nullable="NULLABLE")
     arcpy.AddField_management(profielen, "van", "DOUBLE", 2, field_is_nullable="NULLABLE")
     arcpy.AddField_management(profielen, "tot", "DOUBLE", 2, field_is_nullable="NULLABLE")
 
-    arcpy.CalculateField_management(profielen, "profielnummer", '!OBJECTID!', "PYTHON")
+    #arcpy.CalculateField_management(profielen, "profielnummer", '!OBJECTID!', "PYTHON")
 
     # split profiles
     rivierlijn = "river"
@@ -515,8 +515,15 @@ def generate_profiles(profiel_interval,profiel_lengte_land,profiel_lengte_rivier
 
     print 'Profielen gemaakt op trajectlijn'
 
-
-
+def join_mg_profiles(trajectlijn, profielen,profielen_mg,profielen_plus):
+    # select from trajectlijn
+    arcpy.MakeFeatureLayer_management(profielen_mg, 'templaag_profielen_mg')
+    arcpy.MakeFeatureLayer_management(profielen, 'templaag_profielen')
+    arcpy.SelectLayerByLocation_management('templaag_profielen_mg', 'intersect', trajectlijn)
+    arcpy.CopyFeatures_management('templaag_profielen_mg', 'maatgevend_profiel')
+    # merge
+    arcpy.Merge_management(['templaag_profielen', 'maatgevend_profiel'], profielen_plus)
+    print "maatgevende profielen toegevoegd aan profielset"
 def kruinbepalen(invoer, code, uitvoer_binnenkruin, uitvoer_buitenkruin,verschil_maxkruin,min_afstand,max_afstand):
     array = arcpy.da.FeatureClassToNumPyArray(invoer, ('OBJECTID', 'profielnummer', code, 'afstand', 'z_ahn'))
     df = pd.DataFrame(array)
@@ -572,7 +579,7 @@ def kruinbepalen(invoer, code, uitvoer_binnenkruin, uitvoer_buitenkruin,verschil
 
     print 'Kruinpunten bepaald'
 
-def excel_writer(uitvoerpunten,code,excel,id,trajecten,toetspeil):
+def excel_writer(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_plot,max_plot):
     # toetshoogte aan uitvoerpunten koppelen
     arcpy.JoinField_management(uitvoerpunten, code, trajecten, code, toetspeil)
 
@@ -697,18 +704,166 @@ def excel_writer(uitvoerpunten,code,excel,id,trajecten,toetspeil):
     # })
 
     # kolommen aanpassen
-    line_chart1.set_title({'name': 'Overzicht profielen '+id})
+    line_chart1.set_title({'name': 'Overzicht profielen dijkvak '+id})
     line_chart1.set_x_axis({'name': 'Afstand [m]'})
     line_chart1.set_y_axis({'name': 'Hoogte [m NAP]'})
     line_chart1.set_x_axis({'interval_tick': 0.5})
-    line_chart1.set_x_axis({'min': -10, 'max': 20})
-    line_chart1.set_size({'width': 1000, 'height': 400})
+    line_chart1.set_x_axis({'min': min_plot, 'max': max_plot})
+    line_chart1.set_size({'width': 1000, 'height': 300})
     # line_chart1.set_style(1)
     worksheet.insert_chart('G3', line_chart1) # alleen toevoegen voor toetshoogte
     workbook.close()
 
     print '.xlsx-bestand gemaakt voor profielset'
 
+def excel_writer_maatgevend(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_plot,max_plot):
+
+    # toetshoogte aan uitvoerpunten koppelen
+    arcpy.JoinField_management(uitvoerpunten, code, trajecten, code, toetspeil)
+
+    # binnenhalen van dataframe
+    if toetspeil == 999:
+        array = arcpy.da.FeatureClassToNumPyArray(uitvoerpunten,('OBJECTID', 'profielnummer', code, 'afstand', 'z_ahn', 'x', 'y'))
+    else:
+        array = arcpy.da.FeatureClassToNumPyArray(uitvoerpunten, ('OBJECTID', 'profielnummer', code, 'afstand', 'z_ahn', 'x', 'y', toetspeil))
+
+    df = pd.DataFrame(array)
+    df = df.dropna()
+    sorted = df.sort_values(['profielnummer', 'afstand'], ascending=[True, True])
+
+    # opbouw xlsx
+    workbook = Workbook(excel)
+    worksheet = workbook.add_worksheet()
+
+    # stijl toevoegen voor headers
+    bold = workbook.add_format({'bold': True})
+
+
+    # schrijf kolomnamen
+    worksheet.write(0, 0, "Profielnummer", bold)
+    worksheet.write(0, 1, "Afstand [m]", bold)
+    worksheet.write(0, 2, "Hoogte AHN3 [m NAP]", bold)
+    worksheet.write(0, 3, "x [RD]", bold)
+    worksheet.write(0, 4, "y [RD]", bold)
+
+    # schrijf kolommen vanuit df
+    worksheet.write_column('A2', sorted['profielnummer'])
+    worksheet.write_column('B2', sorted['afstand'])
+    worksheet.write_column('C2', sorted['z_ahn'])
+    worksheet.write_column('D2', sorted['x'])
+    worksheet.write_column('E2', sorted['y'])
+
+    # groepeer per profielnummer
+    grouped = sorted.groupby('profielnummer')
+
+    # definieer startrij
+    startpunt = 2
+
+
+    # lege lijngrafiek invoegen met zowel afstand als hoogte als invoer
+    line_chart1 = workbook.add_chart({'type': 'scatter',
+                                 'subtype': 'straight'})
+
+    ## toetshoogte, aan/uit
+    # toetshoogte toevoegen als horizontale lijn, deel 1 voor legenda
+    # minimum = min(sorted['afstand'])
+    # maximum = max(sorted['afstand'])
+    # th = sorted[toetspeil].iloc[0]
+    #
+    # worksheet.write('K8', minimum)
+    # worksheet.write('K9', maximum)
+    # worksheet.write('K10', th)
+    # worksheet.write('K11', th)
+
+
+    # line_chart1.add_series({
+    #     'name': 'toetshoogte: ' + str(th) + ' m NAP',
+    #
+    #     'categories': '=Sheet1!$K$8:$K$9',
+    #     'values': '=Sheet1!$K$10:$K$11',
+    #     'line': {
+    #         'color': 'red',
+    #         'width': 1.5,
+    #         'dash_type': 'long_dash'
+    #     }
+    # })
+
+    # lijnen toevoegen aan lijngrafiek
+    count = 0
+    for name, group in grouped:
+        profielnaam = str(int(name))
+        meetpunten = len(group['profielnummer'])
+
+        # eerste profiel
+        if count == 0:
+            line_chart1.add_series({
+                'name': 'profiel ' + profielnaam,
+
+                'categories': '=Sheet1!B' + str(startpunt) + ':B' + str(meetpunten + 1),
+                'values': '=Sheet1!C' + str(startpunt) + ':C' + str(meetpunten + 1),
+                'line': {'width': 1}
+            })
+            count +=1
+        # opvolgende profielen
+        else:
+            if count is not 0 and name is not 9999:
+                line_chart1.add_series({
+                    'name': 'profiel '+profielnaam,
+
+                    'categories': '=Sheet1!B'+str(startpunt)+':B' + str(startpunt+meetpunten-1),
+                    'values':     '=Sheet1!C'+str(startpunt)+':C' + str(startpunt+meetpunten-1),
+                    'line': {'width': 1}
+                })
+            if name == 9999:
+                line_chart1.add_series({
+                    'name': 'maatgevend profiel',
+
+                    'categories': '=Sheet1!B'+str(startpunt)+':B' + str(startpunt+meetpunten-1),
+                    'values':     '=Sheet1!C'+str(startpunt)+':C' + str(startpunt+meetpunten-1),
+                    'line': {
+                        'color': 'red',
+                        'width': 3
+                    }
+                })
+        # startpunt verzetten
+        startpunt += (meetpunten)
+
+
+
+    ## toetshoogte toevoegen als horizontale lijn, deel 2 voor voorgrond-lijn
+    # minimum = min(sorted['afstand'])
+    # maximum = max(sorted['afstand'])
+    # th = sorted[toetspeil].iloc[0]
+    #
+    # worksheet.write('K8', minimum)
+    # worksheet.write('K9', maximum)
+    # worksheet.write('K10', th)
+    # worksheet.write('K11', th)
+    #
+    # line_chart1.add_series({
+    #     'name': 'toetshoogte: ' + str(th) + ' m NAP',
+    #
+    #     'categories': '=Sheet1!$K$8:$K$9',
+    #     'values': '=Sheet1!$K$10:$K$11',
+    #     'line': {
+    #         'color': 'red',
+    #         'width': 1.5,
+    #         'dash_type': 'long_dash'
+    #     }
+    # })
+
+    # kolommen aanpassen
+    line_chart1.set_title({'name': 'Overzicht profielen dijkvak '+id})
+    line_chart1.set_x_axis({'name': 'Afstand [m]'})
+    line_chart1.set_y_axis({'name': 'Hoogte [m NAP]'})
+    line_chart1.set_x_axis({'interval_tick': 0.5})
+    line_chart1.set_x_axis({'min': min_plot, 'max': max_plot})
+    line_chart1.set_size({'width': 1000, 'height': 300})
+    # line_chart1.set_style(1)
+    worksheet.insert_chart('G3', line_chart1) # alleen toevoegen voor toetshoogte
+    workbook.close()
+
+    print '.xlsx-bestand gemaakt voor profielset'
 
 def binnenteenbepalen(invoer, code, min_achterland, max_achterland, uitvoer_binnenteen, min_afstand,
                       max_afstand,uitvoer_binnenkruin):
