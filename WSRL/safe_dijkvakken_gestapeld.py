@@ -37,8 +37,10 @@ bodemdalingskaart = r'D:\GIS\losse rasters\bodemdalingskaart_app_data_geotiff_Bo
 afstand_zichtjaar = 10 # het aantal jaren waarmee de bodemdaling (per jaar) moet worden vermenigvuldigd.
 code_wsrl = 'prio_nummer' # naamgeving van traject
 toetspeil = 999 # naam van kolom met toetspeil/toetshoogte, 999 voor uitvoer zonder toetspeil
+min_plot = -50
+max_plot = 100
 trajecten = 'priovakken' # door te rekenen trajecten
-
+profielen_mg = 'profielen_mg'
 naam_totaalprofielen = 'prioprofielen_safe_jan2020'
 
 
@@ -52,6 +54,7 @@ with arcpy.da.SearchCursor(trajecten,['SHAPE@',code_wsrl]) as cursor:
         id = row[1]
         trajectlijn = 'deeltraject_'+str(row[1])
         profielen = 'profielen_'+str(row[1])
+        profielen_plus = 'profielen_plus'+str(row[1])
         uitvoerpunten = 'punten_profielen_z_'+str(row[1])
         uitvoer_maxpunten = 'max_kruinhoogte_'+str(row[1])
         uitvoer_binnenkruin = 'binnenkruin_'+str(row[1])
@@ -68,11 +71,12 @@ with arcpy.da.SearchCursor(trajecten,['SHAPE@',code_wsrl]) as cursor:
 
         # doorlopen stappen
         generate_profiles(profiel_interval, profiel_lengte_land, profiel_lengte_rivier, trajectlijn, code_wsrl,toetspeil, profielen)
+        join_mg_profiles(trajectlijn,profielen,profielen_mg,profielen_plus)
         copy_trajectory_lr(trajectlijn, code_wsrl)
-        set_measurements_trajectory(profielen, trajectlijn, code_wsrl, stapgrootte_punten,toetspeil)
+        set_measurements_trajectory(profielen_plus, trajectlijn, code_wsrl, stapgrootte_punten,toetspeil)
         extract_z_arcpy(invoerpunten, uitvoerpunten, raster)
         add_xy(uitvoerpunten, code_wsrl)
-        excel_writer(uitvoerpunten, code, excel, id,trajecten,toetspeil)
+        excel_writer_maatgevend(uitvoerpunten, code, excel, id,trajecten,toetspeil,min_plot,max_plot)
         # kruinhoogte_groepen(uitvoerpunten, stapgrootte_punten, afronding, code_wsrl)
         # max_kruinhoogte(uitvoerpunten, profielen, code_wsrl,uitvoer_maxpunten,min_afstand,max_afstand,toetspeil)
         # kruinbepalen(uitvoerpunten,code_wsrl,uitvoer_binnenkruin,uitvoer_buitenkruin,verschil_maxkruin,min_afstand,max_afstand)
