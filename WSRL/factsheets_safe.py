@@ -3,7 +3,7 @@ import arcpy
 arcpy.env.workspace = r'D:\Projecten\WSRL\safe_temp.gdb'
 arcpy.env.overwriteOutput = True
 
-trajecten = r'D:\Projecten\WSRL\safe_basis.gdb\priovakken_test_33'
+trajecten = r'D:\Projecten\WSRL\safe_basis.gdb\priovakken_test'
 code_wsrl = "prio_nummer"
 
 buffer_afstand = 50
@@ -154,6 +154,8 @@ def koppel_panden_bitplus_20(trajectlijn, dijkzone, panden, buffer_afstand_pande
 
     del cursor
 
+    arcpy.DeleteField_management(trajectlijn, ['NEAR_FID','NEAR_DIST'])
+
     # sommeren?
 
     # arcpy.DeleteFeatures_management(panden_dijkzone_bit)
@@ -181,7 +183,6 @@ with arcpy.da.SearchCursor(trajecten,['SHAPE@',code_wsrl]) as cursor:
         koppel_dpip(trajectlijn,dpiplaag,buffer_afstand,buffer_dpip)
         koppel_zetting(trajectlijn, zettinglaag, buffer_afstand, buffer_zet)
         koppel_panden_dijk(trajectlijn, dijkzone, panden, buffer_afstand_panden, panden_dijkzone)
-
         koppel_panden_bitplus_20(trajectlijn, dijkzone, panden, buffer_afstand_panden_bit, panden_dijkzone_bit,
                                  binnenteenlijn, binnenteen_traject, code_wsrl, id)
 
