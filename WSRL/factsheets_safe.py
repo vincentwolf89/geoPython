@@ -3,15 +3,17 @@ import arcpy
 arcpy.env.workspace = r'D:\Projecten\WSRL\safe_temp.gdb'
 arcpy.env.overwriteOutput = True
 
-trajecten = r'D:\Projecten\WSRL\safe_basis.gdb\priovakken_test'
+trajecten = r'D:\Projecten\WSRL\safe_basis.gdb\priovakken_test_33'
 code_wsrl = "prio_nummer"
 
 buffer_afstand = 50
 buffer_afstand_panden = 500
+buffer_afstand_panden_bit = 20
 dpiplaag = r'D:\Projecten\WSRL\safe_basis.gdb\dpip_bit'
 zettinglaag = r'D:\Projecten\WSRL\safe_basis.gdb\zetting_buk'
 panden = r'D:\Projecten\WSRL\safe_basis.gdb\panden_bag'
 dijkzone = r'D:\Projecten\WSRL\safe_basis.gdb\bit_but_zone'
+binnenteenlijn = r'D:\Projecten\WSRL\safe_basis.gdb\binnenteenlijn_safe'
 
 def koppel_dpip(trajectlijn, dpiplaag, buffer_afstand, buffer):
     # buffer priovak
@@ -88,10 +90,74 @@ def koppel_panden_dijk(trajectlijn, dijkzone, panden, buffer_afstand_panden, pan
 
     # select panden features from panden dijkzone in bufferzone
     arcpy.MakeFeatureLayer_management("panden_dijkzone", 'templaag_panden_dijkzone')
-    arcpy.SelectLayerByLocation_management('templaag_panden_dijkzone', "INTERSECT", "bufferzone" "0 Meters", "NEW_SELECTION",
-                                           "NOT_INVERT")
-    arcpy.CopyFeatures_management('templaag_panden', panden_dijkzone)
+    arcpy.SelectLayerByLocation_management('templaag_panden_dijkzone', "INTERSECT", "bufferzone", "0 Meters", "NEW_SELECTION","NOT_INVERT")
+    arcpy.CopyFeatures_management('templaag_panden_dijkzone', panden_dijkzone)
 
+    # koppel aantal panden in dijkzone aan traject
+    aantal_panden_ = arcpy.GetCount_management(panden_dijkzone)
+    aantal_panden = aantal_panden_[0]
+    arcpy.AddField_management(trajectlijn, "panden_dijkzone", "DOUBLE", 2, field_is_nullable="NULLABLE")
+
+    with arcpy.da.UpdateCursor(trajectlijn, 'panden_dijkzone') as cursor:
+        for row in cursor:
+            row[0] = aantal_panden
+            cursor.updateRow(row)
+    del cursor
+
+    arcpy.DeleteFeatures_management(panden_dijkzone)
+
+def koppel_panden_bitplus_20(trajectlijn, dijkzone, panden, buffer_afstand_panden_bit, panden_dijkzone_bit,binnenteenlijn, binnenteen_traject,code_wsrl,id):
+
+    ## knip deel binnenteenlijn
+    # buffer
+    arcpy.Buffer_analysis(trajectlijn, 'bufferzone', buffer_afstand_panden, "FULL", "FLAT", "NONE", "", "PLANAR")
+    # isect bit
+    arcpy.MakeFeatureLayer_management(binnenteenlijn, 'templaag_binnenteen')
+    arcpy.Intersect_analysis(["templaag_binnenteen","bufferzone"], "binnenteen_traject_temp", "ALL", "", "LINE")
+
+    # afvangen loze lijnsecties
+    arcpy.FeatureVerticesToPoints_management("binnenteen_traject_temp", "punten_temp", "BOTH_ENDS")
+    arcpy.SplitLineAtPoint_management("binnenteen_traject_temp", "punten_temp", binnenteen_traject,"1 Meters")
+    arcpy.Near_analysis(trajectlijn, binnenteen_traject, "", "NO_LOCATION", "NO_ANGLE", "PLANAR")
+    # zoek near fid
+    with arcpy.da.SearchCursor(trajectlijn, 'NEAR_FID') as cursor:
+        for row in cursor:
+            near_fid = int(row[0])
+
+    # verwijder niet-near-fid
+    with arcpy.da.UpdateCursor(binnenteen_traject, "OBJECTID") as cursor:
+        for row in cursor:
+            if int(row[0]) == near_fid:
+                pass
+            else:
+                cursor.deleteRow()
+
+
+
+    # buffer bit 20m
+    arcpy.Buffer_analysis(binnenteen_traject, 'bufferzone', buffer_afstand_panden_bit, "LEFT", "FLAT", "NONE", "", "PLANAR")
+
+    # select panden features from panden dijkzone in bufferzone
+    arcpy.MakeFeatureLayer_management(panden, 'templaag_panden')
+    arcpy.SelectLayerByLocation_management('templaag_panden', "INTERSECT", "bufferzone", "0 Meters", "NEW_SELECTION","NOT_INVERT")
+    arcpy.CopyFeatures_management('templaag_panden', panden_dijkzone_bit)
+
+    # koppel aantal panden in dijkzone aan traject
+    aantal_panden_ = arcpy.GetCount_management(panden_dijkzone_bit)
+    aantal_panden = aantal_panden_[0]
+    arcpy.AddField_management(trajectlijn, "panden_dijkzone_bit", "DOUBLE", 2, field_is_nullable="NULLABLE")
+
+    with arcpy.da.UpdateCursor(trajectlijn, 'panden_dijkzone_bit') as cursor:
+        for row in cursor:
+            row[0] = aantal_panden
+            cursor.updateRow(row)
+
+    del cursor
+
+    # sommeren?
+
+    # arcpy.DeleteFeatures_management(panden_dijkzone_bit)
+    # arcpy.DeleteFeatures_management(binnenteen_traject)
 
 
 with arcpy.da.SearchCursor(trajecten,['SHAPE@',code_wsrl]) as cursor:
@@ -102,6 +168,8 @@ with arcpy.da.SearchCursor(trajecten,['SHAPE@',code_wsrl]) as cursor:
         buffer_dpip = 'buffer_dpip' + str(row[1])
         buffer_zet = 'buffer_zet' + str(row[1])
         panden_dijkzone = 'panden_dijkzone_' + str(row[1])
+        panden_dijkzone_bit = 'panden_dijkzone_bit_' + str(row[1])
+        binnenteen_traject = 'binnenteen_' + str(row[1])
         where = '"' + code_wsrl + '" = ' + "'" + str(id) + "'"
 
 
@@ -110,8 +178,10 @@ with arcpy.da.SearchCursor(trajecten,['SHAPE@',code_wsrl]) as cursor:
 
         # doorlopen scripts
         print trajectlijn
-        # koppel_dpip(trajectlijn,dpiplaag,buffer_afstand,buffer_dpip)
-        # koppel_zetting(trajectlijn, zettinglaag, buffer_afstand, buffer_zet)
+        koppel_dpip(trajectlijn,dpiplaag,buffer_afstand,buffer_dpip)
+        koppel_zetting(trajectlijn, zettinglaag, buffer_afstand, buffer_zet)
         koppel_panden_dijk(trajectlijn, dijkzone, panden, buffer_afstand_panden, panden_dijkzone)
 
+        koppel_panden_bitplus_20(trajectlijn, dijkzone, panden, buffer_afstand_panden_bit, panden_dijkzone_bit,
+                                 binnenteenlijn, binnenteen_traject, code_wsrl, id)
 
