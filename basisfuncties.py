@@ -1077,7 +1077,7 @@ def excel_writer_factsheets(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_
     # velden = ["prio_nummer","Van","Tot","Shape_Length","TRAJECT","OPLEVERING","gem_dpip","var_dpip","gem_zet",]
     # array_fact = arcpy.da.FeatureClassToNumPyArray(trajectlijn,velden)
     # df_fact= pd.DataFrame(array_fact)
-    # df_fact['param'].iloc[0] == waarde!! 
+    # df_fact['param'].iloc[0] == waarde!!
 
 
     # with arcpy.da.SearchCursor(trajectlijn, ['lengte_kl', 'TRAJECT']) as cursor:
