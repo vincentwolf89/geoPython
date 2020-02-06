@@ -733,25 +733,25 @@ def excel_writer_maatgevend(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_
 
     # opbouw xlsx
     workbook = Workbook(excel)
-    worksheet = workbook.add_worksheet()
-
+    worksheet1 = workbook.add_worksheet()
+    worksheet2 = workbook.add_worksheet()
     # stijl toevoegen voor headers
     bold = workbook.add_format({'bold': True})
 
 
     # schrijf kolomnamen
-    worksheet.write(0, 0, "Profielnummer", bold)
-    worksheet.write(0, 1, "Afstand [m]", bold)
-    worksheet.write(0, 2, "Hoogte AHN3 [m NAP]", bold)
-    worksheet.write(0, 3, "x [RD]", bold)
-    worksheet.write(0, 4, "y [RD]", bold)
+    worksheet2.write(0, 0, "Profielnummer", bold)
+    worksheet2.write(0, 1, "Afstand [m]", bold)
+    worksheet2.write(0, 2, "Hoogte AHN3 [m NAP]", bold)
+    worksheet2.write(0, 3, "x [RD]", bold)
+    worksheet2.write(0, 4, "y [RD]", bold)
 
     # schrijf kolommen vanuit df
-    worksheet.write_column('A2', sorted['profielnummer'])
-    worksheet.write_column('B2', sorted['afstand'])
-    worksheet.write_column('C2', sorted['z_ahn'])
-    worksheet.write_column('D2', sorted['x'])
-    worksheet.write_column('E2', sorted['y'])
+    worksheet2.write_column('A2', sorted['profielnummer'])
+    worksheet2.write_column('B2', sorted['afstand'])
+    worksheet2.write_column('C2', sorted['z_ahn'])
+    worksheet2.write_column('D2', sorted['x'])
+    worksheet2.write_column('E2', sorted['y'])
 
     # groepeer per profielnummer
     grouped = sorted.groupby('profielnummer')
@@ -799,8 +799,8 @@ def excel_writer_maatgevend(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_
             line_chart1.add_series({
                 'name': 'profiel ' + profielnaam,
 
-                'categories': '=Sheet1!B' + str(startpunt) + ':B' + str(meetpunten + 1),
-                'values': '=Sheet1!C' + str(startpunt) + ':C' + str(meetpunten + 1),
+                'categories': '=Sheet2!B' + str(startpunt) + ':B' + str(meetpunten + 1),
+                'values': '=Sheet2!C' + str(startpunt) + ':C' + str(meetpunten + 1),
                 'line': {'width': 1}
             })
             count +=1
@@ -810,16 +810,16 @@ def excel_writer_maatgevend(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_
                 line_chart1.add_series({
                     'name': 'profiel '+profielnaam,
 
-                    'categories': '=Sheet1!B'+str(startpunt)+':B' + str(startpunt+meetpunten-1),
-                    'values':     '=Sheet1!C'+str(startpunt)+':C' + str(startpunt+meetpunten-1),
+                    'categories': '=Sheet2!B'+str(startpunt)+':B' + str(startpunt+meetpunten-1),
+                    'values':     '=Sheet2!C'+str(startpunt)+':C' + str(startpunt+meetpunten-1),
                     'line': {'width': 1}
                 })
             if name == 9999:
                 line_chart1.add_series({
                     'name': 'maatgevend profiel',
 
-                    'categories': '=Sheet1!B'+str(startpunt)+':B' + str(startpunt+meetpunten-1),
-                    'values':     '=Sheet1!C'+str(startpunt)+':C' + str(startpunt+meetpunten-1),
+                    'categories': '=Sheet2!B'+str(startpunt)+':B' + str(startpunt+meetpunten-1),
+                    'values':     '=Sheet2!C'+str(startpunt)+':C' + str(startpunt+meetpunten-1),
                     'line': {
                         'color': 'red',
                         'width': 3
@@ -853,14 +853,175 @@ def excel_writer_maatgevend(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_
     # })
 
     # kolommen aanpassen
-    line_chart1.set_title({'name': 'Overzicht profielen dijkvak '+id})
+    line_chart1.set_title({'name': 'Overzicht profielen prio-vak '+id})
     line_chart1.set_x_axis({'name': 'Afstand [m]'})
     line_chart1.set_y_axis({'name': 'Hoogte [m NAP]'})
     line_chart1.set_x_axis({'interval_tick': 0.5})
     line_chart1.set_x_axis({'min': min_plot, 'max': max_plot})
     line_chart1.set_size({'width': 1000, 'height': 300})
     # line_chart1.set_style(1)
-    worksheet.insert_chart('G3', line_chart1) # alleen toevoegen voor toetshoogte
+    worksheet1.insert_chart('G3', line_chart1) # alleen toevoegen voor toetshoogte
+    # worksheet2.insert_chart('G3', line_chart1) # test
+    # worksheet2.hide()
+    workbook.close()
+
+    print '.xlsx-bestand gemaakt voor profielset'
+
+def excel_writer_factsheets(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_plot,max_plot,trajectlijn):
+
+    # toetshoogte aan uitvoerpunten koppelen
+    arcpy.JoinField_management(uitvoerpunten, code, trajecten, code, toetspeil)
+
+    # binnenhalen van dataframe
+    if toetspeil == 999:
+        array = arcpy.da.FeatureClassToNumPyArray(uitvoerpunten,('OBJECTID', 'profielnummer', code, 'afstand', 'z_ahn', 'x', 'y'))
+    else:
+        array = arcpy.da.FeatureClassToNumPyArray(uitvoerpunten, ('OBJECTID', 'profielnummer', code, 'afstand', 'z_ahn', 'x', 'y', toetspeil))
+
+    df = pd.DataFrame(array)
+    df = df.dropna()
+    sorted = df.sort_values(['profielnummer', 'afstand'], ascending=[True, True])
+
+    # opbouw xlsx
+    workbook = Workbook(excel)
+    worksheet1 = workbook.add_worksheet()
+    worksheet2 = workbook.add_worksheet()
+    # stijl toevoegen voor headers
+    bold = workbook.add_format({'bold': True})
+
+
+    # schrijf kolomnamen
+    worksheet2.write(0, 0, "Profielnummer", bold)
+    worksheet2.write(0, 1, "Afstand [m]", bold)
+    worksheet2.write(0, 2, "Hoogte AHN3 [m NAP]", bold)
+    worksheet2.write(0, 3, "x [RD]", bold)
+    worksheet2.write(0, 4, "y [RD]", bold)
+
+    # schrijf kolommen vanuit df
+    worksheet2.write_column('A2', sorted['profielnummer'])
+    worksheet2.write_column('B2', sorted['afstand'])
+    worksheet2.write_column('C2', sorted['z_ahn'])
+    worksheet2.write_column('D2', sorted['x'])
+    worksheet2.write_column('E2', sorted['y'])
+
+    # groepeer per profielnummer
+    grouped = sorted.groupby('profielnummer')
+
+    # definieer startrij
+    startpunt = 2
+
+
+    # lege lijngrafiek invoegen met zowel afstand als hoogte als invoer
+    line_chart1 = workbook.add_chart({'type': 'scatter',
+                                 'subtype': 'straight'})
+
+    ## toetshoogte, aan/uit
+    # toetshoogte toevoegen als horizontale lijn, deel 1 voor legenda
+    # minimum = min(sorted['afstand'])
+    # maximum = max(sorted['afstand'])
+    # th = sorted[toetspeil].iloc[0]
+    #
+    # worksheet.write('K8', minimum)
+    # worksheet.write('K9', maximum)
+    # worksheet.write('K10', th)
+    # worksheet.write('K11', th)
+
+
+    # line_chart1.add_series({
+    #     'name': 'toetshoogte: ' + str(th) + ' m NAP',
+    #
+    #     'categories': '=Sheet1!$K$8:$K$9',
+    #     'values': '=Sheet1!$K$10:$K$11',
+    #     'line': {
+    #         'color': 'red',
+    #         'width': 1.5,
+    #         'dash_type': 'long_dash'
+    #     }
+    # })
+
+    # lijnen toevoegen aan lijngrafiek
+    count = 0
+    for name, group in grouped:
+        profielnaam = str(int(name))
+        meetpunten = len(group['profielnummer'])
+
+        # eerste profiel
+        if count == 0:
+            line_chart1.add_series({
+                'name': 'profiel ' + profielnaam,
+
+                'categories': '=Sheet2!B' + str(startpunt) + ':B' + str(meetpunten + 1),
+                'values': '=Sheet2!C' + str(startpunt) + ':C' + str(meetpunten + 1),
+                'line': {'width': 1}
+            })
+            count +=1
+        # opvolgende profielen
+        else:
+            if count is not 0 and name is not 9999:
+                line_chart1.add_series({
+                    'name': 'profiel '+profielnaam,
+
+                    'categories': '=Sheet2!B'+str(startpunt)+':B' + str(startpunt+meetpunten-1),
+                    'values':     '=Sheet2!C'+str(startpunt)+':C' + str(startpunt+meetpunten-1),
+                    'line': {'width': 1}
+                })
+            if name == 9999:
+                line_chart1.add_series({
+                    'name': 'maatgevend profiel',
+
+                    'categories': '=Sheet2!B'+str(startpunt)+':B' + str(startpunt+meetpunten-1),
+                    'values':     '=Sheet2!C'+str(startpunt)+':C' + str(startpunt+meetpunten-1),
+                    'line': {
+                        'color': 'red',
+                        'width': 3
+                    }
+                })
+        # startpunt verzetten
+        startpunt += (meetpunten)
+
+
+
+    ## toetshoogte toevoegen als horizontale lijn, deel 2 voor voorgrond-lijn
+    # minimum = min(sorted['afstand'])
+    # maximum = max(sorted['afstand'])
+    # th = sorted[toetspeil].iloc[0]
+    #
+    # worksheet.write('K8', minimum)
+    # worksheet.write('K9', maximum)
+    # worksheet.write('K10', th)
+    # worksheet.write('K11', th)
+    #
+    # line_chart1.add_series({
+    #     'name': 'toetshoogte: ' + str(th) + ' m NAP',
+    #
+    #     'categories': '=Sheet1!$K$8:$K$9',
+    #     'values': '=Sheet1!$K$10:$K$11',
+    #     'line': {
+    #         'color': 'red',
+    #         'width': 1.5,
+    #         'dash_type': 'long_dash'
+    #     }
+    # })
+
+    # kolommen aanpassen
+    line_chart1.set_title({'name': 'Overzicht profielen prio-vak '+id})
+    line_chart1.set_x_axis({'name': 'Afstand [m]'})
+    line_chart1.set_y_axis({'name': 'Hoogte [m NAP]'})
+    line_chart1.set_x_axis({'interval_tick': 0.5})
+    line_chart1.set_x_axis({'min': min_plot, 'max': max_plot})
+    line_chart1.set_size({'width': 1000, 'height': 300})
+    # line_chart1.set_style(1)
+    worksheet1.insert_chart('G3', line_chart1) # alleen toevoegen voor toetshoogte
+    # worksheet2.insert_chart('G3', line_chart1) # test
+    # worksheet2.hide()
+
+    # schrijf parameters uit trajectlijn naar worksheet1
+    # search cursor om er doorheen te gaan en parameters eruit te halen
+    # with arcpy.da.SearchCursor(trajectlijn, ['SHAPE@', code_wsrl]) as cursor:
+    #     for row in cursor:
+    #         print row
+
+
     workbook.close()
 
     print '.xlsx-bestand gemaakt voor profielset'
