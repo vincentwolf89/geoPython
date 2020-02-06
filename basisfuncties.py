@@ -1013,13 +1013,75 @@ def excel_writer_factsheets(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_
     # line_chart1.set_style(1)
     worksheet1.insert_chart('G3', line_chart1) # alleen toevoegen voor toetshoogte
     # worksheet2.insert_chart('G3', line_chart1) # test
-    # worksheet2.hide()
+    worksheet2.hide()
 
     # schrijf parameters uit trajectlijn naar worksheet1
+    # format worksheet
+    cell_format_title = workbook.add_format()
+    cell_format_title.set_font_size(16)
+    cell_format_title.set_bold()
+
+    cell_format_sub = workbook.add_format()
+    cell_format_sub.set_pattern(1)
+    cell_format_sub.set_bg_color('#ADFF2F')
+    cell_format_sub.set_bold()
+
+    worksheet1.set_column(0, 0, 30)
+
+
     # search cursor om er doorheen te gaan en parameters eruit te halen
-    # with arcpy.da.SearchCursor(trajectlijn, ['SHAPE@', code_wsrl]) as cursor:
+
+    worksheet1.write('A1', "Factsheet prio-vak "+str(id), cell_format_title)
+
+    worksheet1.write('A3', "", cell_format_sub)
+    worksheet1.write('B4', "", cell_format_sub)
+    worksheet1.write('B11', "", cell_format_sub)
+    worksheet1.write('B15', "", cell_format_sub)
+    worksheet1.write('B20', "", cell_format_sub)
+    worksheet1.write('B24', "", cell_format_sub)
+
+    worksheet1.write('B3', "waarde",cell_format_sub)
+
+
+    worksheet1.write('A4', "Algemeen",cell_format_sub)
+    worksheet1.write('A5', "Vaknummer")
+    worksheet1.write('A6', "Van dijkpaal")
+    worksheet1.write('A7', "Tot dijkpaal")
+    worksheet1.write('A8', "Vaklengte")
+    worksheet1.write('A9', "Laatste versterking")
+    worksheet1.write('A10', "Eindjaar laatste versterking")
+
+    worksheet1.write('A11', "Basisgegevens techniek",cell_format_sub)
+    worksheet1.write('A12', "Dikte deklaag gemiddeld [m]")
+    worksheet1.write('A13', "Dik deklaag variatie [m]")
+    worksheet1.write('A14', "Deformatie gemiddeld[mm/jaar]")
+
+    worksheet1.write('A15', "Basisgegevens conditionering",cell_format_sub)
+    worksheet1.write('A16', "Huizen binnen teenlijn")
+    worksheet1.write('A17', "Huizen +20m teenlijn")
+    worksheet1.write('A18', "Leidingen [m]")
+    worksheet1.write('A19', "Natura 2000")
+
+    worksheet1.write('A20', "Beoordeling techniek",cell_format_sub)
+    worksheet1.write('A21', "STPH [beta]")
+    worksheet1.write('A22', "STBI [beta]")
+    worksheet1.write('A23', "GEKB [beta]")
+
+    worksheet1.write('A24', "Ontwerpproces",cell_format_sub)
+    worksheet1.write('A25', "Maatregel VVK")
+    worksheet1.write('A26', "Kosten VVK")
+    worksheet1.write('A27', "Extra grondonderzoek")
+    worksheet1.write('A28', "Extra inmetingen geometrie")
+
+
+
+    # worksheet1.write('B1', "trajectnaam")
+    # with arcpy.da.SearchCursor(trajectlijn, ['lengte_kl', 'TRAJECT']) as cursor:
     #     for row in cursor:
-    #         print row
+    #         worksheet1.write('B1', row[0])
+    #         worksheet1.write('B2', row[1])
+    # check resulaten, 999 is geen oordeel!
+
 
 
     workbook.close()
