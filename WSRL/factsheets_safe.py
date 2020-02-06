@@ -22,7 +22,7 @@ dijkzone = r'D:\Projecten\WSRL\safe_basis.gdb\bit_but_zone'
 binnenteenlijn = r'D:\Projecten\WSRL\safe_basis.gdb\binnenteenlijn_safe'
 extra_go = r'D:\Projecten\WSRL\safe_basis.gdb\go_oktober_2019'
 versterkingen = r'D:\Projecten\WSRL\safe_basis.gdb\versterkingen_safe'
-resultaten = r'D:\Projecten\WSRL\safe_basis.gdb\temp_stphresults'
+resultaten = r'D:\Projecten\WSRL\safe_basis.gdb\resultaten_vvk'
 
 
 
@@ -58,7 +58,7 @@ def koppel_dpip(trajectlijn, dpiplaag, buffer_afstand, buffer):
     with arcpy.da.SearchCursor("temp_stat", ['MEAN_dikte_deklaag','RANGE_dikte_deklaag']) as cursor:
         for row in cursor:
             gem_dpip, var_dpip = round(row[0],2),round(row[1],2)
-    print gem_dpip, var_dpip
+    # print gem_dpip, var_dpip
     del cursor
     # koppel gem_dpip en var_dpip aan deeltraject
     arcpy.AddField_management(trajectlijn, "gem_dpip", "DOUBLE", 2, field_is_nullable="NULLABLE")
@@ -80,6 +80,8 @@ def koppel_dpip(trajectlijn, dpiplaag, buffer_afstand, buffer):
     arcpy.DeleteFeatures_management("bufferzone")
     arcpy.Delete_management("temp_stat")
 
+    print "Dikte deklaag gekoppeld"
+
 def koppel_zetting(trajectlijn, zettinglaag, buffer_afstand, buffer):
     # buffer priovak
     arcpy.Buffer_analysis(trajectlijn, 'bufferzone', buffer_afstand, "FULL", "ROUND", "NONE", "", "PLANAR")
@@ -94,7 +96,7 @@ def koppel_zetting(trajectlijn, zettinglaag, buffer_afstand, buffer):
     with arcpy.da.SearchCursor("temp_stat", ['MEAN_velocity','RANGE_velocity']) as cursor:
         for row in cursor:
             gem_zet, var_zet = round(row[0],2),round(row[1],2)
-    print gem_zet, var_zet
+    # print gem_zet, var_zet
     del cursor
     # koppel gem_zet en var_zet aan deeltraject
     arcpy.AddField_management(trajectlijn, "gem_zet", "DOUBLE", 2, field_is_nullable="NULLABLE")
@@ -116,6 +118,8 @@ def koppel_zetting(trajectlijn, zettinglaag, buffer_afstand, buffer):
     arcpy.DeleteFeatures_management(buffer)
     arcpy.DeleteFeatures_management("bufferzone")
     arcpy.Delete_management("temp_stat")
+
+    print "Zetting gekoppeld"
 
 def koppel_panden_dijk(trajectlijn, dijkzone, panden, buffer_afstand_panden, panden_dijkzone):
     # select panden features in dijkvlak, totaal
@@ -143,6 +147,8 @@ def koppel_panden_dijk(trajectlijn, dijkzone, panden, buffer_afstand_panden, pan
     del cursor
 
     arcpy.DeleteFeatures_management(panden_dijkzone)
+
+    print "Panden dijkzone gekoppeld"
 
 def koppel_panden_bitplus_20(trajectlijn, dijkzone, panden, buffer_afstand_panden_bit, panden_dijkzone_bit,binnenteenlijn, binnenteen_traject,code_wsrl,id):
 
@@ -199,6 +205,8 @@ def koppel_panden_bitplus_20(trajectlijn, dijkzone, panden, buffer_afstand_pande
     # arcpy.DeleteFeatures_management(panden_dijkzone_bit)
     # arcpy.DeleteFeatures_management(binnenteen_traject)
 
+    print "Panden bitzone gekoppeld"
+
 
 def koppel_kl(trajectlijn, kabels_leidingen, buffer_afstand, buffer):
     # aantal meter kl in buffer traject
@@ -234,6 +242,8 @@ def koppel_kl(trajectlijn, kabels_leidingen, buffer_afstand, buffer):
     # schoonmaken
     arcpy.DeleteFeatures_management(buffer)
 
+    print "Kabels en leidingen gekoppeld"
+
 def koppel_go(trajectlijn, extra_go, buffer_afstand_go, buffer):
     # buffer priovak
     arcpy.Buffer_analysis(trajectlijn, 'bufferzone', buffer_afstand_go, "FULL", "FLAT", "NONE", "", "PLANAR")
@@ -265,6 +275,8 @@ def koppel_go(trajectlijn, extra_go, buffer_afstand_go, buffer):
     arcpy.DeleteFeatures_management("bufferzone")
     arcpy.Delete_management("temp_stat")
 
+    print "Grondonderzoek gekoppeld"
+
 def koppel_versterkingen(trajectlijn, versterkingen):
     arcpy.Near_analysis(trajectlijn, versterkingen, "5 Meters", "NO_LOCATION", "NO_ANGLE", "PLANAR")
 
@@ -291,10 +303,13 @@ def koppel_versterkingen(trajectlijn, versterkingen):
     else:
         pass
 
+
+    print "Versterkingen gekoppeld"
 def koppel_resultaten(trajectlijn,resultaten):
 
-    arcpy.JoinField_management(trajectlijn, code_wsrl, resultaten, 'dijkvak', ['beta_stph','beta_stbi','beta_gekb'])
+    arcpy.JoinField_management(trajectlijn, code_wsrl, resultaten, 'dijkvak', ['gekb_2023','stph_2023','stbi_2023'])
 
+    print "Resultaten gekoppeld"
 
 
 with arcpy.da.SearchCursor(trajecten,['SHAPE@',code_wsrl]) as cursor:
@@ -324,15 +339,15 @@ with arcpy.da.SearchCursor(trajecten,['SHAPE@',code_wsrl]) as cursor:
 
         # doorlopen scripts
         print trajectlijn
-        # koppel_dpip(trajectlijn,dpiplaag,buffer_afstand,buffer_dpip)
-        # koppel_zetting(trajectlijn, zettinglaag, buffer_afstand, buffer_zet)
-        # koppel_panden_dijk(trajectlijn, dijkzone, panden, buffer_afstand_panden, panden_dijkzone)
-        # koppel_panden_bitplus_20(trajectlijn, dijkzone, panden, buffer_afstand_panden_bit, panden_dijkzone_bit,
-        #                          binnenteenlijn, binnenteen_traject, code_wsrl, id)
-        # koppel_kl(trajectlijn, kabels_leidingen, buffer_afstand, buffer_kl)
-        # koppel_go(trajectlijn, extra_go, buffer_afstand_go, buffer_go)
-        # koppel_versterkingen(trajectlijn,versterkingen)
-        # koppel_resultaten(trajectlijn,resultaten)
+        koppel_dpip(trajectlijn,dpiplaag,buffer_afstand,buffer_dpip)
+        koppel_zetting(trajectlijn, zettinglaag, buffer_afstand, buffer_zet)
+        koppel_panden_dijk(trajectlijn, dijkzone, panden, buffer_afstand_panden, panden_dijkzone)
+        koppel_panden_bitplus_20(trajectlijn, dijkzone, panden, buffer_afstand_panden_bit, panden_dijkzone_bit,
+                                 binnenteenlijn, binnenteen_traject, code_wsrl, id)
+        koppel_kl(trajectlijn, kabels_leidingen, buffer_afstand, buffer_kl)
+        koppel_go(trajectlijn, extra_go, buffer_afstand_go, buffer_go)
+        koppel_versterkingen(trajectlijn,versterkingen)
+        koppel_resultaten(trajectlijn,resultaten)
 
 
         # generate_profiles(profiel_interval, profiel_lengte_land, profiel_lengte_rivier, trajectlijn, code_wsrl,toetspeil, profielen)
@@ -341,6 +356,6 @@ with arcpy.da.SearchCursor(trajecten,['SHAPE@',code_wsrl]) as cursor:
         # set_measurements_trajectory(profielen_plus, trajectlijn, code_wsrl, stapgrootte_punten,toetspeil)
         # extract_z_arcpy(invoerpunten, uitvoerpunten, raster)
         # add_xy(uitvoerpunten, code_wsrl)
-        excel_writer_factsheets(uitvoerpunten, code, excel, id,trajecten,toetspeil,min_plot,max_plot,trajectlijn)
+        # excel_writer_factsheets(uitvoerpunten, code, excel, id,trajecten,toetspeil,min_plot,max_plot,trajectlijn)
 
 
