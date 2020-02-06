@@ -1,15 +1,19 @@
 import arcpy
+from basisfuncties import*
 
 arcpy.env.workspace = r'D:\Projecten\WSRL\safe_temp.gdb'
 arcpy.env.overwriteOutput = True
 
 trajecten = r'D:\Projecten\WSRL\safe_basis.gdb\priovakken_test'
+
+
 code_wsrl = "prio_nummer"
 
 buffer_afstand = 50
 buffer_afstand_panden = 500
 buffer_afstand_panden_bit = 20
 buffer_afstand_go = 100
+
 dpiplaag = r'D:\Projecten\WSRL\safe_basis.gdb\dpip_bit'
 zettinglaag = r'D:\Projecten\WSRL\safe_basis.gdb\zetting_buk'
 kabels_leidingen = r'D:\Projecten\WSRL\safe_basis.gdb\kabels_leidingen_safe'
@@ -17,6 +21,28 @@ panden = r'D:\Projecten\WSRL\safe_basis.gdb\panden_bag'
 dijkzone = r'D:\Projecten\WSRL\safe_basis.gdb\bit_but_zone'
 binnenteenlijn = r'D:\Projecten\WSRL\safe_basis.gdb\binnenteenlijn_safe'
 extra_go = r'D:\Projecten\WSRL\safe_basis.gdb\go_oktober_2019'
+versterkingen = r'D:\Projecten\WSRL\safe_basis.gdb\versterkingen_safe'
+resultaten = r'D:\Projecten\WSRL\safe_basis.gdb\temp_stphresults'
+
+
+
+profiel_interval = 25
+stapgrootte_punten = 1
+profiel_lengte_land = 200
+profiel_lengte_rivier = 100 # 10 default
+
+
+excelmap = 'D:/Projecten/WSRL/safe/uitvoer_priovakken/' # gewenste map voor .xlsx-uitvoer
+raster = r'C:\Users\Vincent\Desktop\ahn3clip_safe' # hoogtegrid
+toetspeil = 999 # naam van kolom met toetspeil/toetshoogte, 999 voor uitvoer zonder toetspeil
+min_plot = -50
+max_plot = 100
+profielen_mg = 'profielen_mg'
+naam_totaalprofielen = 'prioprofielen_safe_jan2020'
+totaal_profielen =[]
+
+
+
 
 def koppel_dpip(trajectlijn, dpiplaag, buffer_afstand, buffer):
     # buffer priovak
@@ -239,11 +265,49 @@ def koppel_go(trajectlijn, extra_go, buffer_afstand_go, buffer):
     arcpy.DeleteFeatures_management("bufferzone")
     arcpy.Delete_management("temp_stat")
 
+def koppel_versterkingen(trajectlijn, versterkingen):
+    arcpy.Near_analysis(trajectlijn, versterkingen, "5 Meters", "NO_LOCATION", "NO_ANGLE", "PLANAR")
+
+    # zoek near fid
+    with arcpy.da.SearchCursor(trajectlijn, 'NEAR_FID') as cursor:
+        for row in cursor:
+            near_fid = int(row[0])
+
+
+
+    # test of near aanwezig is
+    if near_fid > -1:
+
+        # maak templaag voor veiliger werken
+        arcpy.MakeFeatureLayer_management(versterkingen, 'templaag_versterkingen')
+
+        # join field based on near fid - OID
+        arcpy.JoinField_management(trajectlijn, 'NEAR_FID', 'templaag_versterkingen', 'OBJECTID_1', ['TRAJECT','OPLEVERING'])
+        arcpy.AlterField_management(trajectlijn, 'TRAJECT', 'traject')
+        arcpy.AlterField_management(trajectlijn, 'OPLEVERING', 'oplevering')
+
+
+        arcpy.DeleteField_management(trajectlijn, ['NEAR_FID', 'NEAR_DIST'])
+    else:
+        pass
+
+def koppel_resultaten(trajectlijn,resultaten):
+
+    arcpy.JoinField_management(trajectlijn, code_wsrl, resultaten, 'dijkvak', ['beta_stph','beta_stbi','beta_gekb'])
+
+
 
 with arcpy.da.SearchCursor(trajecten,['SHAPE@',code_wsrl]) as cursor:
     for row in cursor:
         code = code_wsrl
         id = row[1]
+
+        profielen = 'profielen_' + str(row[1])
+        profielen_plus = 'profielen_plus' + str(row[1])
+        uitvoerpunten = 'punten_profielen_z_' + str(row[1])
+        excel = excelmap + 'priovak_' + str(row[1]) + '.xlsx'
+
+
         trajectlijn = 'deeltraject_' + str(row[1])
         buffer_dpip = 'buffer_dpip_' + str(row[1])
         buffer_zet = 'buffer_zet_' + str(row[1])
@@ -266,4 +330,17 @@ with arcpy.da.SearchCursor(trajecten,['SHAPE@',code_wsrl]) as cursor:
         # koppel_panden_bitplus_20(trajectlijn, dijkzone, panden, buffer_afstand_panden_bit, panden_dijkzone_bit,
         #                          binnenteenlijn, binnenteen_traject, code_wsrl, id)
         # koppel_kl(trajectlijn, kabels_leidingen, buffer_afstand, buffer_kl)
-        koppel_go(trajectlijn, extra_go, buffer_afstand_go, buffer_go)
+        # koppel_go(trajectlijn, extra_go, buffer_afstand_go, buffer_go)
+        # koppel_versterkingen(trajectlijn,versterkingen)
+        # koppel_resultaten(trajectlijn,resultaten)
+
+
+        # generate_profiles(profiel_interval, profiel_lengte_land, profiel_lengte_rivier, trajectlijn, code_wsrl,toetspeil, profielen)
+        # join_mg_profiles(trajectlijn,profielen,profielen_mg,profielen_plus)
+        # copy_trajectory_lr(trajectlijn, code_wsrl)
+        # set_measurements_trajectory(profielen_plus, trajectlijn, code_wsrl, stapgrootte_punten,toetspeil)
+        # extract_z_arcpy(invoerpunten, uitvoerpunten, raster)
+        # add_xy(uitvoerpunten, code_wsrl)
+        excel_writer_factsheets(uitvoerpunten, code, excel, id,trajecten,toetspeil,min_plot,max_plot,trajectlijn)
+
+
