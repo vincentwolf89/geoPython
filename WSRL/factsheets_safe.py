@@ -280,6 +280,10 @@ def koppel_go(trajectlijn, extra_go, buffer_afstand_go, buffer):
 def koppel_versterkingen(trajectlijn, versterkingen):
     arcpy.Near_analysis(trajectlijn, versterkingen, "5 Meters", "NO_LOCATION", "NO_ANGLE", "PLANAR")
 
+    # voeg velden TRAJECT en OPLEVERING TOE om proces niet te laten vastlopen
+    arcpy.AddField_management(trajectlijn, 'TRAJECT', "TEXT", field_length=50)
+    arcpy.AddField_management(trajectlijn, 'OPLEVERING', "TEXT", field_length=50)
+
     # zoek near fid
     with arcpy.da.SearchCursor(trajectlijn, 'NEAR_FID') as cursor:
         for row in cursor:
@@ -294,9 +298,9 @@ def koppel_versterkingen(trajectlijn, versterkingen):
         arcpy.MakeFeatureLayer_management(versterkingen, 'templaag_versterkingen')
 
         # join field based on near fid - OID
+        arcpy.DeleteField_management(trajectlijn, ['TRAJECT', 'OPLEVERING']) # deze velden zijn nu niet meer nodig
         arcpy.JoinField_management(trajectlijn, 'NEAR_FID', 'templaag_versterkingen', 'OBJECTID_1', ['TRAJECT','OPLEVERING'])
-        arcpy.AlterField_management(trajectlijn, 'TRAJECT', 'traject')
-        arcpy.AlterField_management(trajectlijn, 'OPLEVERING', 'oplevering')
+
 
 
         arcpy.DeleteField_management(trajectlijn, ['NEAR_FID', 'NEAR_DIST'])
