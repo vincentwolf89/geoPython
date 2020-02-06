@@ -9,11 +9,14 @@ code_wsrl = "prio_nummer"
 buffer_afstand = 50
 buffer_afstand_panden = 500
 buffer_afstand_panden_bit = 20
+buffer_afstand_go = 100
 dpiplaag = r'D:\Projecten\WSRL\safe_basis.gdb\dpip_bit'
 zettinglaag = r'D:\Projecten\WSRL\safe_basis.gdb\zetting_buk'
+kabels_leidingen = r'D:\Projecten\WSRL\safe_basis.gdb\kabels_leidingen_safe'
 panden = r'D:\Projecten\WSRL\safe_basis.gdb\panden_bag'
 dijkzone = r'D:\Projecten\WSRL\safe_basis.gdb\bit_but_zone'
 binnenteenlijn = r'D:\Projecten\WSRL\safe_basis.gdb\binnenteenlijn_safe'
+extra_go = r'D:\Projecten\WSRL\safe_basis.gdb\go_oktober_2019'
 
 def koppel_dpip(trajectlijn, dpiplaag, buffer_afstand, buffer):
     # buffer priovak
@@ -35,12 +38,16 @@ def koppel_dpip(trajectlijn, dpiplaag, buffer_afstand, buffer):
     arcpy.AddField_management(trajectlijn, "gem_dpip", "DOUBLE", 2, field_is_nullable="NULLABLE")
     arcpy.AddField_management(trajectlijn, "var_dpip", "DOUBLE", 2, field_is_nullable="NULLABLE")
 
-    with arcpy.da.UpdateCursor(trajectlijn, ['gem_dpip','var_dpip']) as cursor:
-        for row in cursor:
-            row[0] = gem_dpip
-            row[1] = var_dpip
-            cursor.updateRow(row)
-    del cursor
+    try:
+        gem_dpip
+        with arcpy.da.UpdateCursor(trajectlijn, ['gem_dpip','var_dpip']) as cursor:
+            for row in cursor:
+                row[0] = gem_dpip
+                row[1] = var_dpip
+                cursor.updateRow(row)
+        del cursor
+    except NameError:
+        pass
 
     # schoonmaken
     arcpy.DeleteFeatures_management(buffer)
@@ -67,12 +74,17 @@ def koppel_zetting(trajectlijn, zettinglaag, buffer_afstand, buffer):
     arcpy.AddField_management(trajectlijn, "gem_zet", "DOUBLE", 2, field_is_nullable="NULLABLE")
     arcpy.AddField_management(trajectlijn, "var_zet", "DOUBLE", 2, field_is_nullable="NULLABLE")
 
-    with arcpy.da.UpdateCursor(trajectlijn, ['gem_zet','var_zet']) as cursor:
-        for row in cursor:
-            row[0] = gem_zet
-            row[1] = var_zet
-            cursor.updateRow(row)
-    del cursor
+    try:
+        gem_zet
+        with arcpy.da.UpdateCursor(trajectlijn, ['gem_zet','var_zet']) as cursor:
+            for row in cursor:
+                row[0] = gem_zet
+                row[1] = var_zet
+                cursor.updateRow(row)
+        del cursor
+    except NameError:
+        pass
+
 
     # schoonmaken
     arcpy.DeleteFeatures_management(buffer)
@@ -162,13 +174,81 @@ def koppel_panden_bitplus_20(trajectlijn, dijkzone, panden, buffer_afstand_pande
     # arcpy.DeleteFeatures_management(binnenteen_traject)
 
 
+def koppel_kl(trajectlijn, kabels_leidingen, buffer_afstand, buffer):
+    # aantal meter kl in buffer traject
+    arcpy.Buffer_analysis(trajectlijn, 'bufferzone', buffer_afstand, "FULL", "ROUND", "NONE", "", "PLANAR")
+    # select kabels en leidingen features in buffer
+    arcpy.MakeFeatureLayer_management(kabels_leidingen, 'templaag_kl')
+    arcpy.SelectLayerByLocation_management('templaag_kl', "INTERSECT", 'bufferzone', "0 Meters", "NEW_SELECTION", "NOT_INVERT")
+    arcpy.CopyFeatures_management('templaag_kl', buffer)
+
+
+    # bereken totaal aantal kl in buffer
+    arcpy.Statistics_analysis(buffer, "temp_stat", "Shape_Length SUM", "")
+    with arcpy.da.SearchCursor("temp_stat", 'SUM_Shape_Length') as cursor:
+        for row in cursor:
+            tot_kl = row[0]
+            print tot_kl
+
+
+    arcpy.AddField_management(trajectlijn, "lengte_kl", "DOUBLE", 2, field_is_nullable="NULLABLE")
+
+
+    try:
+        tot_kl
+        with arcpy.da.UpdateCursor(trajectlijn, 'lengte_kl') as cursor:
+            for row in cursor:
+                row[0] = tot_kl
+                cursor.updateRow(row)
+        del cursor
+    except NameError:
+        pass
+
+
+    # schoonmaken
+    arcpy.DeleteFeatures_management(buffer)
+
+def koppel_go(trajectlijn, extra_go, buffer_afstand_go, buffer):
+    # buffer priovak
+    arcpy.Buffer_analysis(trajectlijn, 'bufferzone', buffer_afstand_go, "FULL", "FLAT", "NONE", "", "PLANAR")
+
+    # select zetting features in buffer
+    arcpy.MakeFeatureLayer_management(extra_go, 'templaag_go')
+    arcpy.SelectLayerByLocation_management('templaag_go', "INTERSECT", 'bufferzone', "0 Meters", "NEW_SELECTION", "NOT_INVERT")
+    arcpy.CopyFeatures_management('templaag_go', buffer)
+
+
+    # koppel aantal panden in dijkzone aan traject
+    aantal_go_ = arcpy.GetCount_management(buffer)
+    aantal_go = aantal_go_[0]
+    arcpy.AddField_management(trajectlijn, "extra_go", "DOUBLE", 2, field_is_nullable="NULLABLE")
+
+    try:
+        aantal_go
+        with arcpy.da.UpdateCursor(trajectlijn, 'extra_go') as cursor:
+            for row in cursor:
+                row[0] = aantal_go
+                cursor.updateRow(row)
+        del cursor
+    except NameError:
+        pass
+
+
+    # schoonmaken
+    arcpy.DeleteFeatures_management(buffer)
+    arcpy.DeleteFeatures_management("bufferzone")
+    arcpy.Delete_management("temp_stat")
+
+
 with arcpy.da.SearchCursor(trajecten,['SHAPE@',code_wsrl]) as cursor:
     for row in cursor:
         code = code_wsrl
         id = row[1]
         trajectlijn = 'deeltraject_' + str(row[1])
-        buffer_dpip = 'buffer_dpip' + str(row[1])
-        buffer_zet = 'buffer_zet' + str(row[1])
+        buffer_dpip = 'buffer_dpip_' + str(row[1])
+        buffer_zet = 'buffer_zet_' + str(row[1])
+        buffer_kl = 'buffer_kl_' + str(row[1])
+        buffer_go = 'buffer_go_' + str(row[1])
         panden_dijkzone = 'panden_dijkzone_' + str(row[1])
         panden_dijkzone_bit = 'panden_dijkzone_bit_' + str(row[1])
         binnenteen_traject = 'binnenteen_' + str(row[1])
@@ -180,9 +260,10 @@ with arcpy.da.SearchCursor(trajecten,['SHAPE@',code_wsrl]) as cursor:
 
         # doorlopen scripts
         print trajectlijn
-        koppel_dpip(trajectlijn,dpiplaag,buffer_afstand,buffer_dpip)
-        koppel_zetting(trajectlijn, zettinglaag, buffer_afstand, buffer_zet)
-        koppel_panden_dijk(trajectlijn, dijkzone, panden, buffer_afstand_panden, panden_dijkzone)
-        koppel_panden_bitplus_20(trajectlijn, dijkzone, panden, buffer_afstand_panden_bit, panden_dijkzone_bit,
-                                 binnenteenlijn, binnenteen_traject, code_wsrl, id)
-
+        # koppel_dpip(trajectlijn,dpiplaag,buffer_afstand,buffer_dpip)
+        # koppel_zetting(trajectlijn, zettinglaag, buffer_afstand, buffer_zet)
+        # koppel_panden_dijk(trajectlijn, dijkzone, panden, buffer_afstand_panden, panden_dijkzone)
+        # koppel_panden_bitplus_20(trajectlijn, dijkzone, panden, buffer_afstand_panden_bit, panden_dijkzone_bit,
+        #                          binnenteenlijn, binnenteen_traject, code_wsrl, id)
+        # koppel_kl(trajectlijn, kabels_leidingen, buffer_afstand, buffer_kl)
+        koppel_go(trajectlijn, extra_go, buffer_afstand_go, buffer_go)
