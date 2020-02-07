@@ -42,7 +42,9 @@ naam_totaalprofielen = 'prioprofielen_safe_jan2020'
 totaal_profielen =[]
 
 
-
+def koppel_extra(trajectlijn,trajecten):
+    arcpy.JoinField_management(trajectlijn, 'prio_nummer', trajecten, 'prio_nummer', ['Van', 'Tot','extra_inmeten','na2000','maatregel','kosten','groep'])
+    print "Extra velden uit hoofd-tabel gekoppeld"
 
 def koppel_dpip(trajectlijn, dpiplaag, buffer_afstand, buffer):
     # buffer priovak
@@ -222,7 +224,7 @@ def koppel_kl(trajectlijn, kabels_leidingen, buffer_afstand, buffer):
     with arcpy.da.SearchCursor("temp_stat", 'SUM_Shape_Length') as cursor:
         for row in cursor:
             tot_kl = row[0]
-            print tot_kl
+            # print tot_kl
 
 
     arcpy.AddField_management(trajectlijn, "lengte_kl", "DOUBLE", 2, field_is_nullable="NULLABLE")
@@ -337,12 +339,23 @@ with arcpy.da.SearchCursor(trajecten,['SHAPE@',code_wsrl]) as cursor:
         binnenteen_traject = 'binnenteen_' + str(row[1])
         where = '"' + code_wsrl + '" = ' + "'" + str(id) + "'"
 
+        invoerpunten = 'punten_profielen'
 
         # selecteer betreffend traject
         arcpy.Select_analysis(trajecten, trajectlijn, where)
 
         # doorlopen scripts
         print trajectlijn
+
+        generate_profiles(profiel_interval, profiel_lengte_land, profiel_lengte_rivier, trajectlijn, code_wsrl,toetspeil, profielen)
+        join_mg_profiles(trajectlijn,profielen,profielen_mg,profielen_plus)
+        copy_trajectory_lr(trajectlijn, code_wsrl)
+        set_measurements_trajectory(profielen_plus, trajectlijn, code_wsrl, stapgrootte_punten,toetspeil)
+        extract_z_arcpy(invoerpunten, uitvoerpunten, raster)
+        add_xy(uitvoerpunten, code_wsrl)
+
+
+        koppel_extra(trajectlijn, trajecten)
         koppel_dpip(trajectlijn,dpiplaag,buffer_afstand,buffer_dpip)
         koppel_zetting(trajectlijn, zettinglaag, buffer_afstand, buffer_zet)
         koppel_panden_dijk(trajectlijn, dijkzone, panden, buffer_afstand_panden, panden_dijkzone)
@@ -353,13 +366,6 @@ with arcpy.da.SearchCursor(trajecten,['SHAPE@',code_wsrl]) as cursor:
         koppel_versterkingen(trajectlijn,versterkingen)
         koppel_resultaten(trajectlijn,resultaten)
 
-
-        # generate_profiles(profiel_interval, profiel_lengte_land, profiel_lengte_rivier, trajectlijn, code_wsrl,toetspeil, profielen)
-        # join_mg_profiles(trajectlijn,profielen,profielen_mg,profielen_plus)
-        # copy_trajectory_lr(trajectlijn, code_wsrl)
-        # set_measurements_trajectory(profielen_plus, trajectlijn, code_wsrl, stapgrootte_punten,toetspeil)
-        # extract_z_arcpy(invoerpunten, uitvoerpunten, raster)
-        # add_xy(uitvoerpunten, code_wsrl)
-        excel_writer_factsheets(uitvoerpunten, code, excel, id,trajecten,toetspeil,min_plot,max_plot,trajectlijn)
+        excel_writer_factsheets(uitvoerpunten, code, excel, id, trajecten, toetspeil, min_plot, max_plot, trajectlijn)
 
 
