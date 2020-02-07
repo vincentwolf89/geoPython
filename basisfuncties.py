@@ -1051,8 +1051,8 @@ def excel_writer_factsheets(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_
     worksheet1.write('A6', "Van dijkpaal")
     worksheet1.write('A7', "Tot dijkpaal")
     worksheet1.write('A8', "Vaklengte [m]")
-    worksheet1.write('A9', "Laatste versterking")
-    worksheet1.write('A10', "Eindjaar laatste versterking")
+    worksheet1.write('A9', "Laatste versterking [traject]")
+    worksheet1.write('A10', "Laatste versterking [jaar]")
 
     worksheet1.write('A11', "Basisgegevens techniek",cell_format_sub)
     worksheet1.write('A12', "Dikte deklaag gemiddeld [m]")
@@ -1060,8 +1060,8 @@ def excel_writer_factsheets(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_
     worksheet1.write('A14', "Deformatie gemiddeld[mm/jaar]")
 
     worksheet1.write('A15', "Basisgegevens conditionering",cell_format_sub)
-    worksheet1.write('A16', "Huizen binnen teenlijn")
-    worksheet1.write('A17', "Huizen +20m teenlijn")
+    worksheet1.write('A16', "Huizen binnen teenlijn [aantal]")
+    worksheet1.write('A17', "Huizen +20m teenlijn [aantal]")
     worksheet1.write('A18', "Leidingen [m]")
     worksheet1.write('A19', "Natura 2000")
 
@@ -1072,10 +1072,10 @@ def excel_writer_factsheets(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_
 
     worksheet1.write('A24', "Ontwerpproces",cell_format_sub)
     worksheet1.write('A25', "Groep VVK")
-    worksheet1.write('A26', "Maatregel VVK")
+    worksheet1.write('A26', "Maatregel VVK [soort]")
     worksheet1.write('A27', "Kosten VVK [*miljoen euro]")
-    worksheet1.write('A28', "Extra grondonderzoek")
-    worksheet1.write('A29', "Extra inmetingen geometrie")
+    worksheet1.write('A28', "Extra grondonderzoek [aantal]")
+    worksheet1.write('A29', "Geometrie")
 
     # maak array-pandas df van trajectlijn
     velden = ["prio_nummer","Van","Tot","Shape_Length","TRAJECT","OPLEVERING","gem_dpip","var_dpip","gem_zet","panden_dijkzone", "panden_dijkzone_bit",
@@ -1087,22 +1087,25 @@ def excel_writer_factsheets(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_
     van = df_fact['Van'].iloc[0]
     tot = df_fact['Tot'].iloc[0]
     lengte = int(df_fact['Shape_Length'].iloc[0])
+
+    # test op NaN
+
     traject = df_fact['TRAJECT'].iloc[0]
     oplevering = df_fact['OPLEVERING'].iloc[0]
-    gdip = round(df_fact['gem_dpip'].iloc[0],1)
-    vdip = round(df_fact['var_dpip'].iloc[0],1)
-    gzet = round(df_fact['gem_zet'].iloc[0],1)
-    pdijk = int(df_fact['panden_dijkzone'].iloc[0])
-    pbit = int(df_fact['panden_dijkzone_bit'].iloc[0])
-    lengtekl = int(df_fact['lengte_kl'].iloc[0])
+    gdpip = df_fact['gem_dpip'].iloc[0]
+    vdpip = df_fact['var_dpip'].iloc[0]
+    gzet = df_fact['gem_zet'].iloc[0]
+    pdijk = df_fact['panden_dijkzone'].iloc[0]
+    pbit = df_fact['panden_dijkzone_bit'].iloc[0]
+    lengtekl = df_fact['lengte_kl'].iloc[0]
     na2000 = df_fact['na2000'].iloc[0]
-    stph = round(df_fact['stph_2023'].iloc[0],1)
-    stbi = round(df_fact['stbi_2023'].iloc[0],1)
-    gekb = round(df_fact['gekb_2023'].iloc[0],1)
+    stph = df_fact['stph_2023'].iloc[0]
+    stbi = df_fact['stbi_2023'].iloc[0]
+    gekb = df_fact['gekb_2023'].iloc[0]
     groep = df_fact['groep'].iloc[0]
     kosten = df_fact['kosten'].iloc[0]
     maatregel = df_fact['maatregel'].iloc[0]
-    extrago = int(df_fact['extra_go'].iloc[0])
+    extrago = df_fact['extra_go'].iloc[0]
     extrameet= df_fact['extra_inmeten'].iloc[0]
 
     print extrago, type(extrago)
@@ -1124,54 +1127,66 @@ def excel_writer_factsheets(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_
     else:
         worksheet1.write('B10', "n.v.t.")
 
-
-    if gdip is not None:
-        worksheet1.write('B12', str(gdip))
-    else:
+    if math.isnan(gdpip) == True:
         worksheet1.write('B12', "n.v.t.")
-
-    if vdip is not None:
-        worksheet1.write('B13', str(vdip))
     else:
+        gdpip = round(gdpip, 1)
+        worksheet1.write('B12', str(gdpip))
+
+    if math.isnan(vdpip) == True:
         worksheet1.write('B13', "n.v.t.")
-
-    if gzet is not None:
-        worksheet1.write('B14', str(gzet))
     else:
+        vdpip = round(vdpip, 1)
+        worksheet1.write('B13', str(vdpip))
+
+
+    if math.isnan(gzet) == True:
         worksheet1.write('B14', "n.v.t.")
+    else:
+        gzet = round(gzet, 1)
+        worksheet1.write('B14', str(gzet))
+
+
+
 
     if pdijk is not None and pdijk > 0:
+        pdijk = int(pdijk)
         worksheet1.write('B16', str(pdijk))
     else:
         worksheet1.write('B16', "n.v.t.")
 
     if pbit is not None and pbit > 0:
+        pbit = int(pbit)
         worksheet1.write('B17', str(pbit))
     else:
         worksheet1.write('B17', "n.v.t.")
 
 
     if lengtekl is not None and lengtekl > 0:
+        lengtekl = int(lengtekl)
         worksheet1.write('B18', str(lengtekl))
     else:
         worksheet1.write('B18', "n.v.t.")
 
-    if na2000 is not None:
+    if na2000 == "Ja":
         worksheet1.write('B19', "Aanwezig")
     else:
         worksheet1.write('B19', "n.v.t.")
 
     if stph is not None:
+        stph = round(stph,1)
         worksheet1.write('B21', str(stph))
     else:
         worksheet1.write('B21', "n.v.t.")
 
     if stbi is not None:
+        stbi = round(stbi,1)
         worksheet1.write('B22', str(stbi))
     else:
         worksheet1.write('B22', "n.v.t.")
 
     if gekb is not None:
+        gekb = round(gekb,1)
         worksheet1.write('B23', str(gekb))
     else:
         worksheet1.write('B23', "n.v.t.")
@@ -1195,14 +1210,15 @@ def excel_writer_factsheets(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_
         worksheet1.write('B27', "Onbekend")
 
     if extrago is not None and extrago > 0:
+        extrago = int(extrago)
         worksheet1.write('B28', str(extrago))
     else:
         worksheet1.write('B28', "n.v.t.")
 
-    if extrameet is not None:
+    if extrameet == "Ja":
         worksheet1.write('B29', "Extra inmetingen vereist")
     else:
-        worksheet1.write('B29', "n.v.t.")
+        worksheet1.write('B29', "Geen inmetingen vereist")
 
 
 
