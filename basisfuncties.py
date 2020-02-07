@@ -1026,7 +1026,10 @@ def excel_writer_factsheets(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_
     cell_format_sub.set_bg_color('#ADFF2F')
     cell_format_sub.set_bold()
 
+    # stel kolom breedtes in
     worksheet1.set_column(0, 0, 30)
+    worksheet1.set_column(1, 1, 30)
+
 
 
     # search cursor om er doorheen te gaan en parameters eruit te halen
@@ -1080,33 +1083,127 @@ def excel_writer_factsheets(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_
     array_fact = arcpy.da.FeatureClassToNumPyArray(trajectlijn,velden)
     df_fact= pd.DataFrame(array_fact)
 
+    nummer = df_fact['prio_nummer'].iloc[0]
+    van = df_fact['Van'].iloc[0]
+    tot = df_fact['Tot'].iloc[0]
+    lengte = round(df_fact['Shape_Length'].iloc[0],0)
+    traject = df_fact['TRAJECT'].iloc[0]
+    oplevering = df_fact['OPLEVERING'].iloc[0]
+    gdip = round(df_fact['gem_dpip'].iloc[0],1)
+    vdip = round(df_fact['var_dpip'].iloc[0],1)
+    gzet = round(df_fact['gem_zet'].iloc[0],1)
+    pdijk = round(df_fact['panden_dijkzone'].iloc[0],0)
+    pbit = round(df_fact['panden_dijkzone_bit'].iloc[0],0)
+    lengtekl = round(df_fact['lengte_kl'].iloc[0],0)
+    na2000 = df_fact['na2000'].iloc[0]
+    stph = round(df_fact['stph_2023'].iloc[0],1)
+    stbi = round(df_fact['stbi_2023'].iloc[0],1)
+    gekb = round(df_fact['gekb_2023'].iloc[0],1)
+    groep = df_fact['groep'].iloc[0]
+    kosten = df_fact['kosten'].iloc[0]
+    maatregel = df_fact['maatregel'].iloc[0]
+    extrago = round(df_fact['extra_go'].iloc[0],0)
+    extrameet= df_fact['extra_inmeten'].iloc[0]
+
+
+
     # schrijf parameters naar de excelcellen
-    worksheet1.write('B5',  df_fact['prio_nummer'].iloc[0])
-    worksheet1.write('B6', df_fact['Van'].iloc[0])
-    worksheet1.write('B7', df_fact['Tot'].iloc[0])
-    worksheet1.write('B8', round(df_fact['Shape_Length'].iloc[0]),0)
-    worksheet1.write('B9', df_fact['TRAJECT'].iloc[0])
-    worksheet1.write('B10', df_fact['OPLEVERING'].iloc[0])
+    worksheet1.write('B5',  nummer)
+    worksheet1.write('B6', van)
+    worksheet1.write('B7', tot)
+    worksheet1.write('B8', str(lengte))
+
+    if traject is not None or traject is not 0:
+        worksheet1.write('B9', traject)
+    else:
+        worksheet1.write('B9', "n.v.t.")
+
+    if oplevering is not None and oplevering is not 0:
+        worksheet1.write('B10', oplevering)
+    else:
+        worksheet1.write('B10', "n.v.t.")
 
 
-    worksheet1.write('B12', df_fact['gem_dpip'].iloc[0])
-    worksheet1.write('B13', df_fact['var_dpip'].iloc[0])
-    worksheet1.write('B14', df_fact['gem_zet'].iloc[0])
+    if gdip is not None and gdip is not 0:
+        worksheet1.write('B12', str(gdip))
+    else:
+        worksheet1.write('B12', "n.v.t.")
 
-    worksheet1.write('B16', df_fact['panden_dijkzone'].iloc[0])
-    worksheet1.write('B17', df_fact['panden_dijkzone_bit'].iloc[0])
-    worksheet1.write('B18', df_fact['lengte_kl'].iloc[0])
-    worksheet1.write('B19', df_fact['na2000'].iloc[0])
+    if vdip is not None and vdip is not 0:
+        worksheet1.write('B13', str(vdip))
+    else:
+        worksheet1.write('B13', "n.v.t.")
 
-    worksheet1.write('B21', df_fact['stph_2023'].iloc[0])
-    worksheet1.write('B22', df_fact['stbi_2023'].iloc[0])
-    worksheet1.write('B23', df_fact['gekb_2023'].iloc[0])
+    if gzet is not None and gzet is not 0:
+        worksheet1.write('B14', str(gzet))
+    else:
+        worksheet1.write('B14', "n.v.t.")
 
-    worksheet1.write('B25', df_fact['groep'].iloc[0])
-    worksheet1.write('B26', df_fact['maatregel'].iloc[0])
-    worksheet1.write('B27', df_fact['kosten'].iloc[0])
-    worksheet1.write('B28', df_fact['extra_go'].iloc[0])
-    worksheet1.write('B29', df_fact['extra_inmeten'].iloc[0])
+    if pdijk is not None and pdijk is not 0:
+        worksheet1.write('B16', str(pdijk))
+    else:
+        worksheet1.write('B16', "n.v.t.")
+
+    if pbit is not None and pbit is not 0:
+        worksheet1.write('B17', str(pbit))
+    else:
+        worksheet1.write('B17', "n.v.t.")
+
+
+    if lengtekl is not None and lengtekl is not 0:
+        worksheet1.write('B18', str(lengtekl))
+    else:
+        worksheet1.write('B18', "n.v.t.")
+
+    if na2000 is not None and na2000 is not 0:
+        worksheet1.write('B19', "Aanwezig")
+    else:
+        worksheet1.write('B19', "n.v.t.")
+
+    if stph is not None and stph is not 0:
+        worksheet1.write('B21', str(stph))
+    else:
+        worksheet1.write('B21', "n.v.t.")
+
+    if stbi is not None and stbi is not 0:
+        worksheet1.write('B22', str(stbi))
+    else:
+        worksheet1.write('B22', "n.v.t.")
+
+    if gekb is not None and gekb is not 0:
+        worksheet1.write('B23', str(gekb))
+    else:
+        worksheet1.write('B23', "n.v.t.")
+
+
+
+    if groep is not None and groep is not 0:
+        worksheet1.write('B25', str(groep))
+    else:
+        worksheet1.write('B25', "n.v.t.")
+
+    if maatregel is not None and maatregel is not 0:
+        worksheet1.write('B26', str(maatregel))
+    else:
+        worksheet1.write('B26', "n.v.t.")
+
+
+    if kosten is not None and kosten is not 0:
+        worksheet1.write('B27', str(kosten))
+    else:
+        worksheet1.write('B27', "Onbekend")
+
+    if extrago is not None and extrago is not 0:
+        worksheet1.write('B28', str(extrago))
+    else:
+        worksheet1.write('B28', "n.v.t.")
+
+    if extrameet is not None and extrameet is not 0:
+        worksheet1.write('B29', "Extra inmetingen vereist")
+    else:
+        worksheet1.write('B29', "n.v.t.")
+
+
 
 
     workbook.close()
