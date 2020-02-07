@@ -1047,7 +1047,7 @@ def excel_writer_factsheets(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_
     worksheet1.write('A5', "Vaknummer")
     worksheet1.write('A6', "Van dijkpaal")
     worksheet1.write('A7', "Tot dijkpaal")
-    worksheet1.write('A8', "Vaklengte")
+    worksheet1.write('A8', "Vaklengte [m]")
     worksheet1.write('A9', "Laatste versterking")
     worksheet1.write('A10', "Eindjaar laatste versterking")
 
@@ -1068,24 +1068,45 @@ def excel_writer_factsheets(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_
     worksheet1.write('A23', "GEKB [beta]")
 
     worksheet1.write('A24', "Ontwerpproces",cell_format_sub)
-    worksheet1.write('A25', "Maatregel VVK")
-    worksheet1.write('A26', "Kosten VVK")
-    worksheet1.write('A27', "Extra grondonderzoek")
-    worksheet1.write('A28', "Extra inmetingen geometrie")
+    worksheet1.write('A25', "Groep VVK")
+    worksheet1.write('A26', "Maatregel VVK")
+    worksheet1.write('A27', "Kosten VVK [*miljoen euro]")
+    worksheet1.write('A28', "Extra grondonderzoek")
+    worksheet1.write('A29', "Extra inmetingen geometrie")
+
+    # maak array-pandas df van trajectlijn
+    velden = ["prio_nummer","Van","Tot","Shape_Length","TRAJECT","OPLEVERING","gem_dpip","var_dpip","gem_zet","panden_dijkzone", "panden_dijkzone_bit",
+              "lengte_kl", "extra_go", "gekb_2023","stbi_2023","stph_2023","na2000","extra_inmeten","maatregel","kosten","groep"]
+    array_fact = arcpy.da.FeatureClassToNumPyArray(trajectlijn,velden)
+    df_fact= pd.DataFrame(array_fact)
+
+    # schrijf parameters naar de excelcellen
+    worksheet1.write('B5',  df_fact['prio_nummer'].iloc[0])
+    worksheet1.write('B6', df_fact['Van'].iloc[0])
+    worksheet1.write('B7', df_fact['Tot'].iloc[0])
+    worksheet1.write('B8', round(df_fact['Shape_Length'].iloc[0]),0)
+    worksheet1.write('B9', df_fact['TRAJECT'].iloc[0])
+    worksheet1.write('B10', df_fact['OPLEVERING'].iloc[0])
 
 
-    # velden = ["prio_nummer","Van","Tot","Shape_Length","TRAJECT","OPLEVERING","gem_dpip","var_dpip","gem_zet",]
-    # array_fact = arcpy.da.FeatureClassToNumPyArray(trajectlijn,velden)
-    # df_fact= pd.DataFrame(array_fact)
-    # df_fact['param'].iloc[0] == waarde!!
+    worksheet1.write('B12', df_fact['gem_dpip'].iloc[0])
+    worksheet1.write('B13', df_fact['var_dpip'].iloc[0])
+    worksheet1.write('B14', df_fact['gem_zet'].iloc[0])
 
+    worksheet1.write('B16', df_fact['panden_dijkzone'].iloc[0])
+    worksheet1.write('B17', df_fact['panden_dijkzone_bit'].iloc[0])
+    worksheet1.write('B18', df_fact['lengte_kl'].iloc[0])
+    worksheet1.write('B19', df_fact['na2000'].iloc[0])
 
-    # with arcpy.da.SearchCursor(trajectlijn, ['lengte_kl', 'TRAJECT']) as cursor:
-    #     for row in cursor:
-    #         worksheet1.write('B1', row[0])
-    #         worksheet1.write('B2', row[1])
-    # check resulaten, 999 is geen oordeel!
+    worksheet1.write('B21', df_fact['stph_2023'].iloc[0])
+    worksheet1.write('B22', df_fact['stbi_2023'].iloc[0])
+    worksheet1.write('B23', df_fact['gekb_2023'].iloc[0])
 
+    worksheet1.write('B25', df_fact['groep'].iloc[0])
+    worksheet1.write('B26', df_fact['maatregel'].iloc[0])
+    worksheet1.write('B27', df_fact['kosten'].iloc[0])
+    worksheet1.write('B28', df_fact['extra_go'].iloc[0])
+    worksheet1.write('B29', df_fact['extra_inmeten'].iloc[0])
 
 
     workbook.close()
