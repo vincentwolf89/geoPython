@@ -1127,20 +1127,20 @@ def excel_writer_factsheets(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_
     else:
         worksheet1.write('B10', "n.v.t.")
 
-    if math.isnan(gdpip) == True:
+    if pd.isna(gdpip) == True:
         worksheet1.write('B12', "n.v.t.")
     else:
         gdpip = round(gdpip, 1)
         worksheet1.write('B12', str(gdpip))
 
-    if math.isnan(vdpip) == True:
+    if pd.isna(vdpip) == True:
         worksheet1.write('B13', "n.v.t.")
     else:
         vdpip = round(vdpip, 1)
         worksheet1.write('B13', str(vdpip))
 
 
-    if math.isnan(gzet) == True:
+    if pd.isna(gzet) == True:
         worksheet1.write('B14', "n.v.t.")
     else:
         gzet = round(gzet, 1)
