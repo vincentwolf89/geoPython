@@ -1028,7 +1028,7 @@ def excel_writer_factsheets(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_
 
     # stel kolom breedtes in
     worksheet1.set_column(0, 0, 30)
-    worksheet1.set_column(1, 1, 30)
+    worksheet1.set_column(1, 1, 60)
 
 
 
@@ -1117,15 +1117,16 @@ def excel_writer_factsheets(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_
     worksheet1.write('B7', tot)
     worksheet1.write('B8', str(lengte))
 
-    if traject is not None or traject is not 0:
-        worksheet1.write('B9', traject)
-    else:
+    if pd.isna(traject) == True:
         worksheet1.write('B9', "n.v.t.")
-
-    if oplevering is not None:
-        worksheet1.write('B10', oplevering)
     else:
+        worksheet1.write('B9', traject)
+
+
+    if pd.isna(oplevering) == True:
         worksheet1.write('B10', "n.v.t.")
+    else:
+        worksheet1.write('B10', oplevering)
 
     if pd.isna(gdpip) == True:
         worksheet1.write('B12', "n.v.t.")
@@ -1149,71 +1150,73 @@ def excel_writer_factsheets(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_
 
 
 
-    if pdijk is not None and pdijk > 0:
+    if pdijk > 0:
         pdijk = int(pdijk)
         worksheet1.write('B16', str(pdijk))
     else:
         worksheet1.write('B16', "n.v.t.")
 
-    if pbit is not None and pbit > 0:
+    if pbit > 0:
         pbit = int(pbit)
         worksheet1.write('B17', str(pbit))
     else:
         worksheet1.write('B17', "n.v.t.")
 
 
-    if lengtekl is not None and lengtekl > 0:
+    if pd.isna(lengtekl) == True:
+        worksheet1.write('B18', "n.v.t.")
+    else:
         lengtekl = int(lengtekl)
         worksheet1.write('B18', str(lengtekl))
-    else:
-        worksheet1.write('B18', "n.v.t.")
+
 
     if na2000 == "Ja":
         worksheet1.write('B19', "Aanwezig")
     else:
         worksheet1.write('B19', "n.v.t.")
 
-    if stph is not None:
-        stph = round(stph,1)
-        worksheet1.write('B21', str(stph))
-    else:
+    if pd.isna(stph) == True:
         worksheet1.write('B21', "n.v.t.")
-
-    if stbi is not None:
-        stbi = round(stbi,1)
-        worksheet1.write('B22', str(stbi))
     else:
+        stph = round(stph, 1)
+        worksheet1.write('B21', str(stph))
+
+    if pd.isna(stbi) == True:
         worksheet1.write('B22', "n.v.t.")
-
-    if gekb is not None:
-        gekb = round(gekb,1)
-        worksheet1.write('B23', str(gekb))
     else:
+        stbi = round(stbi, 1)
+        worksheet1.write('B22', str(stbi))
+
+    if pd.isna(gekb) == True:
         worksheet1.write('B23', "n.v.t.")
-
-
-
-    if groep is not None:
-        worksheet1.write('B25', str(groep))
     else:
+        gekb = round(gekb, 1)
+        worksheet1.write('B23', str(gekb))
+
+
+
+    if pd.isna(groep) == True:
         worksheet1.write('B25', "n.v.t.")
-
-    if maatregel is not None:
-        worksheet1.write('B26', str(maatregel))
     else:
+        worksheet1.write('B25', str(groep))
+
+    if pd.isna(maatregel) == True:
         worksheet1.write('B26', "n.v.t.")
-
-
-    if kosten is not None:
-        worksheet1.write('B27', str(kosten))
     else:
-        worksheet1.write('B27', "Onbekend")
+        worksheet1.write('B26', str(maatregel))
 
-    if extrago is not None and extrago > 0:
+
+
+    if pd.isna(kosten) == True:
+        worksheet1.write('B27', "Onbekend")
+    else:
+        worksheet1.write('B27', str(kosten))
+
+    if pd.isna(extrago) == True or extrago < 1:
+        worksheet1.write('B28', "n.v.t.")
+    else:
         extrago = int(extrago)
         worksheet1.write('B28', str(extrago))
-    else:
-        worksheet1.write('B28', "n.v.t.")
 
     if extrameet == "Ja":
         worksheet1.write('B29', "Extra inmetingen vereist")
