@@ -4,7 +4,7 @@ from basisfuncties import*
 arcpy.env.workspace = r'D:\Projecten\WSRL\safe_temp.gdb'
 arcpy.env.overwriteOutput = True
 
-trajecten = r'D:\Projecten\WSRL\safe_basis.gdb\priovakken_test'
+trajecten = r'D:\Projecten\WSRL\safe_basis.gdb\priovakken_test2'
 
 
 code_wsrl = "prio_nummer"
@@ -360,6 +360,6 @@ with arcpy.da.SearchCursor(trajecten,['SHAPE@',code_wsrl]) as cursor:
         # set_measurements_trajectory(profielen_plus, trajectlijn, code_wsrl, stapgrootte_punten,toetspeil)
         # extract_z_arcpy(invoerpunten, uitvoerpunten, raster)
         # add_xy(uitvoerpunten, code_wsrl)
-        # excel_writer_factsheets(uitvoerpunten, code, excel, id,trajecten,toetspeil,min_plot,max_plot,trajectlijn)
+        excel_writer_factsheets(uitvoerpunten, code, excel, id,trajecten,toetspeil,min_plot,max_plot,trajectlijn)
 
 
