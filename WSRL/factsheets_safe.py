@@ -4,10 +4,11 @@ from basisfuncties import*
 arcpy.env.workspace = r'D:\Projecten\WSRL\safe_temp.gdb'
 arcpy.env.overwriteOutput = True
 
-trajecten = r'D:\Projecten\WSRL\safe_basis.gdb\priovakken_test2'
+trajecten = r'D:\Projecten\WSRL\safe_basis.gdb\priovakken'
 
 
 code_wsrl = "prio_nummer"
+mxd = r'C:\Users\Vincent\Desktop\werkmxd_factsheets.mxd'
 
 buffer_afstand = 50
 buffer_afstand_panden = 500
@@ -33,6 +34,7 @@ profiel_lengte_rivier = 100 # 10 default
 
 
 excelmap = 'D:/Projecten/WSRL/safe/uitvoer_priovakken/' # gewenste map voor .xlsx-uitvoer
+jpgmap = 'D:/Projecten/WSRL/safe/uitvoer_jpg/'
 raster = r'C:\Users\Vincent\Desktop\ahn3clip_safe' # hoogtegrid
 toetspeil = 999 # naam van kolom met toetspeil/toetshoogte, 999 voor uitvoer zonder toetspeil
 min_plot = -50
@@ -246,7 +248,9 @@ def koppel_kl(trajectlijn, kabels_leidingen, buffer_afstand, buffer):
 
     print "Kabels en leidingen gekoppeld"
 
-def koppel_go(trajectlijn, extra_go, buffer_afstand_go, buffer):
+
+
+def koppel_go_ext(trajectlijn, extra_go, buffer_afstand_go,buffer):
     # buffer priovak
     arcpy.Buffer_analysis(trajectlijn, 'bufferzone', buffer_afstand_go, "FULL", "FLAT", "NONE", "", "PLANAR")
 
@@ -255,29 +259,30 @@ def koppel_go(trajectlijn, extra_go, buffer_afstand_go, buffer):
     arcpy.SelectLayerByLocation_management('templaag_go', "INTERSECT", 'bufferzone', "0 Meters", "NEW_SELECTION", "NOT_INVERT")
     arcpy.CopyFeatures_management('templaag_go', buffer)
 
+    #
+    so = 0
+    bo = 0
+    with arcpy.da.SearchCursor(buffer, 'Type_') as cursor:
+        for row in cursor:
+            if row[0] == "Sondering":
+                so += 1
+            elif row[0] == "HB":
+                bo += 1
+            else:
+                pass
+    arcpy.AddField_management(trajectlijn, "extra_bo", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.AddField_management(trajectlijn, "extra_so", "DOUBLE", 2, field_is_nullable="NULLABLE")
 
-    # koppel aantal panden in dijkzone aan traject
-    aantal_go_ = arcpy.GetCount_management(buffer)
-    aantal_go = aantal_go_[0]
-    arcpy.AddField_management(trajectlijn, "extra_go", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    with arcpy.da.UpdateCursor(trajectlijn, ['extra_bo','extra_so']) as cursor:
+        for row in cursor:
+            row[0] = bo
+            row[1] = so
+            cursor.updateRow(row)
+    del cursor
 
-    try:
-        aantal_go
-        with arcpy.da.UpdateCursor(trajectlijn, 'extra_go') as cursor:
-            for row in cursor:
-                row[0] = aantal_go
-                cursor.updateRow(row)
-        del cursor
-    except NameError:
-        pass
+    # print so, " sonderingen", bo, " boringen"
+    print "Extra grondonderzoek gekoppeld"
 
-
-    # schoonmaken
-    arcpy.DeleteFeatures_management(buffer)
-    arcpy.DeleteFeatures_management("bufferzone")
-    arcpy.Delete_management("temp_stat")
-
-    print "Grondonderzoek gekoppeld"
 
 def koppel_versterkingen(trajectlijn, versterkingen):
     arcpy.Near_analysis(trajectlijn, versterkingen, "5 Meters", "NO_LOCATION", "NO_ANGLE", "PLANAR")
@@ -317,6 +322,21 @@ def koppel_resultaten(trajectlijn,resultaten):
 
     print "Resultaten gekoppeld"
 
+def zoom_mxd(mxd, id, code_wsrl):
+    mxd = arcpy.mapping.MapDocument(mxd)
+    df = arcpy.mapping.ListDataFrames(mxd, "*")[0]
+    lyr = arcpy.mapping.ListLayers(mxd, "priovakken", df)[0]
+
+    where = '"' + code_wsrl + '" = ' + "'" + str(id) + "'"
+    # arcpy.SelectLayerByAttribute_management(lyr, "NEW_SELECTION", ' "prio_nummer" = 2739 ')
+    arcpy.SelectLayerByAttribute_management(lyr, "NEW_SELECTION", where)
+    df.zoomToSelectedFeatures()
+    arcpy.RefreshActiveView()
+    arcpy.mapping.ExportToJPEG(mxd, jpgmap+str(id),df,df_export_width = 1000,df_export_height = 400,world_file=False)
+
+    print "Afbeelding van priovak gemaakt"
+
+
 
 with arcpy.da.SearchCursor(trajecten,['SHAPE@',code_wsrl]) as cursor:
     for row in cursor:
@@ -327,6 +347,7 @@ with arcpy.da.SearchCursor(trajecten,['SHAPE@',code_wsrl]) as cursor:
         profielen_plus = 'profielen_plus' + str(row[1])
         uitvoerpunten = 'punten_profielen_z_' + str(row[1])
         excel = excelmap + 'priovak_' + str(row[1]) + '.xlsx'
+        img = jpgmap + str(id) + '.jpg'
 
 
         trajectlijn = 'deeltraject_' + str(row[1])
@@ -347,12 +368,12 @@ with arcpy.da.SearchCursor(trajecten,['SHAPE@',code_wsrl]) as cursor:
         # doorlopen scripts
         print trajectlijn
 
-        generate_profiles(profiel_interval, profiel_lengte_land, profiel_lengte_rivier, trajectlijn, code_wsrl,toetspeil, profielen)
-        join_mg_profiles(trajectlijn,profielen,profielen_mg,profielen_plus)
-        copy_trajectory_lr(trajectlijn, code_wsrl)
-        set_measurements_trajectory(profielen_plus, trajectlijn, code_wsrl, stapgrootte_punten,toetspeil)
-        extract_z_arcpy(invoerpunten, uitvoerpunten, raster)
-        add_xy(uitvoerpunten, code_wsrl)
+        # generate_profiles(profiel_interval, profiel_lengte_land, profiel_lengte_rivier, trajectlijn, code_wsrl,toetspeil, profielen)
+        # join_mg_profiles(trajectlijn,profielen,profielen_mg,profielen_plus)
+        # copy_trajectory_lr(trajectlijn, code_wsrl)
+        # set_measurements_trajectory(profielen_plus, trajectlijn, code_wsrl, stapgrootte_punten,toetspeil)
+        # extract_z_arcpy(invoerpunten, uitvoerpunten, raster)
+        # add_xy(uitvoerpunten, code_wsrl)
 
 
         koppel_extra(trajectlijn, trajecten)
@@ -362,10 +383,11 @@ with arcpy.da.SearchCursor(trajecten,['SHAPE@',code_wsrl]) as cursor:
         koppel_panden_bitplus_20(trajectlijn, dijkzone, panden, buffer_afstand_panden_bit, panden_dijkzone_bit,
                                  binnenteenlijn, binnenteen_traject, code_wsrl, id)
         koppel_kl(trajectlijn, kabels_leidingen, buffer_afstand, buffer_kl)
-        koppel_go(trajectlijn, extra_go, buffer_afstand_go, buffer_go)
+        koppel_go_ext(trajectlijn, extra_go, buffer_afstand_go, buffer_go)
         koppel_versterkingen(trajectlijn,versterkingen)
         koppel_resultaten(trajectlijn,resultaten)
 
-        excel_writer_factsheets(uitvoerpunten, code, excel, id, trajecten, toetspeil, min_plot, max_plot, trajectlijn)
+        zoom_mxd(mxd, id, code_wsrl)
+        excel_writer_factsheets(uitvoerpunten, code, excel, id, trajecten, toetspeil, min_plot, max_plot, trajectlijn,img)
 
 
