@@ -867,7 +867,7 @@ def excel_writer_maatgevend(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_
 
     print '.xlsx-bestand gemaakt voor profielset'
 
-def excel_writer_factsheets(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_plot,max_plot,trajectlijn):
+def excel_writer_factsheets(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_plot,max_plot,trajectlijn,img):
 
     # toetshoogte aan uitvoerpunten koppelen
     arcpy.JoinField_management(uitvoerpunten, code, trajecten, code, toetspeil)
@@ -1011,7 +1011,8 @@ def excel_writer_factsheets(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_
     line_chart1.set_x_axis({'min': min_plot, 'max': max_plot})
     line_chart1.set_size({'width': 1000, 'height': 300})
     # line_chart1.set_style(1)
-    worksheet1.insert_chart('G3', line_chart1) # alleen toevoegen voor toetshoogte
+    worksheet1.insert_chart('D24', line_chart1) # alleen toevoegen voor toetshoogte
+
     # worksheet2.insert_chart('G3', line_chart1) # test
     worksheet2.hide()
 
@@ -1074,12 +1075,14 @@ def excel_writer_factsheets(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_
     worksheet1.write('A25', "Groep VVK")
     worksheet1.write('A26', "Maatregel VVK [soort]")
     worksheet1.write('A27', "Kosten VVK [*miljoen euro]")
-    worksheet1.write('A28', "Extra grondonderzoek [aantal]")
-    worksheet1.write('A29', "Geometrie")
+    worksheet1.write('A28', "Extra sonderingen [aantal]")
+    worksheet1.write('A29', "Extra boringen [aantal]")
+
+    worksheet1.write('A30', "Geometrie")
 
     # maak array-pandas df van trajectlijn
     velden = ["prio_nummer","Van","Tot","Shape_Length","TRAJECT","OPLEVERING","gem_dpip","var_dpip","gem_zet","panden_dijkzone", "panden_dijkzone_bit",
-              "lengte_kl", "extra_go", "gekb_2023","stbi_2023","stph_2023","na2000","extra_inmeten","maatregel","kosten","groep"]
+              "lengte_kl", "extra_bo", "extra_so", "gekb_2023","stbi_2023","stph_2023","na2000","extra_inmeten","maatregel","kosten","groep"]
     array_fact = arcpy.da.FeatureClassToNumPyArray(trajectlijn,velden)
     df_fact= pd.DataFrame(array_fact)
 
@@ -1105,10 +1108,11 @@ def excel_writer_factsheets(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_
     groep = df_fact['groep'].iloc[0]
     kosten = df_fact['kosten'].iloc[0]
     maatregel = df_fact['maatregel'].iloc[0]
-    extrago = df_fact['extra_go'].iloc[0]
+    extrabo = int(df_fact['extra_bo'].iloc[0])
+    extraso = int(df_fact['extra_so'].iloc[0])
     extrameet= df_fact['extra_inmeten'].iloc[0]
 
-    print extrago, type(extrago)
+
 
 
     # schrijf parameters naar de excelcellen
@@ -1212,19 +1216,29 @@ def excel_writer_factsheets(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_
     else:
         worksheet1.write('B27', str(kosten))
 
-    if pd.isna(extrago) == True or extrago < 1:
+
+
+    if pd.isna(extraso) == True or extraso < 1:
         worksheet1.write('B28', "n.v.t.")
     else:
-        extrago = int(extrago)
-        worksheet1.write('B28', str(extrago))
+        extrago = int(extraso)
+        worksheet1.write('B28', str(extraso))
+
+    if pd.isna(extrabo) == True or extrabo < 1:
+        worksheet1.write('B29', "n.v.t.")
+    else:
+        extrago = int(extrabo)
+        worksheet1.write('B29', str(extrabo))
 
     if extrameet == "Ja":
-        worksheet1.write('B29', "Extra inmetingen vereist")
+        worksheet1.write('B30', "Extra inmetingen vereist")
     else:
-        worksheet1.write('B29', "Geen inmetingen vereist")
+        worksheet1.write('B30', "Geen inmetingen vereist")
 
 
+    # insert plot vanuit arcmap
 
+    worksheet1.insert_image('D3', img)
 
     workbook.close()
 
