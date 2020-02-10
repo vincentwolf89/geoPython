@@ -1121,13 +1121,13 @@ def excel_writer_factsheets(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_
     worksheet1.write('B7', tot)
     worksheet1.write('B8', str(lengte))
 
-    if pd.isna(traject) == True:
+    if str(traject) == "None":
         worksheet1.write('B9', "n.v.t.")
     else:
         worksheet1.write('B9', traject)
 
 
-    if pd.isna(oplevering) == True:
+    if str(oplevering) == "None":
         worksheet1.write('B10', "n.v.t.")
     else:
         worksheet1.write('B10', oplevering)
