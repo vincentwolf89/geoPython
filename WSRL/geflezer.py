@@ -8,9 +8,12 @@ import math
 # arcpy.env.overwriteOutput = True
 
 gefmap = r'C:\Users\Vincent\Desktop\test.txt'
-max_dZ = 1
+max_dZ = 1.0
+soorten_grof = ['Z','G']
 
 deklaag = 0
+zandlaag = 0
+
 gef = open(gefmap, "r")
 bovenkant = []
 onderkant = []
@@ -53,6 +56,7 @@ for regel in gef:
 dict = {'bovenkant': bovenkant, 'onderkant': onderkant, 'type': type,'dikte_laag': laag}
 df = pd.DataFrame(dict)
 df['type_onderliggend'] = df['type'].shift(-1)
+df['dikte_onderliggend'] = df['dikte_laag'].shift(-1)
 
 
 
@@ -60,12 +64,27 @@ print df
 for index, row in df.iterrows():
     s = row['type']
     d = row['dikte_laag']
-    if s is not 'Z':
+    sv = row['type_onderliggend']
+    dv = row['dikte_onderliggend']
+    dikte_som = d+dv
+
+    if s not in soorten_grof:   # check soorten
         deklaag += d
-    elif s is 'Z' and d <= max_dZ:
+
+
+    elif s is 'Z' and d <= max_dZ and sv not in soorten_grof:
         deklaag += d
-    elif s is 'Z' and d > max_dZ:
+
+
+    elif s is 'Z' and d <= max_dZ and sv is 'Z' and zandlaag <= max_dZ and dikte_som <= max_dZ:
+        deklaag += d
+        zandlaag += d
+    elif zandlaag > max_dZ:
         break
+
+    elif s in soorten_grof and d > max_dZ:
+        break
+
 
 print deklaag
 
