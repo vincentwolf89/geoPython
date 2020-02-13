@@ -12,7 +12,7 @@ max_dZ = 1.0
 soorten_grof = ['Z','G']
 
 deklaag = 0
-zandlaag = 0
+grove_laag = 0
 
 gef = open(gefmap, "r")
 bovenkant = []
@@ -68,22 +68,29 @@ for index, row in df.iterrows():
     dv = row['dikte_onderliggend']
     dikte_som = d+dv
 
-    if s not in soorten_grof:   # check soorten
+    if s not in soorten_grof and sv not in soorten_grof:   # check soorten
         deklaag += d
+        # hier doorbouwen
 
-
-    elif s is 'Z' and d <= max_dZ and sv not in soorten_grof:
-        deklaag += d
-
-
-    elif s is 'Z' and d <= max_dZ and sv is 'Z' and zandlaag <= max_dZ and dikte_som <= max_dZ:
-        deklaag += d
-        zandlaag += d
-    elif zandlaag > max_dZ:
-        break
-
-    elif s in soorten_grof and d > max_dZ:
-        break
+    # else:
+    #     if s not in soorten_grof and sv in soorten_grof:
+    #         deklaag += d
+    #
+    #
+    #
+    # elif s in soorten_grof and d <= max_dZ and dikte_som <= max_dZ:
+    #     deklaag += d
+    #
+    #
+    # elif s in soorten_grof and d <= max_dZ and sv in soorten_grof and grove_laag <= max_dZ and dikte_som <= max_dZ:
+    #     deklaag += d
+    #     grove_laag += d
+    #
+    # elif grove_laag> max_dZ:
+    #     break
+    #
+    # elif s in soorten_grof and d > max_dZ:
+    #     break
 
 
 print deklaag
