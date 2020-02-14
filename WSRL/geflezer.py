@@ -8,7 +8,7 @@ import math
 # arcpy.env.overwriteOutput = True
 
 gefmap = r'C:\Users\Vincent\Desktop\test.txt'
-max_dZ = 1.0
+max_dZ = 1
 soorten_grof = ['Z','G']
 
 deklaag = 0
@@ -17,8 +17,9 @@ grove_laag = 0
 gef = open(gefmap, "r")
 bovenkant = []
 onderkant = []
-type = []
+typ = []
 laag = []
+bovenkant_grof = []
 
 
 for regel in gef:
@@ -36,7 +37,7 @@ for regel in gef:
 
         bovenkant.append(bovenkant_)
         onderkant.append(onderkant_)
-        type.append(soort_global)
+        typ.append(soort_global)
         laag.append(dikte_laag)
 
 
@@ -53,7 +54,7 @@ for regel in gef:
 
 
 
-dict = {'bovenkant': bovenkant, 'onderkant': onderkant, 'type': type,'dikte_laag': laag}
+dict = {'bovenkant': bovenkant, 'onderkant': onderkant, 'type': typ,'dikte_laag': laag}
 df = pd.DataFrame(dict)
 df['type_onderliggend'] = df['type'].shift(-1)
 df['dikte_onderliggend'] = df['dikte_laag'].shift(-1)
@@ -62,36 +63,30 @@ df['dikte_onderliggend'] = df['dikte_laag'].shift(-1)
 
 print df
 for index, row in df.iterrows():
-    s = row['type']
+    t = row['type']
     d = row['dikte_laag']
-    sv = row['type_onderliggend']
-    dv = row['dikte_onderliggend']
-    dikte_som = d+dv
+    to = row['type_onderliggend']
+    do = row['dikte_onderliggend']
+    dikte_som = d+do
 
-    if s not in soorten_grof and sv not in soorten_grof:   # check soorten
+    # dikte grove laag bepalen
+    if t in soorten_grof:
+        if to in soorten_grof or pd.isna(to)==True and d <= max_dZ:
+            bovenkant_grof.append(index)
+            grove_laag += d
+        elif d > max_dZ:
+            bovenkant_grof.append(index)
+
+
+
+
+print grove_laag
+print bovenkant_grof[0]
+
+for index, row in df.iterrows():
+    d = row['dikte_laag']
+    if index < bovenkant_grof[0]:
         deklaag += d
-        # hier doorbouwen
-
-    # else:
-    #     if s not in soorten_grof and sv in soorten_grof:
-    #         deklaag += d
-    #
-    #
-    #
-    # elif s in soorten_grof and d <= max_dZ and dikte_som <= max_dZ:
-    #     deklaag += d
-    #
-    #
-    # elif s in soorten_grof and d <= max_dZ and sv in soorten_grof and grove_laag <= max_dZ and dikte_som <= max_dZ:
-    #     deklaag += d
-    #     grove_laag += d
-    #
-    # elif grove_laag> max_dZ:
-    #     break
-    #
-    # elif s in soorten_grof and d > max_dZ:
-    #     break
-
 
 print deklaag
 
