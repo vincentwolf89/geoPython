@@ -9,12 +9,15 @@ arcpy.env.workspace = r'D:\Projecten\WSRL\sprok_sterrenschans.gdb'
 gdb = r'D:\Projecten\WSRL\sprok_sterrenschans.gdb'
 arcpy.env.overwriteOutput = True
 
-gefmap = r'C:\Users\Vincent\Desktop\02-Gef\MB'
-puntenlaag = 'gefmap_uitvoer'
-max_dZ = 1
+gefmap = r'C:\Users\Vincent\Desktop\sonderingen_test'
+puntenlaag = 'gefmap_uitvoer_hb'
+max_dZ = 1 # maximale dikte grove laag bij boring
+max_cws = 10 # maximale conusweerstand bij sondering
 soorten_grof = ['Z','G']
 
 
+####### aantekeningen door te nemen
+# indien onderkant grof stopt deklaag boven deze laag, conservatieve benadering.
 
 
 def gef_txt(gefmap):
@@ -24,7 +27,7 @@ def gef_txt(gefmap):
         nieuwenaam = ingef.replace('.GEF', '.txt')
         output = os.rename(ingef, nieuwenaam)
 
-def bovenkant_deklaag(gefmap, puntenlaag):
+def bovenkant_deklaag_b(gefmap, puntenlaag):
     # maak nieuwe puntenlaag in gdb
     arcpy.CreateFeatureclass_management(gdb, puntenlaag, "POINT", spatial_reference=28992)
     arcpy.AddField_management(puntenlaag, 'naam', "TEXT")
@@ -127,8 +130,46 @@ def bovenkant_deklaag(gefmap, puntenlaag):
 
 
 
+for file in os.listdir(gefmap):
+    ingef = os.path.join(gefmap, file)
+    gef = open(ingef, "r")
+
+    # lagen zijn 0
+    deklaag = 0
+
+    # definieer lege lijsten
+    bovenkant = []
+    cws = []
+
+    laag = []
+    bovenkant_grof = []
+
+    for regel in gef:
+        if regel.startswith('#') or regel.isspace() == True:  # negeer regels met #
+            if regel.startswith('#XYID'):
+                ids = regel.split(',')
+                x = float(ids[1])
+                y = float(ids[2])
+
+            else:
+                pass
+        else:
+            #
+            laagdikte = 0
+
+            delen = regel.split(' ')
+            bovenkant_ = float(delen[0])
+            cws_ = float(delen[1])
+
+            bovenkant.append(bovenkant_)
+            cws.append(cws_)
+
+    # maak df van lijsten via dict
+    dict = {'bovenkant': bovenkant, 'cws': cws}
+    df = pd.DataFrame(dict)
+    df['onderkant'] = df['bovenkant'].shift(-1)
+    # df['dikte_onderliggend'] = df['dikte_laag'].shift(-1)
+    print df
 
 
 
-
-bovenkant_deklaag(gefmap,puntenlaag)
