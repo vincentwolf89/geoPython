@@ -9,8 +9,8 @@ arcpy.env.workspace = r'D:\Projecten\WSRL\sprok_sterrenschans.gdb'
 gdb = r'D:\Projecten\WSRL\sprok_sterrenschans.gdb'
 arcpy.env.overwriteOutput = True
 
-gefmap = r'C:\Users\Vincent\Desktop\sonderingen_test'
-puntenlaag = 'gefmap_uitvoer_so'
+gefmap = r'C:\Users\Vincent\Desktop\testgef'
+puntenlaag = 'gefmap_uitvoer_hb'
 max_dZ = 1 # maximale dikte grove laag bij boring
 max_cws = 10 # maximale conusweerstand bij sondering
 nan = -9999
@@ -102,7 +102,7 @@ def bovenkant_d_boring(gefmap, puntenlaag):
             max_index = len(df)-3
         elif lasttype in soorten_grof and s_lasttype not in soorten_grof:
             max_index = len(df)-2
-        elif s_lasttype in soorten_grof and s_last_d <= max_dZ:
+        elif s_lasttype in soorten_grof and lasttype not in soorten_grof and s_last_d <= max_dZ:
             max_index = len(df) - 1
         else:
             if lasttype not in soorten_grof and s_lasttype not in soorten_grof:
@@ -248,4 +248,4 @@ def bovenkant_d_sondering(gefmap,puntenlaag):
         cursor.insertRow(invoegen)
 
 
-bovenkant_d_sondering(gefmap,puntenlaag)
+bovenkant_d_boring(gefmap,puntenlaag)
