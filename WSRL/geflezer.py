@@ -9,8 +9,8 @@ arcpy.env.workspace = r'D:\Projecten\WSRL\sprok_sterrenschans.gdb'
 gdb = r'D:\Projecten\WSRL\sprok_sterrenschans.gdb'
 arcpy.env.overwriteOutput = True
 
-gefmap = r'C:\Users\Vincent\Desktop\sonderingen_test'
-puntenlaag = 'gefmap_uitvoer_hb'
+gefmap = r'C:\Users\Vincent\Desktop\gefs\SONDERINGEN GEF'
+puntenlaag = 'safe_so_test'
 max_dZ = 1.0 # maximale dikte grove laag bij boring
 max_cws = 10 # maximale conusweerstand bij sondering
 nan = -9999
@@ -26,7 +26,7 @@ def gef_txt(gefmap):
     for gef in os.listdir(gefmap):
         ingef = os.path.join(gefmap, gef)
         if not os.path.isfile(ingef): continue
-        nieuwenaam = ingef.replace('.GEF', '.txt')
+        nieuwenaam = ingef.replace('.gef', '.txt')
         output = os.rename(ingef, nieuwenaam)
 
 
@@ -58,6 +58,8 @@ def bovenkant_d_boring(gefmap, puntenlaag):
         bovenkant_grof = []
 
 
+
+
         for regel in gef:
             if regel.startswith('#') or regel.isspace() == True: # negeer regels met #
                 if regel.startswith('#XYID'):
@@ -71,81 +73,103 @@ def bovenkant_d_boring(gefmap, puntenlaag):
                 #
                 delen = regel.split(';')
                 soort = delen[2]
-                soort_global = soort[1]
-                bovenkant_ = float(delen[0])
-                onderkant_ = float(delen[1])
-                dikte_laag = abs(bovenkant_-onderkant_)
+                # check of boring goed gegaan is, anders stoppen
+                if len(soort) > 1:
+                    soort_global = soort[1]
+                    bovenkant_ = float(delen[0])
+                    onderkant_ = float(delen[1])
+                    dikte_laag = abs(bovenkant_-onderkant_)
 
-                # vul lijsten voor opbouw df
-                bovenkant.append(bovenkant_)
-                onderkant.append(onderkant_)
-                type_laag.append(soort_global)
-                laag.append(dikte_laag)
+                    # vul lijsten voor opbouw df
+                    bovenkant.append(bovenkant_)
+                    onderkant.append(onderkant_)
+                    type_laag.append(soort_global)
+                    laag.append(dikte_laag)
+                    stoppen = False
+                else:
+                    stoppen = True
+
+        if stoppen is False:
+            # maak df van lijsten via dict
+            dict = {'bovenkant': bovenkant, 'onderkant': onderkant, 'type': type_laag,'dikte_laag': laag}
+            df = pd.DataFrame(dict)
+            # df['type_onderliggend'] = df['type'].shift(-1)
+            # df['dikte_onderliggend'] = df['dikte_laag'].shift(-1)
+
+            # als meer dan een laag geboord is:
+            if len(df) > 1:
+                # afvangen dubbele grove laag onderkant 1a: defineer soorten en diktes
+                lasttype = df.loc[len(df)-1, 'type']
+                # last_d = float(df.loc[len(df) - 1, 'dikte_laag'])  # niet direct nodig?
+                s_lasttype = df.loc[len(df) - 2, 'type']
+                s_last_d = float(df.loc[len(df) - 2, 'dikte_laag'])
 
 
 
-        # maak df van lijsten via dict
-        dict = {'bovenkant': bovenkant, 'onderkant': onderkant, 'type': type_laag,'dikte_laag': laag}
-        df = pd.DataFrame(dict)
-        # df['type_onderliggend'] = df['type'].shift(-1)
-        # df['dikte_onderliggend'] = df['dikte_laag'].shift(-1)
+                # afvangen dubbele grove laag onderkant 1b: bepaal max index
+                if lasttype in soorten_grof and s_lasttype in soorten_grof:
+                    max_index = len(df)-3
+                elif lasttype in soorten_grof and s_lasttype not in soorten_grof:
+                    max_index = len(df)-2
+                elif s_lasttype in soorten_grof and lasttype not in soorten_grof and s_last_d <= max_dZ:
+                    max_index = len(df) - 1
+                else:
+                    if lasttype not in soorten_grof and s_lasttype not in soorten_grof:
+                        max_index = len(df)-1
 
 
-        # afvangen dubbele grove laag onderkant 1a: defineer soorten en diktes
-        lasttype = df.loc[len(df)-1, 'type']
-        # last_d = float(df.loc[len(df) - 1, 'dikte_laag'])  # niet direct nodig?
-        s_lasttype = df.loc[len(df) - 2, 'type']
-        s_last_d = float(df.loc[len(df) - 2, 'dikte_laag'])
 
-        # afvangen dubbele grove laag onderkant 1b: bepaal max index
-        if lasttype in soorten_grof and s_lasttype in soorten_grof:
-            max_index = len(df)-3
-        elif lasttype in soorten_grof and s_lasttype not in soorten_grof:
-            max_index = len(df)-2
-        elif s_lasttype in soorten_grof and lasttype not in soorten_grof and s_last_d <= max_dZ:
-            max_index = len(df) - 1
+
+                # bepaal grove laag
+                for index, row in df.iterrows():
+                    t = row['type']
+                    d = row['dikte_laag']
+
+                    if t in soorten_grof:
+                        grove_laag += d
+                        bovenkant_grof.append(index)
+                    if t not in soorten_grof:
+                        grove_laag = 0
+                        bovenkant_grof = []
+
+                    if grove_laag > max_dZ:
+                        max_index = bovenkant_grof[0]-1
+                        break
+
+
+                # bepaal dikte deklaag
+                for index, row in df.iterrows():
+                    d = row['dikte_laag']
+
+                    # als grove laag aanwezig is, dikker dan maatgevend:
+                    if grove_laag > max_dZ and index <= max_index:
+                        deklaag += d
+                    # als grove laag niet dikker is dan maatgevend
+                    if grove_laag < max_dZ and index <= max_index:
+                        deklaag += d
+
+            elif len(df) is 1:
+                t = df.loc[0, 'type']
+                if t in soorten_grof:
+                    deklaag = 0
+                if t not in soorten_grof:
+                    deklaag = df.loc[0, 'dikte_laag']
+
+            else:
+                if len(df) is 0:
+                    deklaag = 0
+
+
+
+            print "deklaag is", deklaag, x,y, file
+            invoegen = (str(file), deklaag, (x, y))
+
+
+
+            cursor.insertRow(invoegen)
+
         else:
-            if lasttype not in soorten_grof and s_lasttype not in soorten_grof:
-                max_index = len(df)-1
-
-
-
-
-        # bepaal grove laag
-        for index, row in df.iterrows():
-            t = row['type']
-            d = row['dikte_laag']
-
-            if t in soorten_grof:
-                grove_laag += d
-                bovenkant_grof.append(index)
-            if t not in soorten_grof:
-                grove_laag = 0
-                bovenkant_grof = []
-
-            if grove_laag > max_dZ:
-                max_index = bovenkant_grof[0]-1
-                break
-
-
-        # bepaal dikte deklaag
-        for index, row in df.iterrows():
-            d = row['dikte_laag']
-
-            # als grove laag aanwezig is, dikker dan maatgevend:
-            if grove_laag > max_dZ and index <= max_index:
-                deklaag += d
-            # als grove laag niet dikker is dan maatgevend
-            if grove_laag < max_dZ and index <= max_index:
-                deklaag += d
-
-        print "deklaag is", deklaag, x,y, file
-        invoegen = (str(file), deklaag, (x, y))
-
-
-
-        cursor.insertRow(invoegen)
-
+            pass
 
 
 def bovenkant_d_sondering(gefmap,puntenlaag):
@@ -169,6 +193,7 @@ def bovenkant_d_sondering(gefmap,puntenlaag):
         # checker voor aanwezigheid significante grove laag
         grof = None
         onder_grof = None
+        andere_sep = False
 
         # definieer lege lijsten
         bovenkant = []
@@ -176,6 +201,9 @@ def bovenkant_d_sondering(gefmap,puntenlaag):
         bovenkant_grof = []
 
         for regel in gef:
+            # uitroeptekens uit voorzorg verwijderen
+            regel = regel.replace("!","")
+
             if regel.startswith('#') or regel.isspace() == True:
                 # get xy
                 if regel.startswith('#XYID'):
@@ -183,15 +211,22 @@ def bovenkant_d_sondering(gefmap,puntenlaag):
                     x = float(ids[1])
                     y = float(ids[2])
 
+                # als andere separator wordt gebruikt
+                if regel.startswith("#COLUMNSEPARATOR= :"):
+                    andere_sep = True
+
                 else:
                     # get maaiveldhoogte
                     if regel.startswith('#ZID'):
                         idz = regel.split(',')
                         z_mv = float(idz[1])
             else:
-                # laagdikte = 0 # deze kan weg?
 
-                delen = regel.split(' ')
+                if andere_sep is False:
+                    delen = regel.split(' ')
+                else:
+                    delen = regel.split(":")
+
                 bovenkant_ = float(delen[0])
                 cws_ = float(delen[1])
 
@@ -282,5 +317,5 @@ def bovenkant_d_sondering(gefmap,puntenlaag):
 
         cursor.insertRow(invoegen)
 
-
-bovenkant_d_sondering(gefmap,puntenlaag)
+gef_txt(gefmap)
+# bovenkant_d_sondering(gefmap,puntenlaag)
