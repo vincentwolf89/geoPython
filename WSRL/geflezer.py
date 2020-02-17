@@ -30,8 +30,6 @@ def gef_txt(gefmap):
         output = os.rename(ingef, nieuwenaam)
 
 
-
-
 def bovenkant_d_boring(gefmap, puntenlaag):
     # maak nieuwe puntenlaag in gdb
     arcpy.CreateFeatureclass_management(gdb, puntenlaag, "POINT", spatial_reference=28992)
@@ -317,5 +315,5 @@ def bovenkant_d_sondering(gefmap,puntenlaag):
 
         cursor.insertRow(invoegen)
 
-gef_txt(gefmap)
+# gef_txt(gefmap)
 # bovenkant_d_sondering(gefmap,puntenlaag)
