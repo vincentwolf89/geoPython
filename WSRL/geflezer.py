@@ -9,9 +9,9 @@ arcpy.env.workspace = r'D:\Projecten\WSRL\sprok_sterrenschans.gdb'
 gdb = r'D:\Projecten\WSRL\sprok_sterrenschans.gdb'
 arcpy.env.overwriteOutput = True
 
-gefmap = r'C:\Users\Vincent\Desktop\testgef'
+gefmap = r'C:\Users\Vincent\Desktop\sonderingen_test'
 puntenlaag = 'gefmap_uitvoer_hb'
-max_dZ = 1 # maximale dikte grove laag bij boring
+max_dZ = 1.0 # maximale dikte grove laag bij boring
 max_cws = 10 # maximale conusweerstand bij sondering
 nan = -9999
 soorten_grof = ['Z','G']
@@ -87,17 +87,17 @@ def bovenkant_d_boring(gefmap, puntenlaag):
         # maak df van lijsten via dict
         dict = {'bovenkant': bovenkant, 'onderkant': onderkant, 'type': type_laag,'dikte_laag': laag}
         df = pd.DataFrame(dict)
-        df['type_onderliggend'] = df['type'].shift(-1)
-        df['dikte_onderliggend'] = df['dikte_laag'].shift(-1)
+        # df['type_onderliggend'] = df['type'].shift(-1)
+        # df['dikte_onderliggend'] = df['dikte_laag'].shift(-1)
 
 
-        # afvangen dubbele grove laag onderkant
+        # afvangen dubbele grove laag onderkant 1a: defineer soorten en diktes
         lasttype = df.loc[len(df)-1, 'type']
-        last_d = float(df.loc[len(df) - 1, 'dikte_laag'])  # niet direct nodig?
+        # last_d = float(df.loc[len(df) - 1, 'dikte_laag'])  # niet direct nodig?
         s_lasttype = df.loc[len(df) - 2, 'type']
         s_last_d = float(df.loc[len(df) - 2, 'dikte_laag'])
 
-
+        # afvangen dubbele grove laag onderkant 1b: bepaal max index
         if lasttype in soorten_grof and s_lasttype in soorten_grof:
             max_index = len(df)-3
         elif lasttype in soorten_grof and s_lasttype not in soorten_grof:
@@ -168,27 +168,28 @@ def bovenkant_d_sondering(gefmap,puntenlaag):
 
         # checker voor aanwezigheid significante grove laag
         grof = None
+        onder_grof = None
 
         # definieer lege lijsten
         bovenkant = []
         cws = []
-
         bovenkant_grof = []
 
         for regel in gef:
-            if regel.startswith('#') or regel.isspace() == True:  # negeer regels met #
+            if regel.startswith('#') or regel.isspace() == True:
+                # get xy
                 if regel.startswith('#XYID'):
                     ids = regel.split(',')
                     x = float(ids[1])
                     y = float(ids[2])
 
                 else:
+                    # get maaiveldhoogte
                     if regel.startswith('#ZID'):
                         idz = regel.split(',')
                         z_mv = float(idz[1])
             else:
-                #
-                laagdikte = 0
+                # laagdikte = 0 # deze kan weg?
 
                 delen = regel.split(' ')
                 bovenkant_ = float(delen[0])
@@ -204,22 +205,49 @@ def bovenkant_d_sondering(gefmap,puntenlaag):
         df['cws_onder'] = df['cws'].shift(-1)
         df['dikte_laag'] = abs(df['bovenkant']-df['onderkant'])
 
-        # df['dikte_onderliggend'] = df['dikte_laag'].shift(-1)
 
         # afvangen nan values
         df = df.replace(nan, 0)
         df['dikte_laag'].fillna(0.01, inplace=True)
         # print df, file
 
+
+
+        # check of sondering wel/niet stopt in grove laag. Indien het geval, neem het laatste snijpunt met grenswaarde
+        df_invert = df.sort_index(ascending=False)
+        last_cws = df.loc[len(df_invert)-1, 'cws']
+        grenswaarde_lijst = []
+        grenswaarde = None
+
+        if last_cws < max_cws:
+            pass
+        else:
+            for index, row in df_invert.iterrows():
+                # print row['cws']
+                grenswaarde_lijst.append(index)
+                if row['cws'] <= max_cws:
+                    grenswaarde_index = min(grenswaarde_lijst)
+                    grenswaarde = df.loc[grenswaarde_index, 'onderkant']
+                    # print z_mv-grenswaarde
+                    break
+
+
+
+
         for index, row in df.iterrows():
-            if row['cws'] <= max_cws:
+            if row['cws'] <= max_cws and grenswaarde is None:
                 grove_laag = 0
                 bovenkant_grof = []
                 deklaag = row['onderkant']
-                grof = True
-
-
+                grof = False
                 continue
+            elif row['cws'] <= max_cws and grenswaarde is not None:
+                grove_laag = 0
+                bovenkant_grof = []
+                deklaag = grenswaarde
+                grof = False
+                onder_grof = True
+
             else:
                 grove_laag+= row['dikte_laag']
                 bovenkant_grof.append(index)
@@ -230,22 +258,29 @@ def bovenkant_d_sondering(gefmap,puntenlaag):
                             # print z_mv-row['bovenkant'], "m - maaiveld"
                             # print row['bovenkant'], file
                             deklaag = row['onderkant']
-                            grof = False
-
-
+                            grof = True
                     break
 
 
-        if grof == False:
-            print "zandlaag aanwezig"
-        if grof == True:
-            print "zandlaag niet aanwezig"
-        print deklaag, file
 
-        print "deklaag is", deklaag, x, y, file
+        if grof == True and onder_grof == False:
+            print "Significante tussenzandlaag aanwezig, sondering stopt niet met grove laag ", file
+        if grof == True and onder_grof == True:
+            print "Significante tussenzandlaag aanwezig, sondering stopt met grove laag ", file
+
+        if grof == False and onder_grof == False:
+            print "Significante tussenzandlaag niet aanwezig, geen grove laatste laag ", file
+
+        # stel deklaag bij indien sondering stopt met grove laag
+        if grof == False and onder_grof == True:
+            deklaag = grenswaarde
+            print "Deklaag bijgesteld: significante tussenzandlaag niet aanwezig, sondering stopt met grove laag ", file
+
+        # print "deklaag is", deklaag, x, y, file, z_mv-deklaag
+        # print z_mv - deklaag, file
         invoegen = (str(file), deklaag, (x, y))
 
         cursor.insertRow(invoegen)
 
 
-bovenkant_d_boring(gefmap,puntenlaag)
+bovenkant_d_sondering(gefmap,puntenlaag)
