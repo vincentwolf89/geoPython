@@ -9,8 +9,8 @@ arcpy.env.workspace = r'D:\Projecten\WSRL\sprok_sterrenschans.gdb'
 gdb = r'D:\Projecten\WSRL\sprok_sterrenschans.gdb'
 arcpy.env.overwriteOutput = True
 
-gefmap = r'C:\Users\Vincent\Desktop\gefs\SONDERINGEN GEF'
-puntenlaag = 'safe_so_test'
+gefmap = r'C:\Users\Vincent\Desktop\02-Gef\MB'
+puntenlaag = 'sprok_mb_test'
 max_dZ = 1.0 # maximale dikte grove laag bij boring
 max_cws = 10 # maximale conusweerstand bij sondering
 nan = -9999
@@ -316,4 +316,4 @@ def bovenkant_d_sondering(gefmap,puntenlaag):
         cursor.insertRow(invoegen)
 
 # gef_txt(gefmap)
-# bovenkant_d_sondering(gefmap,puntenlaag)
+bovenkant_d_boring(gefmap,puntenlaag)
