@@ -13,7 +13,7 @@ arcpy.env.overwriteOutput = True
 gefmap = r'C:\Users\Vincent\Desktop\GO_SPROK\Boormonsterprofiel_Geologisch booronderzoek'
 xml_map = r'C:\Users\Vincent\Desktop\GO_SPROK\Bodemkundig booronderzoek BRO_'
 
-puntenlaag = 'mb_sprok_dino_geo'
+puntenlaag = 'xml_test'
 max_dZ = 1.0 # maximale dikte grove laag bij boring
 max_cws = 10 # maximale conusweerstand bij sondering
 nan = -9999
@@ -218,24 +218,27 @@ def bovenkant_d_boring_xml(xml_map, puntenlaag):
                 y = float(parts[1])
 
         # create pandas dataframe with layers
-        aantal_lagen = len(xml.getElementsByTagName("ns9:upperBoundary"))
-        bovenkanten = xml.getElementsByTagName("ns9:upperBoundary")
-        onderkanten = xml.getElementsByTagName("ns9:lowerBoundary")
-        typen = xml.getElementsByTagName("ns9:horizonCode")
-
         type = []
         bovenkant = []
         onderkant = []
 
-        for item in typen:
-            type.append(item.childNodes[0].nodeValue)
-            # print item.childNodes[0].nodeValue
+        bodemlagen = xml.getElementsByTagName("ns9:soilLayer")
 
-        for item in bovenkanten:
-            bovenkant.append(float(item.childNodes[0].nodeValue))
+        for bodemlaag in bodemlagen:
 
-        for item in onderkanten:
-            onderkant.append(float(item.childNodes[0].nodeValue))
+            bovenkanten = bodemlaag.getElementsByTagName("ns9:upperBoundary")
+            onderkanten = bodemlaag.getElementsByTagName("ns9:lowerBoundary")
+            typen = bodemlaag.getElementsByTagName("ns9:horizonCode")
+
+            for item in typen:
+                type.append(item.childNodes[0].nodeValue)
+                break
+
+            for item in bovenkanten:
+                bovenkant.append(float(item.childNodes[0].nodeValue))
+
+            for item in onderkanten:
+                onderkant.append(float(item.childNodes[0].nodeValue))
 
         # alleen doorgaan als voor alles een waarde wordt gevonden
         if len(type) == len(onderkant) and len(onderkant) == len(bovenkant):
@@ -461,3 +464,4 @@ def bovenkant_d_sondering(gefmap,puntenlaag):
 
 # gef_txt(gefmap)
 # bovenkant_d_boring_gef(gefmap,puntenlaag)
+bovenkant_d_boring_xml(xml_map,puntenlaag)
