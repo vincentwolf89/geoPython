@@ -13,10 +13,10 @@ arcpy.env.overwriteOutput = True
 
 
 gefmap_origin = "C:/Users/Vincent/Desktop/testmap_gef"
-gef_extensie = ".gef"
+gef_extensie = ".GEF"
 
 gefmap = r'C:\Users\Vincent\Desktop\testmap'
-puntenlaag = 'final'
+puntenlaag = 'so_test'
 nan = -9999
 
 def gef_txt(gefmap):
@@ -63,6 +63,21 @@ def gef_to_gis(gefmap, puntenlaag):
                 date = str(id_d[1])
 
 
+            # afvangen probleemgevallen
+            try:
+                company
+            except NameError:
+                if regel.startswith('#COMPANYID'):
+                    id_c = regel.split(",")
+                    company = str(id_c[0]).strip("#COMPANYID=")
+
+
+            try:
+                date
+            except NameError:
+                if regel.startswith('#STARTDATE='):
+                    id_d = regel.split("=")
+                    date = str(id_d[1])
 
 
 
