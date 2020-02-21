@@ -12,21 +12,21 @@ gdb = r'D:\Projecten\WSRL\go_overzetten.gdb'
 arcpy.env.overwriteOutput = True
 
 
-gefmap_origin = "C:/Users/Vincent/Desktop/testmap_gef"
-gef_extensie = ".GEF"
+gefmap_origin = "C:/Users/Vincent/Desktop/totaal_zakbaken_gef"
+gef_extensie = ".gef"
 
-gefmap = r'C:\Users\Vincent\Desktop\testmap'
-puntenlaag = 'so_test'
+gefmap = r'C:\Users\Vincent\Desktop\totaal_zakbaken'
+puntenlaag = 'zakbaken_safe'
 nan = -9999
 
 def gef_txt(gefmap):
     for gef in os.listdir(gefmap):
         ingef = os.path.join(gefmap, gef)
         if not os.path.isfile(ingef): continue
-        nieuwenaam = ingef.replace('.txt', '.gef')
+        nieuwenaam = ingef.replace('.gef', '.txt')
         output = os.rename(ingef, nieuwenaam)
 
-def gef_to_gis(gefmap, puntenlaag):
+def gef_to_gis(gefmap, puntenlaag, gefmap_origin):
     # create leeg df
     velden = ['naam', 'x_rd', 'y_rd', 'z_nap', 'datum', 'bedrijf']
     df = pd.DataFrame(columns=velden)
@@ -54,9 +54,10 @@ def gef_to_gis(gefmap, puntenlaag):
                 z_mv = float(id_z[1])
 
 
-            if regel.startswith('#MEASUREMENTTEXT= 13') or regel.startswith('#MEASUREMENTTEXT = 13') or regel.startswith('#MEASUREMENTTEXT =13'):
-                id_c = regel.split(',')
-                company = str(id_c[1])
+            # if regel.startswith('#MEASUREMENTTEXT= 13') or regel.startswith('#MEASUREMENTTEXT = 13') or regel.startswith('#MEASUREMENTTEXT =13'):
+            #     id_c = regel.split(',')
+            #     company = str(id_c[1])
+            #     print company
 
             if regel.startswith('#MEASUREMENTTEXT= 16') or regel.startswith('#MEASUREMENTTEXT = 16') or regel.startswith('#MEASUREMENTTEXT =16'):
                 id_d = regel.split(",")
@@ -70,6 +71,7 @@ def gef_to_gis(gefmap, puntenlaag):
                 if regel.startswith('#COMPANYID'):
                     id_c = regel.split(",")
                     company = str(id_c[0]).strip("#COMPANYID=")
+                    print company
 
 
             try:
@@ -92,32 +94,37 @@ def gef_to_gis(gefmap, puntenlaag):
         try:
             x
             df.loc[index, 'x_rd'] = x
+            del x
         except NameError:
             pass
 
         try:
             y
             df.loc[index, 'y_rd'] = y
+            del y
         except NameError:
             pass
 
         try:
             z_mv
             df.loc[index, 'z_nap'] = z_mv
+            del z_mv
         except NameError:
             pass
         try:
             date
             df.loc[index, 'datum'] = date
+            del date
         except NameError:
             pass
 
         try:
             company
+
             df.loc[index, 'bedrijf'] = company
+            del company
         except NameError:
             pass
-
 
 
 
@@ -172,12 +179,13 @@ def gef_to_gis(gefmap, puntenlaag):
     # Process: Add Attachments
     # arcpy.AddAttachments_management(gef_test, "OBJECTID", gef_test__2_, "OBJECTID", "origin", gefmap_origin)
     # arcpy.DeleteField_management(puntenlaag,"origin")
-
+    print "Laag met grondonderzoek gemaakt"
 def attach_gef(puntenlaag):
     arcpy.EnableAttachments_management(puntenlaag) # enable attachments
     arcpy.AddAttachments_management(puntenlaag, "OBJECTID", puntenlaag, "OBJECTID", "origin", "")
     arcpy.DeleteField_management(puntenlaag,"origin")
+    print "Bijlages toegevoegd"
 
-# gef_txt(gefmap_origin)
-gef_to_gis(gefmap,puntenlaag)
+# gef_txt(gefmap)
+gef_to_gis(gefmap,puntenlaag,gefmap_origin)
 attach_gef(puntenlaag)
