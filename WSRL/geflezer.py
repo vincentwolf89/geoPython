@@ -13,11 +13,12 @@ arcpy.env.overwriteOutput = True
 gefmap = r'C:\Users\Vincent\Desktop\GO_SPROK\Boormonsterprofiel_Geologisch booronderzoek'
 xml_map = r'C:\Users\Vincent\Desktop\GO_SPROK\Bodemkundig booronderzoek BRO_'
 
-puntenlaag = 'xml_test'
+
+puntenlaag = 'boringen_dino_bodemkundig'
 max_dZ = 1.0 # maximale dikte grove laag bij boring
 max_cws = 10 # maximale conusweerstand bij sondering
 nan = -9999
-soorten_grof = ['Z','G','Cg']
+soorten_grof = ['matigSiltigZand', 'zwakSiltigZand']
 
 
 
@@ -191,10 +192,11 @@ def bovenkant_d_boring_xml(xml_map, puntenlaag):
     # maak een nieuwe puntenlaag aan in de gdb
     arcpy.CreateFeatureclass_management(gdb, puntenlaag, "POINT", spatial_reference=28992)
     arcpy.AddField_management(puntenlaag, 'naam', "TEXT")
+    arcpy.AddField_management(puntenlaag, 'typeOnder', "TEXT")
     arcpy.AddField_management(puntenlaag, 'dikte_deklaag', "DOUBLE", 2, field_is_nullable="NULLABLE")
 
     # open de insertcursor
-    cursor = arcpy.da.InsertCursor(puntenlaag, ['naam', 'dikte_deklaag', 'SHAPE@XY'])
+    cursor = arcpy.da.InsertCursor(puntenlaag, ['naam', 'dikte_deklaag','typeOnder', 'SHAPE@XY'])
 
     # files
     for file in os.listdir(xml_map):
@@ -228,10 +230,17 @@ def bovenkant_d_boring_xml(xml_map, puntenlaag):
 
             bovenkanten = bodemlaag.getElementsByTagName("ns9:upperBoundary")
             onderkanten = bodemlaag.getElementsByTagName("ns9:lowerBoundary")
-            typen = bodemlaag.getElementsByTagName("ns9:horizonCode")
+            typen = bodemlaag.getElementsByTagName("ns9:standardSoilName") # eerst horizonCode
 
             for item in typen:
                 type.append(item.childNodes[0].nodeValue)
+                test = item.childNodes[0].nodeValue
+                if test in soorten_grof:
+                    print test, file
+
+
+
+
                 break
 
             for item in bovenkanten:
@@ -308,8 +317,9 @@ def bovenkant_d_boring_xml(xml_map, puntenlaag):
                 if len(df) is 0:
                     deklaag = 0
 
-            print "deklaag is", deklaag, x, y, file
-            invoegen = (str(file), deklaag, (x, y))
+
+            # print "deklaag is", deklaag, x, y, file ,type[-1]
+            invoegen = (str(file), deklaag, type[-1], (x, y))
 
             cursor.insertRow(invoegen)
 
@@ -465,3 +475,4 @@ def bovenkant_d_sondering(gefmap,puntenlaag):
 # gef_txt(gefmap)
 # bovenkant_d_boring_gef(gefmap,puntenlaag)
 bovenkant_d_boring_xml(xml_map,puntenlaag)
+
