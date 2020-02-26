@@ -1,50 +1,56 @@
+## import
+
 import arcpy
 import numpy as np
 import pandas as pd
 from itertools import groupby
 from arcpy.sa import *
 
-
 # overschrijf de oude data
 arcpy.env.overwriteOutput = True
 
 # definieer de werkomgeving
-arcpy.env.workspace = 'D:/GIS/13_1_temp.gdb'
+arcpy.env.workspace = r'D:\Projecten\HHNK\ds_5_1.gdb'
 
-# invoer
-profielen = 'profielen_13_1_aanpassing'  # profielen, zoals gegenereerd via ET-Tools/andere manier
+
+## invoer
+profielen = 'profielen_5_1'  # profielen, zoals gegenereerd via scriptdeel
 profielen_hr = 'profielen_hr'  # werklaag, deze kan onaangepast blijven
 invoer = 'profielen_punten_z'  # werklaag, deze kan onaangepast blijven.
 stapgrootte_punten = 2  # stapgrootte tussen de punten vanuit de hoogtedata (niet kleiner dan gridgrootte)
-stapgrootte_punten_marge = 3.5
-# marge = 2   # marge tussen de punten, om enige ruimte te laten voor kleine laagtes die er niet direct toe doen ****
-maximale_beginwaarde = 45  # de maximale afstand waarop, t.o.v. de gedefinieerde landwaartse lijn, mag worden begonnen met de volume berekening
+stapgrootte_punten_marge = 3.5 # marge tussen de punten, om enige ruimte te laten voor kleine laagtes die er niet direct toe doen
+
+maximale_beginwaarde = 60  # de maximale afstand waarop, t.o.v. de gedefinieerde landwaartse lijn, mag worden begonnen met de volume berekening
 hoogte_controle = 1  # een punt binnen de volumegroep moet dit niveau hebben (TRDA 2006: min 1 m boven Rp)
-maximaal_talud_zz = 100  # het maximale talud aan de zeezijde (TRDA 2006: 1:1)
-maximaal_talud_lz = 100  # het maximale talud aan de zeezijde (TRDA 2006: 1:2)
+maximaal_talud_zz = 1  # het maximale talud aan de zeezijde (TRDA 2006: 1:1)
+maximaal_talud_lz = 0.5  # het maximale talud aan de zeezijde (TRDA 2006: 1:2)
 minimale_hoogte_boven_rp = 0.01  # minimale hoogte van alle punten die nodig is om een aaneengesloten volume te verkrijgen
 max_gp_hoogte = 'max_h_gp' # veld voor het meenemen van profielen waarbij maximale grensprofielhoogte handmatig is aangepast
-raster = r'D:\GIS\AHN3_13_1_13_2.gdb\AHN3_tt'  # hoogtedata voor het ophalen van hoogte-waardes
-hr = r'D:\GIS\duinscript.gdb\hr_ref_13_1_iiv'  # JARKUS-raaien op 0 m RSP met bijbehorende hr (Rp, Hs en Tp)
+raster = r'D:\Projecten\HHNK\raster\AHN3_5_11.tif'  # hoogtedata voor het ophalen van hoogte-waardes
+hr = 'hr_ref_5_1_iiv'  # JARKUS-raaien op 0 m RSP met bijbehorende hr (Rp, Hs en Tp)
 
-profiel_interval = 10
-profiel_lengte_land = 150
-profiel_lengte_rivier = 0
-trajectlijn = 'lijn_13_1_aangepast'
-sectie_id = 'sectie'
-aantekeningen_bebouwing = 'grensprofiel_nabij_bebouwing'
-minimale_profiellengte = 20
+profiel_interval = 10 # interval tussen de te maken profielen
+profiel_lengte_zee = 120 # profiel lengte aan de zeezijde
+profiel_lengte_land = 0 # profiel lengte aan de landzijde
+### LET OP ### TRAJECTLIJN MOET NOORD-ZUID GEORIENTEERD ZIJN
+trajectlijn = 'lijn_jrk_5_1' # trajectlijn waarlangs de profielen moeten worden gemaakt
+sectie_id = 'code' # dit veld moet aanwezig zijn binnen de trajectlijn, ter referentie
+aantekeningen_bebouwing = 'grensprofiel_nabij_bebouwing' # indien aanwezig wordt deze laag bekeken door het script
+minimale_profiellengte = 20 # de minimale lengte van een profiel. Indien sprake van erge kromming in de trajectlijn kunnen profielen zo automatisch worden verwijderd.
 
-velden = ['afstand', 'z_ahn', 'groep', 'volume_groep', 'profielnummer', 'kenmerk']
-def profielen_op_lijn(profiel_interval,profiel_lengte_land,profiel_lengte_rivier,trajectlijn,code, profielen):
+velden = ['afstand', 'z_ahn', 'groep', 'volume_groep', 'profielnummer', 'kenmerk'] # werkvelden voor script
+
+
+## functies
+def profielen_op_lijn(profiel_interval,profiel_lengte_zee,profiel_lengte_land,trajectlijn,code, profielen):
     # traject to points
     arcpy.GeneratePointsAlongLines_management(trajectlijn, 'traject_punten', 'DISTANCE', Distance=profiel_interval, Include_End_Points='END_POINTS')
     arcpy.AddField_management('traject_punten', "profielnummer", "DOUBLE", 2, field_is_nullable="NULLABLE")
     arcpy.AddField_management('traject_punten', "lengte_landzijde", "DOUBLE", 2, field_is_nullable="NULLABLE")
-    arcpy.AddField_management('traject_punten', "lengte_rivierzijde", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.AddField_management('traject_punten', "lengte_zeezijde", "DOUBLE", 2, field_is_nullable="NULLABLE")
     arcpy.CalculateField_management('traject_punten', "profielnummer", '!OBJECTID!', "PYTHON")
     arcpy.CalculateField_management('traject_punten', "lengte_landzijde", profiel_lengte_land, "PYTHON")
-    arcpy.CalculateField_management('traject_punten', "lengte_rivierzijde", profiel_lengte_rivier, "PYTHON")
+    arcpy.CalculateField_management('traject_punten', "lengte_zeezijde", profiel_lengte_zee, "PYTHON")
 
     # route voor trajectlijn
     # arcpy.CreateRoutes_lr(trajectlijn, code, "route_traject", "LENGTH", "", "", "UPPER_LEFT", "1", "0", "IGNORE", "INDEX")
@@ -67,27 +73,27 @@ def profielen_op_lijn(profiel_interval,profiel_lengte_land,profiel_lengte_rivier
                                        "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS",
                                        "M_DIRECTON")
 
-    # offset rivierdeel profiel
-    arcpy.MakeRouteEventLayer_lr('route_traject', code, 'tabel_traject_punten', "rid POINT meas", 'deel_rivier',
-                                 "lengte_rivierzijde", "NO_ERROR_FIELD", "NO_ANGLE_FIELD", "NORMAL", "ANGLE", "RIGHT",
+    # offset zeedeel profiel
+    arcpy.MakeRouteEventLayer_lr('route_traject', code, 'tabel_traject_punten', "rid POINT meas", 'deel_zee',
+                                 "lengte_zeezijde", "NO_ERROR_FIELD", "NO_ANGLE_FIELD", "NORMAL", "ANGLE", "RIGHT",
                                  "POINT")
 
     arcpy.MakeRouteEventLayer_lr('route_traject', code, 'tabel_traject_punten', "rid POINT meas", 'deel_land',
                                  "lengte_landzijde", "NO_ERROR_FIELD", "NO_ANGLE_FIELD", "NORMAL", "ANGLE", "LEFT",
                                  "POINT")
     # temp inzicht layer
-    arcpy.CopyFeatures_management('deel_rivier', "temp_rivierdeel")
+    arcpy.CopyFeatures_management('deel_zee', "temp_zeedeel")
     arcpy.CopyFeatures_management('deel_land', "temp_landdeel")
-    arcpy.AddField_management('temp_rivierdeel', "id", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.AddField_management('temp_zeedeel', "id", "DOUBLE", 2, field_is_nullable="NULLABLE")
     arcpy.AddField_management('temp_landdeel', "id", "DOUBLE", 2, field_is_nullable="NULLABLE")
-    arcpy.CalculateField_management('temp_rivierdeel', "id", 2, "PYTHON")
+    arcpy.CalculateField_management('temp_zeedeel', "id", 2, "PYTHON")
     arcpy.CalculateField_management('temp_landdeel', "id", 1, "PYTHON")
 
 
 
 
 
-    arcpy.Merge_management("'temp_rivierdeel';'temp_landdeel'", 'merge_profielpunten')
+    arcpy.Merge_management("'temp_zeedeel';'temp_landdeel'", 'merge_profielpunten')
     arcpy.PointsToLine_management('merge_profielpunten', profielen, "profielnummer", "id", "NO_CLOSE")
 
     arcpy.SpatialJoin_analysis(profielen, trajectlijn, 'profielen_temp', "JOIN_ONE_TO_ONE", "KEEP_ALL", match_option="INTERSECT")
@@ -115,7 +121,6 @@ def profielen_op_lijn(profiel_interval,profiel_lengte_land,profiel_lengte_rivier
                 cursor.updateRow(row)
 
     print 'profielen gemaakt op grensprofiellijn'
-
 
 def aanpassing_ongeldige_profielen():
     # intersect op trajectlijn
@@ -206,7 +211,6 @@ def bereken_grensprofiel(): # hier wordt per profiel het minimale volume uitgere
             cursor.updateRow(row)
     print "Minimaal benodigde grensprofielvolumes berekend voor profielen"
 
-
 def afstanden_punten(): # hier worden routes gemaakt op de profielen, zodat de afstanden kunnen worden berekend
 
     arcpy.CreateRoutes_lr(profielen_hr, "profielnummer", "routes_profielen", "TWO_FIELDS", "van", "tot", "", "1", "0", "IGNORE", "INDEX")
@@ -237,8 +241,7 @@ def afstanden_punten(): # hier worden routes gemaakt op de profielen, zodat de a
     arcpy.JoinField_management('punten_route', 'profielnummer', profielen_hr, 'profielnummer', velden)
     print "Velden voor grensprofiel en rekenpeil toegevoegd"
 
-
-def values_points(): # hier wordt een hoogtewaarde aan ieder punt, op iedere route, gekoppeld
+def hoogtewaarde_punten(): # hier wordt een hoogtewaarde aan ieder punt, op iedere route, gekoppeld
     # bepaal invoer
     invoer_punten = "punten_route"
     uitvoer_punten = "profielen_punten_z"
@@ -263,6 +266,7 @@ def values_points(): # hier wordt een hoogtewaarde aan ieder punt, op iedere rou
             else:
                 pass
     print "Maximale grensprofielhoogtes doorgevoerd voor betreffende profielen"
+
 def aanpassen_groepen(): # hier worden de groepen aangepast en groepen die aangesloten zijn voorzien van hetzelfde nummer
     # Voeg nodige velden toe aan definitieve puntenlaag
     arcpy.AddField_management(invoer, 'kenmerk', "TEXT", field_length=50)
@@ -325,7 +329,6 @@ def aanpassen_groepen(): # hier worden de groepen aangepast en groepen die aange
             cur3.updateRow(row)
     print "Profielen voorzien van aangesloten groepen"
 
-
 def bereken_opzet(): # hier worden per groep, ongeacht of deze aaneengesloten is met een bovenliggend profiel, de volumes berekend.
     dct = {} # lege dictionary voor koppeling
     array = arcpy.da.FeatureClassToNumPyArray(invoer, ('afstand', 'z_ahn','groep','profielnummer', 'kenmerk','z_rest'))
@@ -362,8 +365,6 @@ def bereken_opzet(): # hier worden per groep, ongeacht of deze aaneengesloten is
             else:
                 pass
     print "Volumes toegevoegd aan puntenlaag"
-
-
 
 def ruimtebeslag():  # hier wordt het minimale ruimtebeslag berekend, op basis van het minimale grensprofielvolume en de taludhellingen (zeewaarts max 1:1, landwaarts max 1:2)
 
@@ -641,16 +642,16 @@ def ruimtebeslag():  # hier wordt het minimale ruimtebeslag berekend, op basis v
     print "Ruimtebeslag berekend indien mogelijk"
 
 
-
-profielen_op_lijn(profiel_interval,profiel_lengte_land,profiel_lengte_rivier,trajectlijn,sectie_id,profielen)
-aanpassing_ongeldige_profielen()
-koppel_hr()
-bereken_grensprofiel()
-afstanden_punten()
-values_points()
-aanpassen_groepen()
-bereken_opzet()
-ruimtebeslag()
+## runnen functies
+profielen_op_lijn(profiel_interval,profiel_lengte_zee,profiel_lengte_land,trajectlijn,sectie_id,profielen)
+# aanpassing_ongeldige_profielen()
+# koppel_hr()
+# bereken_grensprofiel()
+# afstanden_punten()
+# hoogtewaarde_punten()
+# aanpassen_groepen()
+# bereken_opzet()
+# ruimtebeslag()
 
 
 
