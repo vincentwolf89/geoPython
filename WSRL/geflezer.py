@@ -10,15 +10,17 @@ arcpy.env.workspace = r'D:\Projecten\WSRL\sprok_sterrenschans.gdb'
 gdb = r'D:\Projecten\WSRL\sprok_sterrenschans.gdb'
 arcpy.env.overwriteOutput = True
 
-gefmap = r'C:\Users\Vincent\Desktop\GO_SPROK\Boormonsterprofiel_Geologisch booronderzoek'
+gefmap = r'C:\Users\Vincent\Desktop\GO_SPROK\WSRL_eigen\MB'
 xml_map = r'C:\Users\Vincent\Desktop\GO_SPROK\Bodemkundig booronderzoek BRO_'
 
 
-puntenlaag = 'boringen_dino_bodemkundig'
+puntenlaag = 'boringen_wsrl_mbv2'
 max_dZ = 1.0 # maximale dikte grove laag bij boring
 max_cws = 10 # maximale conusweerstand bij sondering
 nan = -9999
-soorten_grof = ['matigSiltigZand', 'zwakSiltigZand']
+
+soorten_grof_gef = ['Z','G']
+soorten_grof_xml = ['matigSiltigZand', 'zwakSiltigZand','sterkZandigeLeem','zwakZandigeLeem']
 
 
 
@@ -36,10 +38,11 @@ def bovenkant_d_boring_gef(gefmap, puntenlaag):
     # maak nieuwe puntenlaag in gdb
     arcpy.CreateFeatureclass_management(gdb, puntenlaag, "POINT", spatial_reference=28992)
     arcpy.AddField_management(puntenlaag, 'naam', "TEXT")
+    arcpy.AddField_management(puntenlaag, 'typeOnder', "TEXT")
     arcpy.AddField_management(puntenlaag, 'dikte_deklaag', "DOUBLE", 2, field_is_nullable="NULLABLE")
 
     # open de insertcursor
-    cursor = arcpy.da.InsertCursor(puntenlaag, ['naam', 'dikte_deklaag', 'SHAPE@XY'])
+    cursor = arcpy.da.InsertCursor(puntenlaag, ['naam', 'dikte_deklaag', 'typeOnder', 'SHAPE@XY'])
 
     # open gef uit map
     for file in os.listdir(gefmap):
@@ -51,6 +54,7 @@ def bovenkant_d_boring_gef(gefmap, puntenlaag):
         grove_laag = 0
 
         # definieer lege lijsten
+        type = []
         bovenkant = []
         onderkant = []
         type_laag = []
@@ -96,6 +100,7 @@ def bovenkant_d_boring_gef(gefmap, puntenlaag):
                     bovenkant.append(bovenkant_)
                     onderkant.append(onderkant_)
                     type_laag.append(soort_global)
+                    # type.append(soort) # specificatie laagtype
                     laag.append(dikte_laag)
                     stoppen = False
                 else:
@@ -122,14 +127,14 @@ def bovenkant_d_boring_gef(gefmap, puntenlaag):
 
 
                 # afvangen dubbele grove laag onderkant 1b: bepaal max index
-                if lasttype in soorten_grof and s_lasttype in soorten_grof:
+                if lasttype in soorten_grof_gef and s_lasttype in soorten_grof_gef:
                     max_index = len(df)-3
-                elif lasttype in soorten_grof and s_lasttype not in soorten_grof:
+                elif lasttype in soorten_grof_gef and s_lasttype not in soorten_grof_gef:
                     max_index = len(df)-2
-                elif s_lasttype in soorten_grof and lasttype not in soorten_grof and s_last_d <= max_dZ:
+                elif s_lasttype in soorten_grof_gef and lasttype not in soorten_grof_gef and s_last_d <= max_dZ:
                     max_index = len(df) - 1
                 else:
-                    if lasttype not in soorten_grof and s_lasttype not in soorten_grof:
+                    if lasttype not in soorten_grof_gef and s_lasttype not in soorten_grof_gef:
                         max_index = len(df)-1
 
 
@@ -140,10 +145,10 @@ def bovenkant_d_boring_gef(gefmap, puntenlaag):
                     t = row['type']
                     d = row['dikte_laag']
 
-                    if t in soorten_grof:
+                    if t in soorten_grof_gef:
                         grove_laag += d
                         bovenkant_grof.append(index)
-                    if t not in soorten_grof:
+                    if t not in soorten_grof_gef:
                         grove_laag = 0
                         bovenkant_grof = []
 
@@ -166,9 +171,9 @@ def bovenkant_d_boring_gef(gefmap, puntenlaag):
 
             elif len(df) is 1:
                 t = df.loc[0, 'type']
-                if t in soorten_grof:
+                if t in soorten_grof_gef:
                     deklaag = 0
-                if t not in soorten_grof:
+                if t not in soorten_grof_gef:
                     deklaag = df.loc[0, 'dikte_laag']
 
             else:
@@ -178,7 +183,11 @@ def bovenkant_d_boring_gef(gefmap, puntenlaag):
 
 
             print "deklaag is", deklaag, x,y, file
-            invoegen = (str(file), deklaag, (x, y))
+
+            if len(df) is 0:
+                invoegen = (str(file), deklaag, "geen waarde", (x, y))
+            else:
+                invoegen = (str(file), deklaag, type_laag[-1], (x, y))
 
 
 
@@ -235,8 +244,8 @@ def bovenkant_d_boring_xml(xml_map, puntenlaag):
             for item in typen:
                 type.append(item.childNodes[0].nodeValue)
                 test = item.childNodes[0].nodeValue
-                if test in soorten_grof:
-                    print test, file
+                if test in soorten_grof_xml:
+                    print file
 
 
 
@@ -267,14 +276,14 @@ def bovenkant_d_boring_xml(xml_map, puntenlaag):
                 s_last_d = float(df.loc[len(df) - 2, 'dikte_laag'])
 
                 # afvangen dubbele grove laag onderkant 1b: bepaal max index
-                if lasttype in soorten_grof and s_lasttype in soorten_grof:
+                if lasttype in soorten_grof_xml and s_lasttype in soorten_grof_xml:
                     max_index = len(df) - 3
-                elif lasttype in soorten_grof and s_lasttype not in soorten_grof:
+                elif lasttype in soorten_grof_xml and s_lasttype not in soorten_grof_xml:
                     max_index = len(df) - 2
-                elif s_lasttype in soorten_grof and lasttype not in soorten_grof and s_last_d <= max_dZ:
+                elif s_lasttype in soorten_grof_xml and lasttype not in soorten_grof_xml and s_last_d <= max_dZ:
                     max_index = len(df) - 1
                 else:
-                    if lasttype not in soorten_grof and s_lasttype not in soorten_grof:
+                    if lasttype not in soorten_grof_xml and s_lasttype not in soorten_grof_xml:
                         max_index = len(df) - 1
 
                 # bepaal grove laag
@@ -282,10 +291,10 @@ def bovenkant_d_boring_xml(xml_map, puntenlaag):
                     t = row['type']
                     d = row['dikte_laag']
 
-                    if t in soorten_grof:
+                    if t in soorten_grof_xml:
                         grove_laag += d
                         bovenkant_grof.append(index)
-                    if t not in soorten_grof:
+                    if t not in soorten_grof_xml:
                         grove_laag = 0
                         bovenkant_grof = []
 
@@ -308,9 +317,9 @@ def bovenkant_d_boring_xml(xml_map, puntenlaag):
 
             elif len(df) is 1:
                 t = df.loc[0, 'type']
-                if t in soorten_grof:
+                if t in soorten_grof_xml:
                     deklaag = 0
-                if t not in soorten_grof:
+                if t not in soorten_grof_xml:
                     deklaag = df.loc[0, 'dikte_laag']
 
             else:
@@ -319,7 +328,10 @@ def bovenkant_d_boring_xml(xml_map, puntenlaag):
 
 
             # print "deklaag is", deklaag, x, y, file ,type[-1]
-            invoegen = (str(file), deklaag, type[-1], (x, y))
+            if len(df) is 0:
+                invoegen = (str(file), deklaag, "geen waarde", (x, y))
+            else:
+                invoegen = (str(file), deklaag, type[-1], (x, y))
 
             cursor.insertRow(invoegen)
 
@@ -473,6 +485,6 @@ def bovenkant_d_sondering(gefmap,puntenlaag):
         cursor.insertRow(invoegen)
 
 # gef_txt(gefmap)
-# bovenkant_d_boring_gef(gefmap,puntenlaag)
-bovenkant_d_boring_xml(xml_map,puntenlaag)
+bovenkant_d_boring_gef(gefmap,puntenlaag)
+# bovenkant_d_boring_xml(xml_map,puntenlaag)
 
