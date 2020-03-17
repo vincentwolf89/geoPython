@@ -1033,6 +1033,7 @@ def excel_writer_factsheets_main(uitvoerpunten,code,excel,id,trajecten,toetspeil
     # stel kolom breedtes in
     worksheet1.set_column(0, 0, 30)
     worksheet1.set_column(1, 1, 60)
+    worksheet3.set_column(0, 6, 15)
 
 
 
