@@ -7,6 +7,7 @@ import xlwt
 import pandas as pd
 from itertools import groupby
 from xlsxwriter.workbook import Workbook
+from openpyxl import load_workbook
 import matplotlib.pyplot as plt
 # uitzetten melding pandas
 pd.set_option('mode.chained_assignment', None)
@@ -733,8 +734,9 @@ def excel_writer_maatgevend(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_
 
     # opbouw xlsx
     workbook = Workbook(excel)
-    worksheet1 = workbook.add_worksheet()
+    worksheet1 = workbook.add_worksheet('Overzicht')
     worksheet2 = workbook.add_worksheet()
+
     # stijl toevoegen voor headers
     bold = workbook.add_format({'bold': True})
 
@@ -867,7 +869,7 @@ def excel_writer_maatgevend(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_
 
     print '.xlsx-bestand gemaakt voor profielset'
 
-def excel_writer_factsheets(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_plot,max_plot,trajectlijn,img):
+def excel_writer_factsheets_main(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_plot,max_plot,trajectlijn,img,percelen_zone):
 
     # toetshoogte aan uitvoerpunten koppelen
     arcpy.JoinField_management(uitvoerpunten, code, trajecten, code, toetspeil)
@@ -884,8 +886,9 @@ def excel_writer_factsheets(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_
 
     # opbouw xlsx
     workbook = Workbook(excel)
-    worksheet1 = workbook.add_worksheet()
+    worksheet1 = workbook.add_worksheet('Overzicht')
     worksheet2 = workbook.add_worksheet()
+    worksheet3 = workbook.add_worksheet('Perceelgegevens')
     # stijl toevoegen voor headers
     bold = workbook.add_format({'bold': True})
 
@@ -1063,28 +1066,30 @@ def excel_writer_factsheets(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_
     worksheet1.write('A15', "Basisgegevens conditionering",cell_format_sub)
     worksheet1.write('A16', "Huizen binnen teenlijn [aantal]")
     worksheet1.write('A17', "Huizen +20m teenlijn [aantal]")
-    worksheet1.write('A18', "Leidingen [m]")
-    worksheet1.write('A19', "Natura 2000")
+    worksheet1.write('A18', "Percelen binnen zone.. [aantal]")
+    worksheet1.write('A19', "Leidingen [m]")
+    worksheet1.write('A20', "Natura 2000")
 
-    worksheet1.write('A20', "Beoordeling techniek",cell_format_sub)
-    worksheet1.write('A21', "STPH [beta]")
-    worksheet1.write('A22', "STBI [beta]")
-    worksheet1.write('A23', "GEKB [beta]")
+    worksheet1.write('A21', "Beoordeling techniek",cell_format_sub)
+    worksheet1.write('A22', "STPH [beta]")
+    worksheet1.write('A23', "STBI [beta]")
+    worksheet1.write('A24', "GEKB [beta]")
 
-    worksheet1.write('A24', "Ontwerpproces",cell_format_sub)
-    worksheet1.write('A25', "Groep VVK")
-    worksheet1.write('A26', "Maatregel VVK [soort]")
-    worksheet1.write('A27', "Kosten VVK [*miljoen euro]")
-    worksheet1.write('A28', "Extra sonderingen [aantal]")
-    worksheet1.write('A29', "Extra boringen [aantal]")
+    worksheet1.write('A25', "Ontwerpproces",cell_format_sub)
+    worksheet1.write('A26', "Groep VVK")
+    worksheet1.write('A27', "Maatregel VVK [soort]")
+    worksheet1.write('A28', "Kosten VVK [*miljoen euro]")
+    worksheet1.write('A29', "Extra sonderingen [aantal]")
+    worksheet1.write('A30', "Extra boringen [aantal]")
 
-    worksheet1.write('A30', "Geometrie")
+    worksheet1.write('A31', "Geometrie")
 
     # maak array-pandas df van trajectlijn
     velden = ["prio_nummer","Van","Tot","Shape_Length","TRAJECT","OPLEVERING","gem_dpip","var_dpip","gem_zet","panden_dijkzone", "panden_dijkzone_bit",
-              "lengte_kl", "extra_bo", "extra_so", "gekb_2023","stbi_2023","stph_2023","na2000","extra_inmeten","maatregel","kosten","groep"]
+              "lengte_kl", "extra_bo", "extra_so", "gekb_2023","stbi_2023","stph_2023","na2000","extra_inmeten","maatregel","kosten","groep","percelen_zone"]
     array_fact = arcpy.da.FeatureClassToNumPyArray(trajectlijn,velden)
     df_fact= pd.DataFrame(array_fact)
+
 
     nummer = df_fact['prio_nummer'].iloc[0]
     van = df_fact['Van'].iloc[0]
@@ -1111,6 +1116,7 @@ def excel_writer_factsheets(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_
     extrabo = int(df_fact['extra_bo'].iloc[0])
     extraso = int(df_fact['extra_so'].iloc[0])
     extrameet= df_fact['extra_inmeten'].iloc[0]
+    percelen = df_fact['percelen_zone'].iloc[0]
 
 
 
@@ -1166,83 +1172,125 @@ def excel_writer_factsheets(uitvoerpunten,code,excel,id,trajecten,toetspeil,min_
     else:
         worksheet1.write('B17', "n.v.t.")
 
+    if percelen > 0:
+        percelen = int(percelen)
+        worksheet1.write('B18', str(percelen))
+    else:
+        worksheet1.write('B18', "n.v.t.")
+
 
     if pd.isna(lengtekl) == True:
-        worksheet1.write('B18', "n.v.t.")
+        worksheet1.write('B19', "n.v.t.")
     else:
         lengtekl = int(lengtekl)
-        worksheet1.write('B18', str(lengtekl))
+        worksheet1.write('B19', str(lengtekl))
 
 
     if na2000 == "Ja":
-        worksheet1.write('B19', "Aanwezig")
+        worksheet1.write('B20', "Aanwezig")
     else:
-        worksheet1.write('B19', "n.v.t.")
+        worksheet1.write('B20', "n.v.t.")
 
     if pd.isna(stph) == True:
-        worksheet1.write('B21', "n.v.t.")
-    else:
-        stph = round(stph, 1)
-        worksheet1.write('B21', str(stph))
-
-    if pd.isna(stbi) == True:
         worksheet1.write('B22', "n.v.t.")
     else:
-        stbi = round(stbi, 1)
-        worksheet1.write('B22', str(stbi))
+        stph = round(stph, 1)
+        worksheet1.write('B22', str(stph))
 
-    if pd.isna(gekb) == True:
+    if pd.isna(stbi) == True:
         worksheet1.write('B23', "n.v.t.")
     else:
+        stbi = round(stbi, 1)
+        worksheet1.write('B23', str(stbi))
+
+    if pd.isna(gekb) == True:
+        worksheet1.write('B24', "n.v.t.")
+    else:
         gekb = round(gekb, 1)
-        worksheet1.write('B23', str(gekb))
+        worksheet1.write('B24', str(gekb))
 
 
 
     if pd.isna(groep) == True:
-        worksheet1.write('B25', "n.v.t.")
-    else:
-        worksheet1.write('B25', str(groep))
-
-    if pd.isna(maatregel) == True:
         worksheet1.write('B26', "n.v.t.")
     else:
-        worksheet1.write('B26', str(maatregel))
+        worksheet1.write('B26', str(groep))
+
+    if pd.isna(maatregel) == True:
+        worksheet1.write('B27', "n.v.t.")
+    else:
+        worksheet1.write('B27', str(maatregel))
 
 
 
     if pd.isna(kosten) == True:
-        worksheet1.write('B27', "Onbekend")
+        worksheet1.write('B28', "Onbekend")
     else:
-        worksheet1.write('B27', str(kosten))
+        worksheet1.write('B28', str(kosten))
 
 
 
     if pd.isna(extraso) == True or extraso < 1:
-        worksheet1.write('B28', "n.v.t.")
-    else:
-        extrago = int(extraso)
-        worksheet1.write('B28', str(extraso))
-
-    if pd.isna(extrabo) == True or extrabo < 1:
         worksheet1.write('B29', "n.v.t.")
     else:
+        extrago = int(extraso)
+        worksheet1.write('B29', str(extraso))
+
+    if pd.isna(extrabo) == True or extrabo < 1:
+        worksheet1.write('B30', "n.v.t.")
+    else:
         extrago = int(extrabo)
-        worksheet1.write('B29', str(extrabo))
+        worksheet1.write('B30', str(extrabo))
 
     if extrameet == "Ja":
-        worksheet1.write('B30', "Extra inmetingen vereist")
+        worksheet1.write('B31', "Extra inmetingen vereist")
     else:
-        worksheet1.write('B30', "Geen inmetingen vereist")
+        worksheet1.write('B31', "Geen inmetingen vereist")
 
 
     # insert plot vanuit arcmap
-
     worksheet1.insert_image('D3', img)
 
-    workbook.close()
 
-    print '.xlsx-bestand gemaakt voor profielset'
+
+
+    ## voeg perceeldata toe aan nieuwe sheet
+
+    # data binnenhalen
+    velden_percelen = ["OBJECTID","Huisnummer","Huisletter","Postcode","OpenbareRuimteNaam","WoonplaatsNaam"]
+    array_percelen = arcpy.da.FeatureClassToNumPyArray(percelen_zone, velden_percelen, null_value=-9999)
+    df = pd.DataFrame(array_percelen)
+    df_percelen = df.sort_values('OpenbareRuimteNaam', ascending=False)
+
+    # kolomnamen
+    worksheet3.write('A1', "OBJECTID_gis", cell_format_sub)
+    worksheet3.write('B1', "Straatnaam", cell_format_sub)
+    worksheet3.write('C1', "Huisnummer", cell_format_sub)
+    worksheet3.write('D1', "Huisletter", cell_format_sub)
+    worksheet3.write('E1', "Postcode", cell_format_sub)
+    worksheet3.write('F1', "Plaatsnaam", cell_format_sub)
+
+    # schrijven kolommen
+    worksheet3.write_column('A2', df_percelen['OBJECTID'])
+    worksheet3.write_column('B2', df_percelen['OpenbareRuimteNaam'])
+    worksheet3.write_column('C2', df_percelen['Huisnummer'])
+    worksheet3.write_column('D2', df_percelen['Huisletter'])
+    worksheet3.write_column('E2', df_percelen['Postcode'])
+    worksheet3.write_column('F2', df_percelen['WoonplaatsNaam'])
+
+
+    workbook.close()
+    del df
+    del df_percelen
+    del df_fact
+
+
+
+
+    print '.xlsx-bestand gemaakt voor factsheet'
+
+
+
 
 def binnenteenbepalen(invoer, code, min_achterland, max_achterland, uitvoer_binnenteen, min_afstand,
                       max_afstand,uitvoer_binnenkruin):
