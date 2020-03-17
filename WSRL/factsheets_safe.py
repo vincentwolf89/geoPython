@@ -1,29 +1,34 @@
 import arcpy
+import numpy as np
+import pandas as pd
 from basisfuncties import*
+from openpyxl import load_workbook
+from openpyxl.drawing.image import Image
 
-arcpy.env.workspace = r'D:\Projecten\WSRL\safe_temp.gdb'
+arcpy.env.workspace = r'D:\GoogleDrive\WSRL\safe_temp.gdb'
 arcpy.env.overwriteOutput = True
 
-trajecten = r'D:\Projecten\WSRL\safe_basis.gdb\priovakken'
+trajecten = r'D:\GoogleDrive\WSRL\safe_basis.gdb\priovakken'
 
 
 code_wsrl = "prio_nummer"
-mxd = r'C:\Users\Vincent\Desktop\werkmxd_factsheets.mxd'
+mxd = r'D:\GoogleDrive\WSRL\mxd\werkmxd_factsheets.mxd'
 
 buffer_afstand = 50
 buffer_afstand_panden = 500
 buffer_afstand_panden_bit = 20
 buffer_afstand_go = 100
 
-dpiplaag = r'D:\Projecten\WSRL\safe_basis.gdb\dpip_bit'
-zettinglaag = r'D:\Projecten\WSRL\safe_basis.gdb\zetting_buk'
-kabels_leidingen = r'D:\Projecten\WSRL\safe_basis.gdb\kabels_leidingen_safe'
-panden = r'D:\Projecten\WSRL\safe_basis.gdb\panden_bag'
-dijkzone = r'D:\Projecten\WSRL\safe_basis.gdb\bit_but_zone'
-binnenteenlijn = r'D:\Projecten\WSRL\safe_basis.gdb\binnenteenlijn_safe'
-extra_go = r'D:\Projecten\WSRL\safe_basis.gdb\go_oktober_2019'
-versterkingen = r'D:\Projecten\WSRL\safe_basis.gdb\versterkingen_safe'
-resultaten = r'D:\Projecten\WSRL\safe_basis.gdb\resultaten_vvk'
+dpiplaag = r'D:\GoogleDrive\WSRL\safe_basis.gdb\dpip_bit'
+zettinglaag = r'D:\GoogleDrive\WSRL\safe_basis.gdb\zetting_buk'
+kabels_leidingen = r'D:\GoogleDrive\WSRL\safe_basis.gdb\kabels_leidingen_safe'
+panden = r'D:\GoogleDrive\WSRL\safe_basis.gdb\panden_bag'
+percelen = r'D:\GoogleDrive\WSRL\safe_basis.gdb\percelen_bag_500m'
+dijkzone = r'D:\GoogleDrive\WSRL\safe_basis.gdb\bit_but_zone'
+binnenteenlijn = r'D:\GoogleDrive\WSRL\safe_basis.gdb\binnenteenlijn_safe'
+extra_go = r'D:\GoogleDrive\WSRL\safe_basis.gdb\go_oktober_2019'
+versterkingen = r'D:\GoogleDrive\WSRL\safe_basis.gdb\versterkingen_safe'
+resultaten = r'D:\GoogleDrive\WSRL\safe_basis.gdb\resultaten_vvk'
 
 
 
@@ -33,8 +38,8 @@ profiel_lengte_land = 200
 profiel_lengte_rivier = 100 # 10 default
 
 
-excelmap = 'D:/Projecten/WSRL/safe/uitvoer_priovakken/' # gewenste map voor .xlsx-uitvoer
-jpgmap = 'D:/Projecten/WSRL/safe/uitvoer_jpg/'
+excelmap = 'D:/GoogleDrive/WSRL/safe/uitvoer_priovakken/' # gewenste map voor .xlsx-uitvoer
+jpgmap = 'D:/GoogleDrive/WSRL/safe/uitvoer_jpg/'
 raster = r'C:\Users\Vincent\Desktop\ahn3clip_safe' # hoogtegrid
 toetspeil = 999 # naam van kolom met toetspeil/toetshoogte, 999 voor uitvoer zonder toetspeil
 min_plot = -50
@@ -125,18 +130,23 @@ def koppel_zetting(trajectlijn, zettinglaag, buffer_afstand, buffer):
 
     print "Zetting gekoppeld"
 
-def koppel_panden_dijk(trajectlijn, dijkzone, panden, buffer_afstand_panden, panden_dijkzone):
+def koppel_panden_dijk(trajectlijn, dijkzone, panden, buffer_afstand_panden, panden_dijkzone,buffer_dijk):
+    if arcpy.Exists(buffer_dijk):
+        arcpy.Delete_management(buffer_dijk)
+    else:
+        pass
+
     # select panden features in dijkvlak, totaal
     arcpy.MakeFeatureLayer_management(panden, 'templaag_panden')
     arcpy.SelectLayerByLocation_management('templaag_panden', "INTERSECT", dijkzone, "0 Meters", "NEW_SELECTION", "NOT_INVERT")
     arcpy.CopyFeatures_management('templaag_panden', 'panden_dijkzone')
 
     # bufferzone trajectlijn voor panden
-    arcpy.Buffer_analysis(trajectlijn, 'bufferzone', buffer_afstand_panden, "FULL", "FLAT", "NONE", "", "PLANAR")
+    arcpy.Buffer_analysis(trajectlijn, buffer_dijk, buffer_afstand_panden, "FULL", "FLAT", "NONE", "", "PLANAR")
 
     # select panden features from panden dijkzone in bufferzone
     arcpy.MakeFeatureLayer_management("panden_dijkzone", 'templaag_panden_dijkzone')
-    arcpy.SelectLayerByLocation_management('templaag_panden_dijkzone', "INTERSECT", "bufferzone", "0 Meters", "NEW_SELECTION","NOT_INVERT")
+    arcpy.SelectLayerByLocation_management('templaag_panden_dijkzone', "INTERSECT", buffer_dijk, "0 Meters", "NEW_SELECTION","NOT_INVERT")
     arcpy.CopyFeatures_management('templaag_panden_dijkzone', panden_dijkzone)
 
     # koppel aantal panden in dijkzone aan traject
@@ -150,11 +160,16 @@ def koppel_panden_dijk(trajectlijn, dijkzone, panden, buffer_afstand_panden, pan
             cursor.updateRow(row)
     del cursor
 
-    arcpy.DeleteFeatures_management(panden_dijkzone)
+    # arcpy.DeleteFeatures_management(panden_dijkzone)
 
     print "Panden dijkzone gekoppeld"
 
-def koppel_panden_bitplus_20(trajectlijn, dijkzone, panden, buffer_afstand_panden_bit, panden_dijkzone_bit,binnenteenlijn, binnenteen_traject,code_wsrl,id):
+def koppel_panden_bitplus_20(trajectlijn, dijkzone, panden, buffer_afstand_panden_bit, panden_dijkzone_bit,binnenteenlijn, binnenteen_traject,code_wsrl,id,buffer_bitplus):
+
+    if arcpy.Exists(buffer_bitplus):
+        arcpy.Delete_management(buffer_bitplus)
+    else:
+        pass
 
     ## knip deel binnenteenlijn
     # buffer
@@ -183,11 +198,11 @@ def koppel_panden_bitplus_20(trajectlijn, dijkzone, panden, buffer_afstand_pande
 
 
     # buffer bit 20m
-    arcpy.Buffer_analysis(binnenteen_traject, 'bufferzone', buffer_afstand_panden_bit, "LEFT", "FLAT", "NONE", "", "PLANAR")
+    arcpy.Buffer_analysis(binnenteen_traject, buffer_bitplus, buffer_afstand_panden_bit, "LEFT", "FLAT", "NONE", "", "PLANAR")
 
     # select panden features from panden dijkzone in bufferzone
     arcpy.MakeFeatureLayer_management(panden, 'templaag_panden')
-    arcpy.SelectLayerByLocation_management('templaag_panden', "INTERSECT", "bufferzone", "0 Meters", "NEW_SELECTION","NOT_INVERT")
+    arcpy.SelectLayerByLocation_management('templaag_panden', "INTERSECT", buffer_bitplus, "0 Meters", "NEW_SELECTION","NOT_INVERT")
     arcpy.CopyFeatures_management('templaag_panden', panden_dijkzone_bit)
 
     # koppel aantal panden in dijkzone aan traject
@@ -322,6 +337,47 @@ def koppel_resultaten(trajectlijn,resultaten):
 
     print "Resultaten gekoppeld"
 
+
+def koppel_percelen(trajectlijn, buffer_afstand_panden, dijkzone, percelen,percelen_zone):
+    # aantal percelen binnen buffer
+    # select panden features in dijkvlak, totaal
+    arcpy.MakeFeatureLayer_management(percelen, 'templaag_percelen')
+    arcpy.SelectLayerByLocation_management('templaag_percelen', "INTERSECT", dijkzone, "0 Meters", "NEW_SELECTION", "NOT_INVERT")
+    ## selecteer ook panden in bitplus20 zone?
+    arcpy.CopyFeatures_management('templaag_percelen', 'percelen_zone')
+
+    # bufferzone trajectlijn voor panden
+    arcpy.Buffer_analysis(trajectlijn, 'bufferzone', buffer_afstand_panden, "FULL", "FLAT", "NONE", "", "PLANAR") # hier panden gebruiken
+
+    # select panden features from panden dijkzone in bufferzone
+    arcpy.MakeFeatureLayer_management("percelen_zone", 'templaag_percelen_zone')
+    arcpy.SelectLayerByLocation_management('templaag_percelen_zone', "INTERSECT", "bufferzone", "0 Meters", "NEW_SELECTION","NOT_INVERT")
+    arcpy.CopyFeatures_management('templaag_percelen_zone', percelen_zone)
+
+    # koppel aantal panden in dijkzone aan traject
+    aantal_percelen_ = arcpy.GetCount_management(percelen_zone)
+    aantal_percelen = aantal_percelen_[0]
+    arcpy.AddField_management(trajectlijn, "percelen_zone", "DOUBLE", 2, field_is_nullable="NULLABLE")
+
+    with arcpy.da.UpdateCursor(trajectlijn, 'percelen_zone') as cursor:
+        for row in cursor:
+            row[0] = aantal_percelen
+            cursor.updateRow(row)
+    del cursor
+
+    # arcpy.DeleteFeatures_management(percelen_zone)
+
+    print "Percelen voor ..zone gekoppeld, totaal aantal percelen: {} ".format(aantal_percelen)
+
+
+
+
+
+
+
+
+
+
 def zoom_mxd(mxd, id, code_wsrl):
     mxd = arcpy.mapping.MapDocument(mxd)
     df = arcpy.mapping.ListDataFrames(mxd, "*")[0]
@@ -355,8 +411,11 @@ with arcpy.da.SearchCursor(trajecten,['SHAPE@',code_wsrl]) as cursor:
         buffer_zet = 'buffer_zet_' + str(row[1])
         buffer_kl = 'buffer_kl_' + str(row[1])
         buffer_go = 'buffer_go_' + str(row[1])
+        buffer_dijk = 'buffer_dijk_'+str(row[1])
+        buffer_bitplus = 'buffer_bitplus_'+str(row[1])
         panden_dijkzone = 'panden_dijkzone_' + str(row[1])
         panden_dijkzone_bit = 'panden_dijkzone_bit_' + str(row[1])
+        percelen_zone = 'percelen_zone_'+ str(row[1])
         binnenteen_traject = 'binnenteen_' + str(row[1])
         where = '"' + code_wsrl + '" = ' + "'" + str(id) + "'"
 
@@ -368,6 +427,8 @@ with arcpy.da.SearchCursor(trajecten,['SHAPE@',code_wsrl]) as cursor:
         # doorlopen scripts
         print trajectlijn
 
+
+        ## alleen doorlopen bij wijzigingen geometrie
         # generate_profiles(profiel_interval, profiel_lengte_land, profiel_lengte_rivier, trajectlijn, code_wsrl,toetspeil, profielen)
         # join_mg_profiles(trajectlijn,profielen,profielen_mg,profielen_plus)
         # copy_trajectory_lr(trajectlijn, code_wsrl)
@@ -375,19 +436,22 @@ with arcpy.da.SearchCursor(trajecten,['SHAPE@',code_wsrl]) as cursor:
         # extract_z_arcpy(invoerpunten, uitvoerpunten, raster)
         # add_xy(uitvoerpunten, code_wsrl)
 
-
+        # functies runnen bij ongewijzigde geometrie
         koppel_extra(trajectlijn, trajecten)
         koppel_dpip(trajectlijn,dpiplaag,buffer_afstand,buffer_dpip)
         koppel_zetting(trajectlijn, zettinglaag, buffer_afstand, buffer_zet)
-        koppel_panden_dijk(trajectlijn, dijkzone, panden, buffer_afstand_panden, panden_dijkzone)
+        koppel_panden_dijk(trajectlijn, dijkzone, panden, buffer_afstand_panden, panden_dijkzone, buffer_dijk)
         koppel_panden_bitplus_20(trajectlijn, dijkzone, panden, buffer_afstand_panden_bit, panden_dijkzone_bit,
-                                 binnenteenlijn, binnenteen_traject, code_wsrl, id)
+                                 binnenteenlijn, binnenteen_traject, code_wsrl, id,buffer_bitplus)
+        koppel_percelen(trajectlijn, buffer_afstand_panden, dijkzone, percelen,percelen_zone)
         koppel_kl(trajectlijn, kabels_leidingen, buffer_afstand, buffer_kl)
         koppel_go_ext(trajectlijn, extra_go, buffer_afstand_go, buffer_go)
         koppel_versterkingen(trajectlijn,versterkingen)
         koppel_resultaten(trajectlijn,resultaten)
 
         zoom_mxd(mxd, id, code_wsrl)
-        excel_writer_factsheets(uitvoerpunten, code, excel, id, trajecten, toetspeil, min_plot, max_plot, trajectlijn,img)
+        excel_writer_factsheets_main(uitvoerpunten, code, excel, id, trajecten, toetspeil, min_plot, max_plot, trajectlijn,img,percelen_zone)
+
+
 
 
