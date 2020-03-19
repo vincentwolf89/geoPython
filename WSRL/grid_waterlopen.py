@@ -63,9 +63,18 @@ def buffer_waterloop(waterloop,talud, buffer, buffer_lijn, insteek_waterloop):
 
 
 
-def vergridden_waterloop(waterloop,waterloop_lijn,waterloop_lijn_totaal,waterloop_3d_lijn, waterloop_3d_poly,tin,raster_waterloop):
+def vergridden_waterloop(waterloop,waterloop_lijn,waterloop_lijn_totaal,waterloop_3d_lijn, waterloop_3d_poly,tin,raster_waterloop,raster_waterloop_clip):
     # lijn van omtrek waterloop
     arcpy.FeatureToLine_management(waterloop, waterloop_lijn)
+    # lijn splitsen en hoogte koppelen van oever:
+    # buffer waterloop
+    # raster clippen met bufferzone
+    # focal stats op bufferclip
+
+    # lijn simplifyen
+    # lijn splitten op vertices
+    # punten over lijn om de ? 1m?
+    # punten extracten uit focal stats...
 
     # merge waterlooplijn met bufferlijn
     arcpy.Merge_management([waterloop_lijn,buffer_lijn],waterloop_lijn_totaal)
@@ -80,6 +89,8 @@ def vergridden_waterloop(waterloop,waterloop_lijn,waterloop_lijn_totaal,waterloo
     arcpy.TinRaster_3d(tin, raster_waterloop, "FLOAT", "LINEAR", "CELLSIZE 0,1", "1")
 
     # clip raster met waterloop poly en verwijder oude raster
+    arcpy.Clip_management(raster_waterloop, "",
+                          raster_waterloop_clip, waterloop, "-3,402823e+038", "ClippingGeometry", "MAINTAIN_EXTENT")
 
 
 with arcpy.da.SearchCursor(waterlopen,['SHAPE@',code_waterloop]) as cursor:
@@ -95,6 +106,7 @@ with arcpy.da.SearchCursor(waterlopen,['SHAPE@',code_waterloop]) as cursor:
 
         tin = "D:/GoogleDrive/WSRL/tin/waterloop"+str(row[1])
         raster_waterloop = 'waterloop_raster_' + str(row[1])
+        raster_waterloop_clip = 'waterloop_raster_clip_' + str(row[1])
         buffer = 'buffer_waterloop_'+str(row[1])
         buffer_lijn = 'buffer_waterloop_lijn_'+str(row[1])
 
@@ -105,7 +117,7 @@ with arcpy.da.SearchCursor(waterlopen,['SHAPE@',code_waterloop]) as cursor:
 
         # functies runnen
         buffer_waterloop(waterloop, talud, buffer,buffer_lijn,insteek_waterloop)
-        vergridden_waterloop(waterloop, waterloop_lijn, waterloop_lijn_totaal, waterloop_3d_lijn, waterloop_3d_poly, tin, raster_waterloop)
+        vergridden_waterloop(waterloop, waterloop_lijn, waterloop_lijn_totaal, waterloop_3d_lijn, waterloop_3d_poly, tin, raster_waterloop,raster_waterloop_clip)
 
 
 
