@@ -6,13 +6,16 @@ arcpy.env.overwriteOutput = True
 code_waterloop = "id_string"
 raster_safe = r'C:\Users\Vincent\Desktop\ahn3clip_safe'
 talud = (1.0/4.0)
+min_lengte_segment = 15 #?
 delta_w = 0.8
-buffer_max = 0.7
+buffer_max = 0.8
 
 buffer_buitenkant = 3 # buffer voor focalraster
 insteek_waterloop = -1
 
-waterlopen = "waterlopen_samples"
+waterlopen = "testset_waterlopen"
+
+rasterlijst = []
 
 
 
@@ -54,11 +57,11 @@ def buffer_waterloop(waterloop,talud, buffer, buffer_lijn, waterloop_lijn_simp):
             break
 
     if gebruikte_buffer == buffer_afstand_talud:
-        print (buffer_afstand_talud*talud), "buffer onbegrensd", waterloop_lijn_simp
+        # print (buffer_afstand_talud*talud), "buffer onbegrensd", waterloop_lijn_simp
         z_nap = insteek_waterloop- (buffer_afstand_talud*talud)
 
     elif gebruikte_buffer == buffer_max:
-        print (buffer_max * talud), "buffer begrensd", waterloop_lijn_simp
+        # print (buffer_max * talud), "buffer begrensd", waterloop_lijn_simp
         z_nap = insteek_waterloop- (buffer_max*talud)
 
     else:
@@ -71,6 +74,7 @@ def buffer_waterloop(waterloop,talud, buffer, buffer_lijn, waterloop_lijn_simp):
             cursor.updateRow(row)
     del cursor
 
+    print "Binnen-buffer gemaakt voor {}".format(waterloop)
 
 ## hier wordt een breder raster gemaakt aan de buitenkant voor zoveel mogelijk geldende z-waardes
 def raster_buitenkant(waterloop, buffer_buitenkant, buitenraster, raster_safe):
@@ -82,11 +86,10 @@ def raster_buitenkant(waterloop, buffer_buitenkant, buitenraster, raster_safe):
     # focal stats op bufferclip
     arcpy.gp.FocalStatistics_sa("temp_raster_buitenkant", buitenraster, "Rectangle 4 4 CELL", "MEAN", "DATA")
 
+    print "Focal buffer gemaakt voor {}".format(waterloop)
 
 
-
-
-def bepaal_insteek_waterloop(waterloop,waterloop_lijn,waterloop_lijn_simp, punten_insteek):
+def bepaal_insteek_waterloop(waterloop,waterloop_lijn,waterloop_lijn_simp, punten_insteek, min_lengte_segment):
 
     # lijn van omtrek waterloop
     arcpy.FeatureToLine_management(waterloop, waterloop_lijn)
@@ -109,7 +112,7 @@ def bepaal_insteek_waterloop(waterloop,waterloop_lijn,waterloop_lijn_simp, punte
     # selecteer punten op lijnstuk, als meer dan 3/4 van de punten geen z-waarde heeft, lijnstuk deleten
     arcpy.MakeFeatureLayer_management(punten_insteek, 'templaag_insteekpunten')
 
-    with arcpy.da.UpdateCursor(waterloop_lijn_simp, ['SHAPE@', 'z_nap']) as cursor:
+    with arcpy.da.UpdateCursor(waterloop_lijn_simp, ['SHAPE@', 'z_nap', 'SHAPE@LENGTH']) as cursor:
 
             for row in cursor:
 
@@ -137,8 +140,8 @@ def bepaal_insteek_waterloop(waterloop,waterloop_lijn,waterloop_lijn_simp, punte
                 #     row[1] = average(lijst_z)
                 #     cursor.updateRow(row)
 
-                if aantal_nan/aantal_z > 0.25:
-                    print "Aansluiting eruitgehaald"
+                if aantal_nan/aantal_z > 0.25 and row[2] < min_lengte_segment:
+                    # print "Aansluiting eruitgehaald"
                     cursor.deleteRow()
 
 
@@ -160,7 +163,7 @@ def bepaal_insteek_waterloop(waterloop,waterloop_lijn,waterloop_lijn_simp, punte
 
                 elif aantal_punten == 15:
                     z_nap_og = average(lijst_punten)
-                    print z_nap_og, waterloop
+                    # print z_nap_og, waterloop
                     break
 
 
@@ -172,8 +175,7 @@ def bepaal_insteek_waterloop(waterloop,waterloop_lijn,waterloop_lijn_simp, punte
             row[0] = round(z_nap_og,2)
             cursor.updateRow(row)
 
-
-
+    print "Gemiddelde insteekhoogte bepaald voor {}".format(waterloop)
 
 
 def create_raster(waterloop,waterloop_lijn_simp, buffer_lijn, waterloop_lijn_totaal, waterloop_3d_lijn,tin, raster_waterloop,raster_waterloop_clip):
@@ -195,48 +197,69 @@ def create_raster(waterloop,waterloop_lijn_simp, buffer_lijn, waterloop_lijn_tot
 
     arcpy.Delete_management(raster_waterloop)
 
-with arcpy.da.SearchCursor(waterlopen,['SHAPE@',code_waterloop]) as cursor:
-    for row in cursor:
-        id = row[1]
+    rasterlijst.append(raster_waterloop_clip)
 
-        waterloop = 'waterloop_' + str(row[1])
-        waterloop_lijn = 'waterloop_lijn_' + str(row[1])
-        waterloop_lijn_simp = 'waterloop_lijn_simp_' + str(row[1])
-        punten_insteek = 'waterloop_punten_insteek_' + str(row[1])
-        waterloop_lijn_totaal = 'tt_waterloop_lijn_' + str(row[1])
-        waterloop_3d_lijn = 'waterloop_3d_lijn' + str(row[1])
-        waterloop_3d_poly = 'waterloop_3d_poly' + str(row[1])
+    print "Raster gemaakt voor {}".format(waterloop)
 
+def insert_into_ahn(waterlopen, raster_safe,rasterlijst):
+    # clip totaalgebied uit ahn
+    arcpy.Clip_management(raster_safe, "", "clip_waterlopen", waterlopen, "-3,402823e+038", "NONE","MAINTAIN_EXTENT")
+    rasterlijst.append("clip_waterlopen")
 
-        tin = "D:/GoogleDrive/WSRL/tin/waterloop"+str(row[1])
-        raster_waterloop = 'waterloop_raster_' + str(row[1])
-        raster_waterloop_clip = 'waterloop_raster_clip_' + str(row[1])
-        buitenraster = 'waterloop_buitenraster_' + str(row[1])
-        buffer = 'buffer_waterloop_'+str(row[1])
-        buffer_lijn = 'buffer_waterloop_lijn_'+str(row[1])
-
-
-        where = '"' + code_waterloop + '" = ' + "'" + str(id) + "'"
-
-        arcpy.Select_analysis(waterlopen, waterloop, where)
-
-        # functies runnen
-
-        raster_buitenkant(waterloop, buffer_buitenkant, buitenraster, raster_safe)
-        bepaal_insteek_waterloop(waterloop, waterloop_lijn, waterloop_lijn_simp, punten_insteek)
-
-        buffer_waterloop(waterloop, talud, buffer, buffer_lijn, waterloop_lijn_simp)
-
-        create_raster(waterloop, waterloop_lijn_simp, buffer_lijn, waterloop_lijn_totaal, waterloop_3d_lijn, tin,
-                      raster_waterloop, raster_waterloop_clip)
+    # voeg lagen toe van losse waterlopen
+    rasters = arcpy.ListRasters()
+    for raster in rasters:
+        if raster.startswith("waterloop_raster_clip"):
+            rasterlijst.append(raster)
+    # merge rasterlijst
+    arcpy.MosaicToNewRaster_management(rasterlijst, arcpy.env.workspace, "raster_totaal",
+                                       "", "32_BIT_FLOAT", "0,5", "1", "LAST", "FIRST")
 
 
 
+def batch_waterlopen():
+    with arcpy.da.SearchCursor(waterlopen,['SHAPE@',code_waterloop]) as cursor:
+        for row in cursor:
+            id = row[1]
+
+            waterloop = 'waterloop_' + str(row[1])
+            waterloop_lijn = 'waterloop_lijn_' + str(row[1])
+            waterloop_lijn_simp = 'waterloop_lijn_simp_' + str(row[1])
+            punten_insteek = 'waterloop_punten_insteek_' + str(row[1])
+            waterloop_lijn_totaal = 'tt_waterloop_lijn_' + str(row[1])
+            waterloop_3d_lijn = 'waterloop_3d_lijn' + str(row[1])
+            waterloop_3d_poly = 'waterloop_3d_poly' + str(row[1])
+
+
+            tin = "D:/GoogleDrive/WSRL/tin/waterloop"+str(row[1])
+            raster_waterloop = 'waterloop_raster_' + str(row[1])
+            raster_waterloop_clip = 'waterloop_raster_clip_' + str(row[1])
+            buitenraster = 'waterloop_buitenraster_' + str(row[1])
+            buffer = 'buffer_waterloop_'+str(row[1])
+            buffer_lijn = 'buffer_waterloop_lijn_'+str(row[1])
+
+
+            where = '"' + code_waterloop + '" = ' + "'" + str(id) + "'"
+
+            arcpy.Select_analysis(waterlopen, waterloop, where)
+
+            # voeg veld toe voor z_nap
+            arcpy.AddField_management(waterloop,"z_nap","DOUBLE", 2, field_is_nullable="NULLABLE")
+            # algemene functies runnen
+
+            raster_buitenkant(waterloop, buffer_buitenkant, buitenraster, raster_safe)
+            bepaal_insteek_waterloop(waterloop, waterloop_lijn, waterloop_lijn_simp, punten_insteek, min_lengte_segment)
+
+            buffer_waterloop(waterloop, talud, buffer, buffer_lijn, waterloop_lijn_simp)
+
+            create_raster(waterloop, waterloop_lijn_simp, buffer_lijn, waterloop_lijn_totaal, waterloop_3d_lijn, tin,
+                          raster_waterloop, raster_waterloop_clip)
+
+
+# hoofdfuncties
+batch_waterlopen()
+insert_into_ahn(waterlopen,raster_safe,rasterlijst)
 
 
 
 
-# buitencontour waterloop --> BGT omtrek
-#
-# buffer stapjes
-# arcpy.Buffer_analysis()
