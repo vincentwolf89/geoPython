@@ -14,16 +14,18 @@ insteek_waterloop = -1
 
 waterlopen = "waterlopen_samples"
 
-def buffer_waterloop(waterloop,talud, buffer, buffer_lijn, insteek_waterloop):
+
+
+def buffer_waterloop(waterloop,talud, buffer, buffer_lijn, waterloop_lijn_simp):
 
     buffer_afstand_talud = abs(delta_w/talud) # buffer afstand volgens talud, tot bodemdiepte
 
 
     if abs(buffer_afstand_talud) <= abs(buffer_max):
-        arcpy.Buffer_analysis(waterloop, buffer, -buffer_afstand_talud, "OUTSIDE_ONLY", "FLAT", "NONE", "", "PLANAR")
+        arcpy.Buffer_analysis(waterloop_lijn_simp, buffer, -buffer_afstand_talud, "OUTSIDE_ONLY", "FLAT", "NONE", "", "PLANAR")
         gebruikte_buffer = buffer_afstand_talud
     else:
-        arcpy.Buffer_analysis(waterloop, buffer, -buffer_max, "OUTSIDE_ONLY", "FLAT", "NONE", "", "PLANAR")
+        arcpy.Buffer_analysis(waterloop_lijn_simp, buffer, buffer_max, "RIGHT", "FLAT", "NONE", "", "PLANAR")
         gebruikte_buffer = buffer_max
 
     # feature to line
@@ -45,18 +47,22 @@ def buffer_waterloop(waterloop,talud, buffer, buffer_lijn, insteek_waterloop):
                 pass
     del cursor
 
-    # bereken hoogte bufferlijn
+    # bereken hoogte bufferlijn met insteek
+    with arcpy.da.SearchCursor(waterloop_lijn_simp, ['z_nap']) as cursor:
+        for row in cursor:
+            insteek_waterloop = row[0]
+            break
 
     if gebruikte_buffer == buffer_afstand_talud:
-        print (buffer_afstand_talud*talud), "buffer onbegrensd", waterloop
+        print (buffer_afstand_talud*talud), "buffer onbegrensd", waterloop_lijn_simp
         z_nap = insteek_waterloop- (buffer_afstand_talud*talud)
 
     elif gebruikte_buffer == buffer_max:
-        print (buffer_max * talud), "buffer begrensd", waterloop
+        print (buffer_max * talud), "buffer begrensd", waterloop_lijn_simp
         z_nap = insteek_waterloop- (buffer_max*talud)
 
     else:
-        print "Er is een probleem bij {} !".format(waterloop)
+        print "Er is een probleem bij {} !".format(waterloop_lijn_simp)
 
 
     with arcpy.da.UpdateCursor(buffer_lijn, ['z_nap']) as cursor:
@@ -80,7 +86,7 @@ def raster_buitenkant(waterloop, buffer_buitenkant, buitenraster, raster_safe):
 
 
 
-def vergridden_waterloop(waterloop,waterloop_lijn,waterloop_lijn_totaal,waterloop_3d_lijn,tin,raster_waterloop,raster_waterloop_clip, waterloop_lijn_simp, punten_insteek):
+def bepaal_insteek_waterloop(waterloop,waterloop_lijn,waterloop_lijn_simp, punten_insteek):
 
     # lijn van omtrek waterloop
     arcpy.FeatureToLine_management(waterloop, waterloop_lijn)
@@ -136,29 +142,58 @@ def vergridden_waterloop(waterloop,waterloop_lijn,waterloop_lijn_totaal,waterloo
                     cursor.deleteRow()
 
 
-    # koppel gemiddelde hoogte van 10 laagste punten aan lijnstukken als z-waarde
+    ## koppel gemiddelde hoogte van 10 laagste punten aan lijnstukken als z-waarde
+
+    # zoek laagste 15 waardes per waterloop
+    with arcpy.da.UpdateCursor(punten_insteek, ['RASTERVALU','z_nap','OBJECTID'],sql_clause = (None,"ORDER BY RASTERVALU ASC")) as cursor:
+        aantal_punten = 0
+        lijst_punten = []
+
+
+        for row in cursor:
+            if row[0] is None:
+                cursor.deleteRow()
+            else:
+                if aantal_punten < 15:
+                    lijst_punten.append(row[0])
+                    aantal_punten += 1
+
+                elif aantal_punten == 15:
+                    z_nap_og = average(lijst_punten)
+                    print z_nap_og, waterloop
+                    break
+
+
+
+
+    # koppel gemiddelde laaste waarde terug aan hele waterloop
+    with arcpy.da.UpdateCursor(waterloop_lijn_simp, ['z_nap']) as cursor:
+        for row in cursor:
+            row[0] = round(z_nap_og,2)
+            cursor.updateRow(row)
 
 
 
 
 
+def create_raster(waterloop,waterloop_lijn_simp, buffer_lijn, waterloop_lijn_totaal, waterloop_3d_lijn,tin, raster_waterloop,raster_waterloop_clip):
 
     # # merge waterlooplijn met bufferlijn
-    # arcpy.Merge_management([waterloop_lijn,buffer_lijn],waterloop_lijn_totaal)
-    #
-    # # feature to 3d
-    # arcpy.FeatureTo3DByAttribute_3d(waterloop_lijn_totaal, waterloop_3d_lijn, "z_nap")
-    #
-    # # tin
-    # arcpy.CreateTin_3d(tin, "", "{} z_nap Hard_Line <None>".format(waterloop_3d_lijn), "DELAUNAY")
-    # # tin to raster
-    # arcpy.TinRaster_3d(tin, raster_waterloop, "FLOAT", "LINEAR", "CELLSIZE 0,1", "1")
-    #
-    # # clip raster met waterloop poly en verwijder oude raster
-    # arcpy.Clip_management(raster_waterloop, "",
-    #                       raster_waterloop_clip, waterloop, "-3,402823e+038", "ClippingGeometry", "MAINTAIN_EXTENT")
-    #
-    # arcpy.Delete_management(raster_waterloop)
+    arcpy.Merge_management([waterloop_lijn_simp,buffer_lijn],waterloop_lijn_totaal)
+
+    # feature to 3d
+    arcpy.FeatureTo3DByAttribute_3d(waterloop_lijn_totaal, waterloop_3d_lijn, "z_nap")
+
+    # tin
+    arcpy.CreateTin_3d(tin, "", "{} z_nap Hard_Line <None>".format(waterloop_3d_lijn), "DELAUNAY")
+    # tin to raster
+    arcpy.TinRaster_3d(tin, raster_waterloop, "FLOAT", "LINEAR", "CELLSIZE 0,5", "1")
+
+    # clip raster met waterloop poly en verwijder oude raster
+    arcpy.Clip_management(raster_waterloop, "",
+                      raster_waterloop_clip, waterloop, "-3,402823e+038", "ClippingGeometry", "MAINTAIN_EXTENT")
+
+    arcpy.Delete_management(raster_waterloop)
 
 with arcpy.da.SearchCursor(waterlopen,['SHAPE@',code_waterloop]) as cursor:
     for row in cursor:
@@ -186,10 +221,14 @@ with arcpy.da.SearchCursor(waterlopen,['SHAPE@',code_waterloop]) as cursor:
         arcpy.Select_analysis(waterlopen, waterloop, where)
 
         # functies runnen
-        buffer_waterloop(waterloop, talud, buffer,buffer_lijn,insteek_waterloop)
-        raster_buitenkant(waterloop, buffer_buitenkant, buitenraster, raster_safe)
-        vergridden_waterloop(waterloop,waterloop_lijn,waterloop_lijn_totaal,waterloop_3d_lijn,tin,raster_waterloop,raster_waterloop_clip, waterloop_lijn_simp, punten_insteek)
 
+        raster_buitenkant(waterloop, buffer_buitenkant, buitenraster, raster_safe)
+        bepaal_insteek_waterloop(waterloop, waterloop_lijn, waterloop_lijn_simp, punten_insteek)
+
+        buffer_waterloop(waterloop, talud, buffer, buffer_lijn, waterloop_lijn_simp)
+
+        create_raster(waterloop, waterloop_lijn_simp, buffer_lijn, waterloop_lijn_totaal, waterloop_3d_lijn, tin,
+                      raster_waterloop, raster_waterloop_clip)
 
 
 
