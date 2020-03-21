@@ -7,6 +7,7 @@ arcpy.env.overwriteOutput = True
 code_waterloop = "id_string"
 raster_safe = r'C:\Users\Vincent\Desktop\ahn3clip_safe'
 min_lengte_segment = 15 #?
+defaultbreedte = 5 #?
 
 # variabelen nodig voor goede run:
 talud = (1.0/4.0)
@@ -18,12 +19,12 @@ delta_w = 0.8
 buffer_buitenkant = 3 # buffer voor focalraster
 insteek_waterloop = -1
 
-waterlopen = "test_12"
+waterlopen = "testset_"
 
 rasterlijst = []
 
 
-def bepaal_maxbufferdist(waterloop_lijn_simp):
+def bepaal_maxbufferdist(waterloop_lijn_simp,waterloop, defaultbreedte):
     # remove sideparts
     lengtes_segmenten = []
     with arcpy.da.SearchCursor(waterloop_lijn_simp,['SHAPE@LENGTH']) as cursor:
@@ -56,22 +57,23 @@ def bepaal_maxbufferdist(waterloop_lijn_simp):
     arcpy.PointsToLine_management("temp_isect_point", "temp_breedtes", "profielnummer", "", "NO_CLOSE")
     # average line length
     lijst_gemiddelde_breedte = []
-    with arcpy.da.SearchCursor("temp_breedtes", ['SHAPE@LENGTH']) as cursor:
+    with arcpy.da.UpdateCursor("temp_breedtes", ['SHAPE@LENGTH']) as cursor:
         for row in cursor:
-            lijst_gemiddelde_breedte.append(row[0])
+            if row[0] > 0:
+                lijst_gemiddelde_breedte.append(row[0])
+            else:
+                cursor.deleteRow()
     del cursor
     global gemiddelde_breedte
-    gemiddelde_breedte = average(lijst_gemiddelde_breedte)
+    #### REMOVE 0 lengtes uit temp breedtes!!!
+
+    if lijst_gemiddelde_breedte:
+        gemiddelde_breedte = average(lijst_gemiddelde_breedte)
+    else:
+        gemiddelde_breedte = defaultbreedte
+        print "Defaultbreedte gebruikt bij {}".format(waterloop)
 
     print "Gemiddelde breedte waterloop is {}".format(gemiddelde_breedte)
-
-
-
-
-
-
-
-
 
 
 
@@ -84,7 +86,7 @@ def buffer_waterloop(waterloop,talud, buffer, buffer_lijn, waterloop_lijn_simp):
 
 
     if abs(buffer_afstand_talud) <= abs(buffer_max):
-        arcpy.Buffer_analysis(waterloop_lijn_simp, buffer, -buffer_afstand_talud, "OUTSIDE_ONLY", "FLAT", "NONE", "", "PLANAR")
+        arcpy.Buffer_analysis(waterloop_lijn_simp, buffer, buffer_afstand_talud, "RIGHT", "FLAT", "NONE", "", "PLANAR")
         gebruikte_buffer = buffer_afstand_talud
     else:
         arcpy.Buffer_analysis(waterloop_lijn_simp, buffer, buffer_max, "RIGHT", "FLAT", "NONE", "", "PLANAR")
@@ -135,7 +137,7 @@ def buffer_waterloop(waterloop,talud, buffer, buffer_lijn, waterloop_lijn_simp):
 
     print "Binnen-buffer gemaakt voor {}".format(waterloop)
 
-## hier wordt een breder raster gemaakt aan de buitenkant voor zoveel mogelijk geldende z-waardes
+
 def raster_buitenkant(waterloop, buffer_buitenkant, buitenraster, raster_safe):
     # buffer waterloop
     arcpy.Buffer_analysis(waterloop, "temp_buffer_wl", buffer_buitenkant, "OUTSIDE_ONLY", "FLAT", "NONE", "", "PLANAR")
@@ -308,7 +310,7 @@ with arcpy.da.SearchCursor(waterlopen,['SHAPE@',code_waterloop]) as cursor:
 
         raster_buitenkant(waterloop, buffer_buitenkant, buitenraster, raster_safe)
         bepaal_insteek_waterloop(waterloop, waterloop_lijn, waterloop_lijn_simp, punten_insteek, min_lengte_segment)
-        bepaal_maxbufferdist(waterloop_lijn_simp)
+        bepaal_maxbufferdist(waterloop_lijn_simp,waterloop,defaultbreedte)
         buffer_waterloop(waterloop, talud, buffer, buffer_lijn, waterloop_lijn_simp)
 
         create_raster(waterloop, waterloop_lijn_simp, buffer_lijn, waterloop_lijn_totaal, waterloop_3d_lijn, tin,
