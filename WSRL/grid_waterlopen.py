@@ -6,10 +6,14 @@ arcpy.env.workspace = r'D:\GoogleDrive\WSRL\test_vergridden.gdb'
 arcpy.env.overwriteOutput = True
 code_waterloop = "id_string"
 raster_safe = r'C:\Users\Vincent\Desktop\ahn3clip_safe'
-talud = (1.0/4.0)
 min_lengte_segment = 15 #?
+
+# variabelen nodig voor goede run:
+talud = (1.0/4.0)
 delta_w = 0.8
-buffer_max = 0.8
+
+
+
 
 buffer_buitenkant = 3 # buffer voor focalraster
 insteek_waterloop = -1
@@ -47,8 +51,19 @@ def bepaal_maxbufferdist(waterloop_lijn_simp):
                 cursor.deleteRow()
     del cursor
     # multipoint to point
+    arcpy.FeatureToPoint_management("temp_isect", "temp_isect_point")
     # point to line
+    arcpy.PointsToLine_management("temp_isect_point", "temp_breedtes", "profielnummer", "", "NO_CLOSE")
     # average line length
+    lijst_gemiddelde_breedte = []
+    with arcpy.da.SearchCursor("temp_breedtes", ['SHAPE@LENGTH']) as cursor:
+        for row in cursor:
+            lijst_gemiddelde_breedte.append(row[0])
+    del cursor
+    global gemiddelde_breedte
+    gemiddelde_breedte = average(lijst_gemiddelde_breedte)
+
+    print "Gemiddelde breedte waterloop is {}".format(gemiddelde_breedte)
 
 
 
@@ -63,7 +78,8 @@ def bepaal_maxbufferdist(waterloop_lijn_simp):
 
 
 def buffer_waterloop(waterloop,talud, buffer, buffer_lijn, waterloop_lijn_simp):
-
+    buffer_max = gemiddelde_breedte/2
+    print buffer_max, "max_bufferafstand"
     buffer_afstand_talud = abs(delta_w/talud) # buffer afstand volgens talud, tot bodemdiepte
 
 
@@ -281,6 +297,7 @@ with arcpy.da.SearchCursor(waterlopen,['SHAPE@',code_waterloop]) as cursor:
         buffer_lijn = 'buffer_waterloop_lijn_'+str(row[1])
 
 
+
         where = '"' + code_waterloop + '" = ' + "'" + str(id) + "'"
 
         arcpy.Select_analysis(waterlopen, waterloop, where)
@@ -292,10 +309,10 @@ with arcpy.da.SearchCursor(waterlopen,['SHAPE@',code_waterloop]) as cursor:
         raster_buitenkant(waterloop, buffer_buitenkant, buitenraster, raster_safe)
         bepaal_insteek_waterloop(waterloop, waterloop_lijn, waterloop_lijn_simp, punten_insteek, min_lengte_segment)
         bepaal_maxbufferdist(waterloop_lijn_simp)
-        # buffer_waterloop(waterloop, talud, buffer, buffer_lijn, waterloop_lijn_simp)
-        #
-        # create_raster(waterloop, waterloop_lijn_simp, buffer_lijn, waterloop_lijn_totaal, waterloop_3d_lijn, tin,
-        #               raster_waterloop, raster_waterloop_clip)
+        buffer_waterloop(waterloop, talud, buffer, buffer_lijn, waterloop_lijn_simp)
+
+        create_raster(waterloop, waterloop_lijn_simp, buffer_lijn, waterloop_lijn_totaal, waterloop_3d_lijn, tin,
+                      raster_waterloop, raster_waterloop_clip)
 
 
 
