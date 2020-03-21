@@ -80,6 +80,14 @@ def bepaal_maxbufferdist(waterloop_lijn_simp,waterloop, defaultbreedte):
 
 
 def buffer_waterloop(waterloop,talud, buffer, buffer_lijn, waterloop_lijn_simp):
+    # # voeg losse lijndelen weer samen
+    # arcpy.Dissolve_management(waterloop_lijn_simp, "templijn", [code_waterloop,"z_nap"], "", "MULTI_PART",
+    #                           "DISSOLVE_LINES")
+    # arcpy.Copy_management("templijn",waterloop_lijn_simp)
+
+
+
+
     buffer_max = gemiddelde_breedte/2
     print buffer_max, "max_bufferafstand"
     buffer_afstand_talud = abs(delta_w/talud) # buffer afstand volgens talud, tot bodemdiepte
@@ -150,7 +158,7 @@ def raster_buitenkant(waterloop, buffer_buitenkant, buitenraster, raster_safe):
     print "Focal buffer gemaakt voor {}".format(waterloop)
 
 
-def bepaal_insteek_waterloop(waterloop,waterloop_lijn,waterloop_lijn_simp, punten_insteek, min_lengte_segment):
+def bepaal_insteek_waterloop(waterloop,waterloop_lijn,waterloop_lijn_simp, punten_insteek, min_lengte_segment,code_waterloop):
 
     # lijn van omtrek waterloop
     arcpy.FeatureToLine_management(waterloop, waterloop_lijn)
@@ -236,6 +244,8 @@ def bepaal_insteek_waterloop(waterloop,waterloop_lijn,waterloop_lijn_simp, punte
             row[0] = round(z_nap_og,2)
             cursor.updateRow(row)
 
+
+
     print "Gemiddelde insteekhoogte bepaald voor {}".format(waterloop)
 
 
@@ -309,7 +319,7 @@ with arcpy.da.SearchCursor(waterlopen,['SHAPE@',code_waterloop]) as cursor:
         # algemene functies runnen
 
         raster_buitenkant(waterloop, buffer_buitenkant, buitenraster, raster_safe)
-        bepaal_insteek_waterloop(waterloop, waterloop_lijn, waterloop_lijn_simp, punten_insteek, min_lengte_segment)
+        bepaal_insteek_waterloop(waterloop, waterloop_lijn, waterloop_lijn_simp, punten_insteek, min_lengte_segment,code_waterloop)
         bepaal_maxbufferdist(waterloop_lijn_simp,waterloop,defaultbreedte)
         buffer_waterloop(waterloop, talud, buffer, buffer_lijn, waterloop_lijn_simp)
 
