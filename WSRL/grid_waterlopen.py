@@ -81,9 +81,12 @@ def bepaal_maxbufferdist(waterloop_lijn_simp,waterloop, defaultbreedte):
 
 def buffer_waterloop(waterloop,talud, buffer, buffer_lijn, waterloop_lijn_simp):
     # # voeg losse lijndelen weer samen
-    # arcpy.Dissolve_management(waterloop_lijn_simp, "templijn", [code_waterloop,"z_nap"], "", "MULTI_PART",
-    #                           "DISSOLVE_LINES")
-    # arcpy.Copy_management("templijn",waterloop_lijn_simp)
+    arcpy.Dissolve_management(waterloop_lijn_simp, "templijn", [code_waterloop,"z_nap"], "", "MULTI_PART",
+                              "DISSOLVE_LINES")
+
+
+
+    arcpy.Copy_management("templijn",waterloop_lijn_simp)
 
 
 
@@ -103,21 +106,29 @@ def buffer_waterloop(waterloop,talud, buffer, buffer_lijn, waterloop_lijn_simp):
     # feature to line
     arcpy.FeatureToLine_management(buffer,buffer_lijn)
 
-    # remove biggest objectid
-    id_list = []
-    with arcpy.da.SearchCursor(buffer_lijn, ['OBJECTID']) as cursor:
-        for row in cursor:
-            id_list.append(row[0])
-    max_id = max(id_list)
+    # split line at vertices
+    arcpy.SplitLine_management(buffer_lijn, "bufferlijn")
 
-    del cursor
-    with arcpy.da.UpdateCursor(buffer_lijn, ['OBJECTID']) as cursor:
-        for row in cursor:
-            if row[0] == max_id:
-                cursor.deleteRow()
-            else:
-                pass
-    del cursor
+    # isect met simplijn
+    arcpy.MakeFeatureLayer_management("bufferlijn", "temp_bufferlijn")
+    arcpy.SelectLayerByLocation_management("temp_bufferlijn", 'intersect', waterloop_lijn_simp,selection_type="NEW_SELECTION",invert_spatial_relationship="INVERT")
+    arcpy.CopyFeatures_management("temp_bufferlijn",buffer_lijn)
+
+    # # remove biggest objectid
+    # id_list = []
+    # with arcpy.da.SearchCursor(buffer_lijn, ['OBJECTID']) as cursor:
+    #     for row in cursor:
+    #         id_list.append(row[0])
+    # max_id = max(id_list)
+    #
+    # del cursor
+    # with arcpy.da.UpdateCursor(buffer_lijn, ['OBJECTID']) as cursor:
+    #     for row in cursor:
+    #         if row[0] == max_id:
+    #             cursor.deleteRow()
+    #         else:
+    #             pass
+    # del cursor
 
     # bereken hoogte bufferlijn met insteek
     with arcpy.da.SearchCursor(waterloop_lijn_simp, ['z_nap']) as cursor:
