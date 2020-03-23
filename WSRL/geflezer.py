@@ -6,15 +6,15 @@ import os, sys
 import xml.dom.minidom as minidom
 
 # from basisfuncties import*
-arcpy.env.workspace = r'D:\Projecten\WSRL\sprok_sterrenschans.gdb'
-gdb = r'D:\Projecten\WSRL\sprok_sterrenschans.gdb'
+arcpy.env.workspace = r'D:\GoogleDrive\WSRL\go_wos.gdb'
+gdb = r'D:\GoogleDrive\WSRL\go_wos.gdb'
 arcpy.env.overwriteOutput = True
 
-gefmap = r'C:\Users\Vincent\Desktop\GO_SPROK\WSRL_eigen\MB'
+gefmap = r'C:\Users\Vincent\Desktop\testmap'
 xml_map = r'C:\Users\Vincent\Desktop\GO_SPROK\Bodemkundig booronderzoek BRO_'
 
 
-puntenlaag = 'boringen_wsrl_mbv2'
+puntenlaag = 'test_boringen_wsrl'
 max_dZ = 1.0 # maximale dikte grove laag bij boring
 max_cws = 10 # maximale conusweerstand bij sondering
 nan = -9999
@@ -379,8 +379,10 @@ def bovenkant_d_sondering(gefmap,puntenlaag):
                     y = float(ids[2])
 
                 # als andere separator wordt gebruikt
-                if regel.startswith("#COLUMNSEPARATOR= :"):
+                if regel.startswith("#COLUMNSEPARATOR"):
                     andere_sep = True
+                    sep = regel.strip()[-1:]
+                    print "Kolomscheider is ".format(sep)
 
                 else:
                     # get maaiveldhoogte
@@ -392,7 +394,7 @@ def bovenkant_d_sondering(gefmap,puntenlaag):
                 if andere_sep is False:
                     delen = regel.split(' ')
                 else:
-                    delen = regel.split(":")
+                    delen = regel.split("{}".format(sep))
 
                 bovenkant_ = float(delen[0])
                 cws_ = float(delen[1])
@@ -485,6 +487,8 @@ def bovenkant_d_sondering(gefmap,puntenlaag):
         cursor.insertRow(invoegen)
 
 # gef_txt(gefmap)
-bovenkant_d_boring_gef(gefmap,puntenlaag)
+# bovenkant_d_boring_gef(gefmap,puntenlaag)
 # bovenkant_d_boring_xml(xml_map,puntenlaag)
+
+bovenkant_d_sondering(gefmap,puntenlaag)
 
