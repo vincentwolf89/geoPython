@@ -9,15 +9,15 @@ arcpy.env.workspace = r'D:\GoogleDrive\WSRL\sprok_sterrenschans.gdb'
 gdb = r'D:\GoogleDrive\WSRL\sprok_sterrenschans.gdb'
 arcpy.env.overwriteOutput = True
 
-puntenOordeel ="OutputAggregatiePerUittredepunt"
+puntenOordeel ="ga_topzand"
 profielen = "profielen_ss"
 trajectLijn = "trajectlijn"
 veldenOordeelPunten = ['Eindoordeel','profielnummer']
 veldenProfielen = ['profielnummer','eindoordeelPiping']
-lijstOnvoldoende = ["IIIv","Ivv","Vv","VIv","Voldoet niet vanwege dijkbasisregel"]
+lijstOnvoldoende = ["IVv", "Vv", "VIv","Voldoet niet vanwege dijkbasisregel"]
 
 outputPunten = "OordeelProfielNummer"
-outputOordeelLijn = "oordeel1"
+outputOordeelLijn = "oordeel_ga_topzand_v2"
 
 def koppelingPunten(puntenOordeel,profielen,outputPunten):
     # koppel profielnummer aan punten, dichtstbijzijnde
