@@ -11,13 +11,15 @@ gdb = r'D:\GoogleDrive\WSRL\go_wos.gdb'
 arcpy.env.overwriteOutput = True
 
 gefmap = r'C:\Users\Vincent\Desktop\testmap'
-xml_map = r'C:\Users\Vincent\Desktop\GO_SPROK\Bodemkundig booronderzoek BRO_'
+xml_map = gefmap
 
 
 puntenlaag = 'test_boringen_wsrl'
 max_dZ = 1.0 # maximale dikte grove laag bij boring
 max_cws = 10 # maximale conusweerstand bij sondering
 nan = -9999
+
+splitBoring = ';'
 
 soorten_grof_gef = ['Z','G']
 soorten_grof_xml = ['matigSiltigZand', 'zwakSiltigZand','sterkZandigeLeem','zwakZandigeLeem']
@@ -28,24 +30,36 @@ soorten_grof_xml = ['matigSiltigZand', 'zwakSiltigZand','sterkZandigeLeem','zwak
 
 def gef_txt(gefmap):
     for gef in os.listdir(gefmap):
-        ingef = os.path.join(gefmap, gef)
-        if not os.path.isfile(ingef): continue
-        nieuwenaam = ingef.replace('.gef', '.txt')
-        output = os.rename(ingef, nieuwenaam)
+        if gef.endswith(".gef"):
+
+            ingef = os.path.join(gefmap, gef)
+            if not os.path.isfile(ingef): continue
+            nieuwenaam = ingef.replace('.gef', '.txt')
+            output = os.rename(ingef, nieuwenaam)
+            print "Extensie veranderd van .gef naar .txt voor {}".format(gef)
+        elif gef.endswith(".GEF"):
+
+            ingef = os.path.join(gefmap, gef)
+            if not os.path.isfile(ingef): continue
+            nieuwenaam = ingef.replace('.GEF', '.txt')
+            output = os.rename(ingef, nieuwenaam)
+            print "Extensie veranderd van .GEF naar .txt voor {}".format(gef)
 
 
-def bovenkant_d_boring_gef(gefmap, puntenlaag):
+def bovenkant_d_boring_gef(gefmap, puntenlaag,splitBoring):
     # maak nieuwe puntenlaag in gdb
     arcpy.CreateFeatureclass_management(gdb, puntenlaag, "POINT", spatial_reference=28992)
     arcpy.AddField_management(puntenlaag, 'naam', "TEXT")
     arcpy.AddField_management(puntenlaag, 'typeOnder', "TEXT")
     arcpy.AddField_management(puntenlaag, 'dikte_deklaag', "DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.AddField_management(puntenlaag, 'zOnderNAP', "DOUBLE", 2, field_is_nullable="NULLABLE")
 
     # open de insertcursor
-    cursor = arcpy.da.InsertCursor(puntenlaag, ['naam', 'dikte_deklaag', 'typeOnder', 'SHAPE@XY'])
+    cursor = arcpy.da.InsertCursor(puntenlaag, ['naam', 'dikte_deklaag', 'typeOnder','zOnderNAP', 'SHAPE@XY'])
 
     # open gef uit map
     for file in os.listdir(gefmap):
+        naam = file.split('.')[0]
         ingef = os.path.join(gefmap, file)
         gef = open(ingef, "r")
 
@@ -61,7 +75,17 @@ def bovenkant_d_boring_gef(gefmap, puntenlaag):
         laag = []
         bovenkant_grof = []
 
+        # onderste laag vinden
+        rijen = gef.read().splitlines()
+        try:
+            onderste_rij = rijen[-1]
+            onderkant_onderlaag = float(onderste_rij.split(splitBoring)[1])
+            # print onderkant_onderlaag
+        except NameError:
+            print "Lege gef?"
 
+        # gef opnieuw openenen voor verdere acties
+        gef = open(ingef,"r")
 
 
         for regel in gef:
@@ -71,11 +95,25 @@ def bovenkant_d_boring_gef(gefmap, puntenlaag):
                     x = float(ids[1])
                     y = float(ids[2])
 
+                elif regel.startswith('#ZID'):
+                    idz = regel.split(',')
+                    z_mv = float(idz[1])
+                    try:
+                        onderkant_onderlaag
+                        z_onderlaag = z_mv-abs(onderkant_onderlaag)
+                    except NameError:
+                        z_onderlaag = None
+
+                    print "Boring {} heeft een maaiveldhoogte van {}m NAP en de onderste laag ligt op {}m NAP ".format(naam,z_mv,z_onderlaag)
+
                 else:
                     pass
             else:
-                #
-                delen = regel.split(';')
+                # split regel
+                delen = regel.split(splitBoring)
+
+
+
 
                 # check of soortenkolom wordt meegenomen en niet nan-kolom
                 for item in delen:
@@ -84,7 +122,7 @@ def bovenkant_d_boring_gef(gefmap, puntenlaag):
                     else:
                         if item[1].isupper():
                             soort = item
-                            print soort
+                            # print soort
                             break
 
                 # check of boring goed gegaan is, anders stoppen
@@ -181,13 +219,13 @@ def bovenkant_d_boring_gef(gefmap, puntenlaag):
                     deklaag = 0
 
 
+            print "Deklaag heeft een dikte van {}m".format(deklaag)
 
-            print "deklaag is", deklaag, x,y, file
 
             if len(df) is 0:
-                invoegen = (str(file), deklaag, "geen waarde", (x, y))
+                invoegen = (str(naam), deklaag, None,None, (x, y))
             else:
-                invoegen = (str(file), deklaag, type_laag[-1], (x, y))
+                invoegen = (str(naam), deklaag, type_laag[-1], z_onderlaag, (x, y))
 
 
 
@@ -203,12 +241,15 @@ def bovenkant_d_boring_xml(xml_map, puntenlaag):
     arcpy.AddField_management(puntenlaag, 'naam', "TEXT")
     arcpy.AddField_management(puntenlaag, 'typeOnder', "TEXT")
     arcpy.AddField_management(puntenlaag, 'dikte_deklaag', "DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.AddField_management(puntenlaag, 'zOnderNAP', "DOUBLE", 2, field_is_nullable="NULLABLE")
+
 
     # open de insertcursor
-    cursor = arcpy.da.InsertCursor(puntenlaag, ['naam', 'dikte_deklaag','typeOnder', 'SHAPE@XY'])
+    cursor = arcpy.da.InsertCursor(puntenlaag, ['naam', 'dikte_deklaag','typeOnder','zOnderNAP', 'SHAPE@XY'])
 
     # files
     for file in os.listdir(xml_map):
+        naam = file.split('.')[0]
         in_xml = os.path.join(xml_map, file)
         xml = minidom.parse(in_xml)
 
@@ -228,6 +269,33 @@ def bovenkant_d_boring_xml(xml_map, puntenlaag):
                 x = float(parts[0])
                 y = float(parts[1])
 
+        # get maaiveldhoogte from xml
+        hoogtes = xml.getElementsByTagName("ns9:offset")
+
+        for hoogte in hoogtes:
+            try:
+                z_mv = float(hoogte.childNodes[0].nodeValue)
+            except IndexError:
+                z_mv = -999
+
+
+        # get einddiepte from xml
+        eindlaag = xml.getElementsByTagName("ns9:endDepth")
+        for eindhoogte in eindlaag:
+            try:
+                onderkant_onderlaag = float(eindhoogte.childNodes[0].nodeValue)
+            except IndexError:
+                onderkant_onderlaag= -999
+                print "Geen eindhoogte gevonde bij xml: {}".format(naam)
+
+        # bereken einddiepte in m NAP
+        if z_mv is not -999 and onderkant_onderlaag is not -999:
+            z_onderlaag = z_mv-abs(onderkant_onderlaag)
+        else:
+            z_onderlaag = None
+
+
+
         # create pandas dataframe with layers
         type = []
         bovenkant = []
@@ -244,8 +312,8 @@ def bovenkant_d_boring_xml(xml_map, puntenlaag):
             for item in typen:
                 type.append(item.childNodes[0].nodeValue)
                 test = item.childNodes[0].nodeValue
-                if test in soorten_grof_xml:
-                    print file
+                # if test in soorten_grof_xml:
+                #     print file
 
 
 
@@ -325,19 +393,23 @@ def bovenkant_d_boring_xml(xml_map, puntenlaag):
             else:
                 if len(df) is 0:
                     deklaag = 0
+            print "Boring {} heeft een maaiveldhoogte van {}m NAP en de onderste laag ligt op {}m NAP ".format(naam,
+                                                                                                               z_mv,
+                                                                                                               z_onderlaag)
+            print "Deklaag heeft een dikte van {}m".format(deklaag)
 
 
-            # print "deklaag is", deklaag, x, y, file ,type[-1]
             if len(df) is 0:
-                invoegen = (str(file), deklaag, "geen waarde", (x, y))
+                invoegen = (str(naam), deklaag, None,None, (x, y))
             else:
-                invoegen = (str(file), deklaag, type[-1], (x, y))
+                invoegen = (str(naam), deklaag, type[-1], z_onderlaag, (x, y))
 
             cursor.insertRow(invoegen)
 
         else:
             print "Ontbrekende waarden ", file
 
+        del deklaag, x,y,type,z_onderlaag
 
 def bovenkant_d_sondering(gefmap,puntenlaag):
     # maak nieuwe puntenlaag in gdb
@@ -350,6 +422,7 @@ def bovenkant_d_sondering(gefmap,puntenlaag):
 
     # itereer over sonderingen in map
     for file in os.listdir(gefmap):
+        naam = file.split('.')[0]
         ingef = os.path.join(gefmap, file)
         gef = open(ingef, "r")
 
@@ -389,6 +462,7 @@ def bovenkant_d_sondering(gefmap,puntenlaag):
                     if regel.startswith('#ZID'):
                         idz = regel.split(',')
                         z_mv = float(idz[1])
+                        print "Maaiveldhoogte is {}m".format(z_mv)
             else:
 
                 if andere_sep is False:
@@ -482,13 +556,17 @@ def bovenkant_d_sondering(gefmap,puntenlaag):
 
         # print "deklaag is", deklaag, x, y, file, z_mv-deklaag
         # print z_mv - deklaag, file
-        invoegen = (str(file), deklaag, (x, y))
+        invoegen = (str(naam), deklaag, (x, y))
 
         cursor.insertRow(invoegen)
 
 # gef_txt(gefmap)
-# bovenkant_d_boring_gef(gefmap,puntenlaag)
-# bovenkant_d_boring_xml(xml_map,puntenlaag)
+# bovenkant_d_boring_gef(gefmap,puntenlaag,splitBoring)
 
-bovenkant_d_sondering(gefmap,puntenlaag)
+
+
+
+bovenkant_d_boring_xml(xml_map,puntenlaag)
+
+# bovenkant_d_sondering(gefmap,puntenlaag)
 
