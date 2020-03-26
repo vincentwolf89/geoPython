@@ -9,15 +9,17 @@ arcpy.env.workspace = r'D:\GoogleDrive\WSRL\sprok_sterrenschans.gdb'
 gdb = r'D:\GoogleDrive\WSRL\sprok_sterrenschans.gdb'
 arcpy.env.overwriteOutput = True
 
-puntenOordeel ="ga_topzand"
+puntenOordeel ="OutputAggregatiePerUittredepunt" #invoer uitvoerpunten
+outputOordeelLijn = "oordeel_hoofd_v2" # uitvoer gesplitte trajectlijn
 profielen = "profielen_ss"
+minTrajectLengte = 50
 trajectLijn = "trajectlijn"
 veldenOordeelPunten = ['Eindoordeel','profielnummer']
 veldenProfielen = ['profielnummer','eindoordeelPiping']
 lijstOnvoldoende = ["IVv", "Vv", "VIv","Voldoet niet vanwege dijkbasisregel"]
 
 outputPunten = "OordeelProfielNummer"
-outputOordeelLijn = "oordeel_ga_topzand_v2"
+
 
 def koppelingPunten(puntenOordeel,profielen,outputPunten):
     # koppel profielnummer aan punten, dichtstbijzijnde
@@ -58,7 +60,7 @@ def oordeelProfiel(outputPunten, veldenOordeelPunten, lijstOnvoldoende,profielen
 
     print "Oordeel van punten per profiel vastgesteld"
 
-def eindOordeel(trajectLijn, profielen, outputOordeelLijn):
+def eindOordeel(trajectLijn, profielen, outputOordeelLijn, minTrajectLengte):
     # isects trajectlijn profielen
     arcpy.Intersect_analysis([trajectLijn,profielen], "tempIsect", "ALL", "", "POINT")
 
@@ -74,11 +76,52 @@ def eindOordeel(trajectLijn, profielen, outputOordeelLijn):
     # koppel oordeel splits
     arcpy.SpatialJoin_analysis('splitTussen', profielen, "splitTussenOordeel", "JOIN_ONE_TO_ONE", "KEEP_ALL","",match_option="CLOSEST")
     # dissolve op eindoordeel
-    arcpy.Dissolve_management("splitTussenOordeel", outputOordeelLijn, "eindoordeelPiping", "", "MULTI_PART", "DISSOLVE_LINES")
+    arcpy.Dissolve_management("splitTussenOordeel", "tempDissolve", "eindoordeelPiping", "", "MULTI_PART", "DISSOLVE_LINES")
+
+    # unmerge de twee lijnen om trajecten kleiner dan 50 m eruit te halen
+    arcpy.FeatureVerticesToPoints_management("tempDissolve", "tempDissolvePoints", "START")
+
+    # split dissolved oordeellijn op dissolvepunten
+    arcpy.SplitLineAtPoint_management("tempDissolve", "tempDissolvePoints", "tempDissolveSplit", 1)
+
+    # maak feature class met alleen lijndelen die aan lengte-eis voldoen
+    arcpy.CopyFeatures_management('tempDissolveSplit', 'tempDissolveSplitLang')
+    with arcpy.da.UpdateCursor("tempDissolveSplitLang", ['SHAPE@LENGTH']) as cursor:
+        for row in cursor:
+            if row[0] < minTrajectLengte:
+                cursor.deleteRow()
+            else:
+                pass
+    del cursor
+
+    # maak feature class met alleen lijndelen die niet aan de lengte-eis voldoen
+    with arcpy.da.UpdateCursor("tempDissolveSplit", ['SHAPE@LENGTH']) as cursor:
+        for row in cursor:
+            if row[0] >= minTrajectLengte:
+                cursor.deleteRow()
+            else:
+                pass
+    del cursor
+
+    # join elk kort lijndeel aan dichtstbijzijnde lange lijndeel en neem oordeel over
+    arcpy.Near_analysis("tempDissolveSplit", "tempDissolveSplitLang", "", "NO_LOCATION", "NO_ANGLE", "PLANAR")
+
+    # join eindoordeel van dichtstbijzijnde lange lijndeel
+    arcpy.JoinField_management("tempDissolveSplit", "NEAR_FID", "tempDissolveSplitLang", "OBJECTID", "eindoordeelPiping")
+    arcpy.AlterField_management("tempDissolveSplit", "eindoordeelPiping", "eindoordeelPipingKort")
+    arcpy.AlterField_management("tempDissolveSplit", "eindoordeelPiping_1", "eindoordeelPiping")
+
+    # merge lijnen
+    arcpy.Merge_management(["tempDissolveSplit", "tempDissolveSplitLang"], "tempTotaalMerge")
+
+    # dissolve op oordeel
+    arcpy.Dissolve_management("tempTotaalMerge", outputOordeelLijn, "eindoordeelPiping", "", "MULTI_PART",
+                              "DISSOLVE_LINES")
+
 
     print "Eindoordeel voor trajectlijn bepaald"
 
 koppelingPunten(puntenOordeel,profielen,outputPunten)
 oordeelProfiel(outputPunten, veldenOordeelPunten, lijstOnvoldoende,profielen, veldenProfielen)
-eindOordeel(trajectLijn,profielen,outputOordeelLijn)
+eindOordeel(trajectLijn,profielen,outputOordeelLijn,minTrajectLengte)
 
