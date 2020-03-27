@@ -6,15 +6,15 @@ import os, sys
 import xml.dom.minidom as minidom
 
 # from basisfuncties import*
-arcpy.env.workspace = r'D:\GoogleDrive\WSRL\go_wos.gdb'
-gdb = r'D:\GoogleDrive\WSRL\go_wos.gdb'
+arcpy.env.workspace = r'D:\GoogleDrive\WSRL\werk.gdb'
+gdb = r'D:\GoogleDrive\WSRL\werk.gdb'
 arcpy.env.overwriteOutput = True
 
-files = r'C:\Users\Vincent\Desktop\testmap_boringen_gef'
+files = r'C:\Users\Vincent\Desktop\sonderingen_safe'
 
 
 
-puntenlaag = 'wsrlBoringen'
+puntenlaag = 'safeSonderingen'
 max_dZ = 1.0 # maximale dikte grove laag bij boring
 max_cws = 10 # maximale conusweerstand bij sondering
 nan = -999
@@ -95,6 +95,7 @@ def bovenkant_d_boring_gef(files, puntenlaag):
                     z_mv = float(idz[1])
                     try:
                         onderkant_onderlaag
+
                         z_onderlaag = z_mv-abs(onderkant_onderlaag)
                     except NameError:
                         z_onderlaag = None
@@ -119,10 +120,15 @@ def bovenkant_d_boring_gef(files, puntenlaag):
                     if item == delen[0] or item == delen[1] or item =="-9999.99":
                         pass
                     else:
-                        if item[1].isupper():
-                            soort = item
-                            # print soort
-                            break
+                        try:
+                            item[1]
+                            if item[1].isupper():
+                                soort = item
+                                # print soort
+                                break
+                        except IndexError:
+                            pass
+
 
                 # check of boring goed gegaan is, anders stoppen
                 if len(soort) > 1:
@@ -446,6 +452,7 @@ def bovenkant_d_sondering(files,puntenlaag):
     # itereer over sonderingen in map
     for file in os.listdir(files):
         naam = file.split('.txt')[0]
+        print naam
         ingef = os.path.join(files, file)
         gef = open(ingef, "r")
 
@@ -465,6 +472,7 @@ def bovenkant_d_sondering(files,puntenlaag):
         bovenkant_grof = []
 
         for regel in gef:
+            regel = regel.strip()
             # uitroeptekens uit voorzorg verwijderen
             regel = regel.replace("!","")
 
@@ -494,6 +502,7 @@ def bovenkant_d_sondering(files,puntenlaag):
                     sep = ' '
                 else:
                     delen = regel.split("{}".format(sep))
+
 
                 bovenkant_ = float(delen[0])
                 cws_ = float(delen[1])
@@ -588,7 +597,7 @@ def bovenkant_d_sondering(files,puntenlaag):
         rijen = gef.read().splitlines()
         try:
             onderste_rij = rijen[-1]
-            onderkant_onderlaag = float(onderste_rij.split(sep)[1])
+            onderkant_onderlaag = float(onderste_rij.split(sep)[0])
             # print onderkant_onderlaag
         except IndexError:
             onderkant_onderlaag = None
@@ -597,22 +606,24 @@ def bovenkant_d_sondering(files,puntenlaag):
         # NAP niveau onderkant berekenen
         try:
             z_mv, onderkant_onderlaag
+            print z_mv, onderkant_onderlaag
             z_onderlaag = z_mv-abs(onderkant_onderlaag)
         except NameError:
             z_onderlaag = None
 
-
-
-
-        invoegen = (str(naam), deklaag, z_onderlaag, (x, y))
-
-        cursor.insertRow(invoegen)
+        # check of coordinaten aanwezig zijn, anders skippen
+        try:
+            x,y
+            invoegen = (str(naam), deklaag, z_onderlaag, (x, y))
+            cursor.insertRow(invoegen)
+        except NameError:
+            pass
 
 gef_txt(files)
-bovenkant_d_boring_gef(files,puntenlaag)
+# bovenkant_d_boring_gef(files,puntenlaag)
 
 
 # bovenkant_d_boring_xml(files,puntenlaag)
 
-# bovenkant_d_sondering(files,puntenlaag)
+bovenkant_d_sondering(files,puntenlaag)
 
