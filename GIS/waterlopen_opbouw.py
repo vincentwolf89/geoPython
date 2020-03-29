@@ -15,7 +15,7 @@ dist_mini_buffer = -0.2
 
 waterlopen = "waterlopen_safe"
 
-## middenvlak creeren ##
+## raster maken voor middenlijn ##
 
 # waterloop buffer afronden (lijn en polygoon)
 arcpy.SmoothLine_cartography(lijn, "line_smooth", "PAEK", "10 Meters", "FIXED_CLOSED_ENDPOINT", "NO_CHECK")
@@ -61,7 +61,7 @@ with arcpy.da.UpdateCursor("temp_poly", ["gridcode","SHAPE@AREA"]) as cursor:
             pass
 
 
-## middenlijn creeren ##
+## middenlijn maken vanuit raster ##
 # poly to line
 arcpy.FeatureToLine_management("temp_poly", "temp_poly_lijn")
 # split line at vertices
