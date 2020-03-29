@@ -9,7 +9,7 @@ arcpy.env.overwriteOutput = True
 
 waterlopen = "waterlopen_samples"
 
-
+smooth = "10 Meters"
 tolerance = 0.3
 dist_mini_buffer = -0.2
 code_waterloop = "id_string"
@@ -25,8 +25,8 @@ def bodemlijn_bepalen(lijn,vlak,tolerance,dist_mini_buffer, bodemlijn):
     #vlak naar lijn vertalen
     arcpy.FeatureToLine_management(vlak, lijn)
     # waterloop buffer afronden (lijn en polygoon)
-    arcpy.SmoothLine_cartography(lijn, "line_smooth", "PAEK", "10 Meters", "FIXED_CLOSED_ENDPOINT", "NO_CHECK")
-    arcpy.SmoothPolygon_cartography(vlak, "poly_smooth", "PAEK", "10 Meters", "FIXED_ENDPOINT", "NO_CHECK")
+    arcpy.SmoothLine_cartography(lijn, "line_smooth", "PAEK", smooth, "FIXED_CLOSED_ENDPOINT", "NO_CHECK")
+    arcpy.SmoothPolygon_cartography(vlak, "poly_smooth", "PAEK", smooth, "FIXED_ENDPOINT", "NO_CHECK")
     # euclidean raster
     arcpy.gp.EucDistance_sa("line_smooth", "temp_euclidean", "", "0,1","")
     # slope euclidean raster
