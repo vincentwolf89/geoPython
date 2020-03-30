@@ -2,7 +2,7 @@ import arcpy
 from basisfuncties import average
 from basisfuncties import generate_profiles
 
-arcpy.env.workspace = r'D:\GoogleDrive\WSRL\test_vergridden.gdb'
+arcpy.env.workspace = r'D:\GoogleDrive\WSRL\test_waterlopen.gdb'
 arcpy.env.overwriteOutput = True
 code_waterloop = "id_string"
 raster_safe = r'C:\Users\Vincent\Desktop\ahn3clip_safe'
@@ -10,8 +10,11 @@ min_lengte_segment = 15 #?
 defaultbreedte = 5 #?
 
 # variabelen nodig voor goede run:
-talud = (1.0/4.0)
-delta_w = 0.8
+standaardTalud = 0.25
+bodemDiepte = 1
+smooth = "10 Meters"
+tolerance = 0.3
+dist_mini_buffer = -0.2
 
 
 
@@ -19,7 +22,7 @@ delta_w = 0.8
 buffer_buitenkant = 3 # buffer voor focalraster
 insteek_waterloop = -1
 
-waterlopen = "testset_"
+waterlopen = "waterlopen_samples"
 
 rasterlijst = []
 
@@ -80,20 +83,18 @@ def bepaal_maxbufferdist(waterloop_lijn_simp,waterloop, defaultbreedte):
 
 
 def buffer_waterloop(waterloop,talud, buffer, buffer_lijn, waterloop_lijn_simp):
-    # # voeg losse lijndelen weer samen
-    arcpy.Dissolve_management(waterloop_lijn_simp, "templijn", [code_waterloop,"z_nap"], "", "MULTI_PART",
-                              "DISSOLVE_LINES")
 
 
+    try talud:
+        talud = talud
+    except NameError:
+        talud = standaardTalud
 
-    arcpy.Copy_management("templijn",waterloop_lijn_simp)
 
-
-
-
-    buffer_max = gemiddelde_breedte/2
+    # buffer_max = gemiddelde_breedte/2
+    buffer_max = 1
     print buffer_max, "max_bufferafstand"
-    buffer_afstand_talud = abs(delta_w/talud) # buffer afstand volgens talud, tot bodemdiepte
+    buffer_afstand_talud = abs(bodemdiepte/talud) # buffer afstand volgens talud, tot bodemdiepte
 
 
     if abs(buffer_afstand_talud) <= abs(buffer_max):
@@ -153,6 +154,10 @@ def buffer_waterloop(waterloop,talud, buffer, buffer_lijn, waterloop_lijn_simp):
             row[0] = z_nap
             cursor.updateRow(row)
     del cursor
+
+    # maak veld aan voor onderdeel-waterloop
+    arcpy.AddField_management(buffer_lijn, 'onderdeel', "TEXT", field_length=50)
+    arcpy.CalculateField_management(buffer_lijn, "onderdeel", "\"onderkant_talud\"", "PYTHON")
 
     print "Binnen-buffer gemaakt voor {}".format(waterloop)
 
@@ -252,18 +257,31 @@ def bepaal_insteek_waterloop(waterloop,waterloop_lijn,waterloop_lijn_simp, punte
     # koppel gemiddelde laaste waarde terug aan hele waterloop
     with arcpy.da.UpdateCursor(waterloop_lijn_simp, ['z_nap']) as cursor:
         for row in cursor:
-            row[0] = round(z_nap_og,2)
+            insteekHoogte = round(z_nap_og,2)
+            row[0] = insteekHoogte
             cursor.updateRow(row)
 
+    # # voeg losse lijndelen weer samen
+    arcpy.Dissolve_management(waterloop_lijn_simp, "templijn", [code_waterloop,"z_nap"], "", "MULTI_PART",
+                              "DISSOLVE_LINES")
+
+
+    arcpy.Copy_management("templijn",waterloop_lijn_simp)
+
+    # maak veld aan voor onderdeel-waterloop
+    arcpy.AddField_management(waterloop_lijn_simp, 'onderdeel', "TEXT", field_length=50)
+    arcpy.CalculateField_management(waterloop_lijn_simp, "onderdeel", "\"insteek\"", "PYTHON")
 
 
     print "Gemiddelde insteekhoogte bepaald voor {}".format(waterloop)
 
 
-def create_raster(waterloop,waterloop_lijn_simp, buffer_lijn, waterloop_lijn_totaal, waterloop_3d_lijn,tin, raster_waterloop,raster_waterloop_clip):
+def create_raster(waterloop,waterloop_lijn_simp, buffer_lijn, waterloop_lijn_totaal, waterloop_3d_lijn,tin, raster_waterloop,raster_waterloop_clip, bodemlijn):
 
     # # merge waterlooplijn met bufferlijn
-    arcpy.Merge_management([waterloop_lijn_simp,buffer_lijn],waterloop_lijn_totaal)
+    arcpy.Merge_management([waterloop_lijn_simp,buffer_lijn,bodemlijn],waterloop_lijn_totaal)
+
+
 
     # feature to 3d
     arcpy.FeatureTo3DByAttribute_3d(waterloop_lijn_totaal, waterloop_3d_lijn, "z_nap")
@@ -298,6 +316,75 @@ def insert_into_ahn(waterlopen, raster_safe,rasterlijst):
                                        "", "32_BIT_FLOAT", "0,5", "1", "LAST", "FIRST")
 
 
+def bodemlijn_bepalen(waterloop_lijn,waterloop,tolerance,dist_mini_buffer, bodemlijn):
+
+    #vlak naar lijn vertalen
+    # arcpy.FeatureToLine_management(waterloop, waterloop_lijn)
+    # waterloop buffer afronden (lijn en polygoon)
+    arcpy.SmoothLine_cartography(waterloop_lijn, "line_smooth", "PAEK", smooth, "FIXED_CLOSED_ENDPOINT", "NO_CHECK")
+    arcpy.SmoothPolygon_cartography(waterloop, "poly_smooth", "PAEK", smooth, "FIXED_ENDPOINT", "NO_CHECK")
+    # euclidean raster
+    arcpy.gp.EucDistance_sa("line_smooth", "temp_euclidean", "", "0,1","")
+    # slope euclidean raster
+    arcpy.gp.Slope_sa("temp_euclidean", "temp_slope", "DEGREE", "1")
+    # rastercalc
+    raster = arcpy.Raster("temp_slope")
+    outraster = raster <= 42
+    outraster.save("temp_rastercalc")
+    # clip raster with polygon
+    # eerst minibuffer op polygoon
+    arcpy.Buffer_analysis("poly_smooth", "temp_buffer_smnooth", dist_mini_buffer, "OUTSIDE_ONLY", "FLAT", "NONE", "", "PLANAR")
+    # minibuffer binnekant bewaren
+    list_oid = []
+    arcpy.FeatureToLine_management("temp_buffer_smnooth", "temp_buffer_smnooth_lijn")
+    with arcpy.da.SearchCursor("temp_buffer_smnooth_lijn", "OID@") as cursor:
+        for row in cursor:
+            list_oid.append(row[0])
+    del cursor
+    oid = list_oid[-2]
+    with arcpy.da.UpdateCursor("temp_buffer_smnooth_lijn", "OID@") as cursor:
+        for row in cursor:
+            if row[0] == oid:
+                pass
+            else:
+                cursor.deleteRow()
+    # terugvertaling buffer naar binnenvlak
+    arcpy.FeatureToPolygon_management("temp_buffer_smnooth_lijn", "temp_buffer_smnooth_poly")
+
+    # clip raster met minibuffer
+    arcpy.Clip_management("temp_rastercalc", "", "temp_clip", "temp_buffer_smnooth_poly", "127", "ClippingGeometry", "MAINTAIN_EXTENT")
+    # clip to polygon
+    arcpy.RasterToPolygon_conversion("temp_clip", "temp_poly", "SIMPLIFY", "Value")
+    # remove items with gridcode 0
+    with arcpy.da.UpdateCursor("temp_poly", ["gridcode","SHAPE@AREA"]) as cursor:
+        for row in cursor:
+            if row[0] is 0 or row[1] < 0.1:
+                cursor.deleteRow()
+            else:
+                pass
+
+
+    ## middenlijn maken vanuit raster ##
+    # poly to line
+    arcpy.FeatureToLine_management("temp_poly", "temp_poly_lijn")
+    # split line at vertices
+    arcpy.SplitLine_management("temp_poly_lijn", "temp_poly_lijn_split")
+
+    # select only bodempart
+    arcpy.MakeFeatureLayer_management("temp_poly_lijn_split", "temp_poly_lijn_split_feat")
+    arcpy.SelectLayerByLocation_management("temp_poly_lijn_split_feat", "INTERSECT", waterloop_lijn, tolerance, "NEW_SELECTION", "INVERT")
+    arcpy.CopyFeatures_management("temp_poly_lijn_split_feat", bodemlijn)
+
+    # maak veld aan voor onderdeel-waterloop
+    arcpy.AddField_management(bodemlijn, 'onderdeel', "TEXT", field_length=50)
+    arcpy.CalculateField_management(bodemlijn, "onderdeel", "\"bodem\"", "PYTHON")
+
+    # calculate z value ## temp
+    temp_bodemhoogte = -2
+    arcpy.AddField_management(bodemlijn, "z_nap", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.CalculateField_management(bodemlijn, "z_nap", temp_bodemhoogte, "PYTHON")
+
+# def koppel_params(waterloop_lijn_simp):
 
 
 with arcpy.da.SearchCursor(waterlopen,['SHAPE@',code_waterloop]) as cursor:
@@ -310,6 +397,7 @@ with arcpy.da.SearchCursor(waterlopen,['SHAPE@',code_waterloop]) as cursor:
         punten_insteek = 'waterloop_punten_insteek_' + str(row[1])
         waterloop_lijn_totaal = 'tt_waterloop_lijn_' + str(row[1])
         waterloop_3d_lijn = 'waterloop_3d_lijn' + str(row[1])
+        bodemlijn = "bodemlijn_waterloop_" + str(row[1])
 
 
         tin = "D:/GoogleDrive/WSRL/tin/waterloop"+str(row[1])
@@ -331,14 +419,16 @@ with arcpy.da.SearchCursor(waterlopen,['SHAPE@',code_waterloop]) as cursor:
 
         raster_buitenkant(waterloop, buffer_buitenkant, buitenraster, raster_safe)
         bepaal_insteek_waterloop(waterloop, waterloop_lijn, waterloop_lijn_simp, punten_insteek, min_lengte_segment,code_waterloop)
-        bepaal_maxbufferdist(waterloop_lijn_simp,waterloop,defaultbreedte)
+        # bepaal_maxbufferdist(waterloop_lijn_simp,waterloop,defaultbreedte)
         buffer_waterloop(waterloop, talud, buffer, buffer_lijn, waterloop_lijn_simp)
 
+        bodemlijn_bepalen(waterloop_lijn,waterloop,tolerance,dist_mini_buffer,bodemlijn)
         create_raster(waterloop, waterloop_lijn_simp, buffer_lijn, waterloop_lijn_totaal, waterloop_3d_lijn, tin,
-                      raster_waterloop, raster_waterloop_clip)
+                      raster_waterloop, raster_waterloop_clip, bodemlijn)
 
 
-
+        # delete globals
+        del
 
 # insert_into_ahn(waterlopen,raster_safe,rasterlijst)
 
