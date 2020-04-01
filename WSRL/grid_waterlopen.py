@@ -6,80 +6,22 @@ arcpy.env.workspace = r'D:\GoogleDrive\WSRL\test_waterlopen.gdb'
 arcpy.env.overwriteOutput = True
 code_waterloop = "id_string"
 raster_safe = r'C:\Users\Vincent\Desktop\ahn3clip_safe'
-min_lengte_segment = 15 #?
-defaultbreedte = 5 #?
 
 # variabelen nodig voor goede run:
-standaardTalud = 0.25
-bodemDiepte = 1
-smooth = "10 Meters"
-tolerance = 0.3
-dist_mini_buffer = -0.2
-
-
-
-
+min_lengte_segment = 15 # segementlengte voor bepaling insteekhoogte
+standaardTalud = 0.25 # standaardtalud als talud niet berekend kan worden vanuit nabijgelegen waterloop
+bodemDiepte = 1 # standaardbodemdiepte als bodemdiepte niet berekend kan worden vanuit nabijgelegen waterloop
+smooth = "10 Meters" # smooth voor euclidean
+tolerance = 0.3 # tolerantie voor selecteren bodemdeel
+dist_mini_buffer = -0.2 # minibuffer bij selecteren bodemdeel
 buffer_buitenkant = 3 # buffer voor focalraster
-# insteek_waterloop = -1
 
+# invoervariabelen
 waterlopen_invoer = "waterlopen_samples2"
 waterlopen = "waterlopen_"
 inmetingenWaterlopen = "profielpunten_waterlopen_safe_1000m"
 
 rasterlijst = []
-
-
-def bepaal_maxbufferdist(waterloop_lijn_simp,waterloop, defaultbreedte):
-    # remove sideparts
-    lengtes_segmenten = []
-    with arcpy.da.SearchCursor(waterloop_lijn_simp,['SHAPE@LENGTH']) as cursor:
-        for row in cursor:
-            lengtes_segmenten.append(row[0])
-
-    del cursor
-    gem_lengte = average(lengtes_segmenten)
-
-
-    arcpy.CopyFeatures_management(waterloop_lijn_simp, 'templijn')
-    with arcpy.da.UpdateCursor('templijn',['SHAPE@LENGTH']) as cursor:
-        for row in cursor:
-            if row[0] < gem_lengte:
-                cursor.deleteRow()
-    del cursor
-    generate_profiles(5,20,20,'templijn',code_waterloop,0,"temp_profielen")
-
-    # intersect punt uitvoer
-    arcpy.Intersect_analysis(['temp_profielen','templijn'], "temp_isect", "ALL", "", "POINT")
-    # remove punten with join count <2
-    with arcpy.da.UpdateCursor('temp_isect', ['Join_Count']) as cursor:
-        for row in cursor:
-            if row[0] < 2:
-                cursor.deleteRow()
-    del cursor
-    # multipoint to point
-    arcpy.FeatureToPoint_management("temp_isect", "temp_isect_point")
-    # point to line
-    arcpy.PointsToLine_management("temp_isect_point", "temp_breedtes", "profielnummer", "", "NO_CLOSE")
-    # average line length
-    lijst_gemiddelde_breedte = []
-    with arcpy.da.UpdateCursor("temp_breedtes", ['SHAPE@LENGTH']) as cursor:
-        for row in cursor:
-            if row[0] > 0:
-                lijst_gemiddelde_breedte.append(row[0])
-            else:
-                cursor.deleteRow()
-    del cursor
-    global gemiddelde_breedte
-    #### REMOVE 0 lengtes uit temp breedtes!!!
-
-    if lijst_gemiddelde_breedte:
-        gemiddelde_breedte = average(lijst_gemiddelde_breedte)
-    else:
-        gemiddelde_breedte = defaultbreedte
-        print "Defaultbreedte gebruikt bij {}".format(waterloop)
-
-    print "Gemiddelde breedte waterloop is {}".format(gemiddelde_breedte)
-
 
 
 
@@ -94,52 +36,12 @@ def buffer_waterloop(waterloop, buffer, buffer_lijn, waterloop_lijn_simp):
     except NameError:
         talud = standaardTalud
         print "standaard talud gebruiken"
-    ## NIEUW ##
+
+    # bepaal bufferafstand talud
     buffer_afstand_talud = abs(bodemDiepte/talud) # buffer afstand volgens talud, tot bodemdiepte
     arcpy.Buffer_analysis("poly_smooth", buffer, -buffer_afstand_talud, "OUTSIDE_ONLY", "ROUND", "NONE", "", "PLANAR")
-    # # buffer_max = gemiddelde_breedte/2
-    # buffer_max = 1
-    # print buffer_max, "max_bufferafstand"
-    # buffer_afstand_talud = abs(bodemDiepte/talud) # buffer afstand volgens talud, tot bodemdiepte
-    #
-    #
-    # if abs(buffer_afstand_talud) <= abs(buffer_max):
-    #     arcpy.Buffer_analysis("line_smooth", buffer, buffer_afstand_talud, "RIGHT", "FLAT", "NONE", "", "PLANAR")
-    #     gebruikte_buffer = buffer_afstand_talud
-    # else:
-    #     arcpy.Buffer_analysis("line_smooth", buffer, buffer_max, "RIGHT", "FLAT", "NONE", "", "PLANAR")
-    #     gebruikte_buffer = buffer_max
 
-    # feature to line
     arcpy.FeatureToLine_management(buffer,"temp_bufferlijn")
-
-    # # split line at vertices
-    # arcpy.SplitLine_management(buffer_lijn, "bufferlijn")
-    #
-    # # isect met simplijn
-    # arcpy.MakeFeatureLayer_management("bufferlijn", "temp_bufferlijn")
-    # arcpy.SelectLayerByLocation_management("temp_bufferlijn", 'intersect', "line_smooth",selection_type="NEW_SELECTION",invert_spatial_relationship="INVERT")
-    # arcpy.CopyFeatures_management("temp_bufferlijn",buffer_lijn)
-
-
-
-    # # bereken hoogte bufferlijn met insteek
-    # with arcpy.da.SearchCursor("line_smooth", ['z_nap']) as cursor:
-    #     for row in cursor:
-    #         insteek_waterloop = row[0]
-    #         break
-
-    # if gebruikte_buffer == buffer_afstand_talud:
-    #     # print (buffer_afstand_talud*talud), "buffer onbegrensd", waterloop_lijn_simp
-    #     z_nap = insteek_waterloop- (buffer_afstand_talud*talud)
-    #
-    # elif gebruikte_buffer == buffer_max:
-    #     # print (buffer_max * talud), "buffer begrensd", waterloop_lijn_simp
-    #     global zBodem
-    #     zBodem = insteek_waterloop- (buffer_max*talud)
-    #
-    # else:
-    #     print "Er is een probleem bij {} !".format("line_smooth")
 
     global bodemHoogte
     try:
@@ -238,11 +140,6 @@ def bepaal_insteek_waterloop(waterloop,waterloop_lijn,waterloop_lijn_simp, punte
 
                 del cursor_waterloop
 
-
-
-                # if lijst_z:
-                #     row[1] = average(lijst_z)
-                #     cursor.updateRow(row)
 
                 if aantal_nan/aantal_z > 0.25 and row[2] < min_lengte_segment:
                     # print "Aansluiting eruitgehaald"
