@@ -5,37 +5,53 @@ from basisfuncties import generate_profiles
 arcpy.env.workspace = r'D:\GoogleDrive\WSRL\test_waterlopen.gdb'
 arcpy.env.overwriteOutput = True
 code_waterloop = "id_string"
-raster_safe = r'C:\Users\Vincent\Desktop\ahn3clip_safe'
+raster_ahn = r'D:\Projecten\WSRL\grote_data\ahn3SProk.gdb\ahn3ClipSprok'
 
 # variabelen nodig voor goede run:
 min_lengte_segment = 15 # segementlengte voor bepaling insteekhoogte
-standaardTalud = 0.25 # standaardtalud als talud niet berekend kan worden vanuit nabijgelegen waterloop
+standaardTalud = 0.5 # standaardtalud als talud niet berekend kan worden vanuit nabijgelegen waterloop
 bodemDiepte = 1 # standaardbodemdiepte als bodemdiepte niet berekend kan worden vanuit nabijgelegen waterloop
+bodemDiepteSmal = 0.5
 smooth = "10 Meters" # smooth voor euclidean
 tolerance = 0.3 # tolerantie voor selecteren bodemdeel
 dist_mini_buffer = -0.2 # minibuffer bij selecteren bodemdeel
 buffer_buitenkant = 3 # buffer voor focalraster
+maxBreedteSmal = 2
 
 # invoervariabelen
 waterlopen_invoer = "waterlopen_samples2"
 waterlopen = "waterlopen_"
-inmetingenWaterlopen = "profielpunten_waterlopen_safe_1000m"
+# inmetingenWaterlopen =
 
 rasterlijst = []
 
 
 
 
-def buffer_waterloop(waterloop, buffer, buffer_lijn, waterloop_lijn_simp):
+def buffer_waterloop(waterloop, buffer, buffer_lijn, bodemDiepte):
 
     arcpy.SmoothPolygon_cartography(waterloop, "poly_smooth", "PAEK", smooth, "FIXED_ENDPOINT", "NO_CHECK")
-    try:
-        talud
-        talud = talud
-        print "talud gebruiken waterloop"
-    except NameError:
-        talud = standaardTalud
-        print "standaard talud gebruiken"
+
+    # set talud to standard
+    talud = standaardTalud
+
+    # bepaal bodemdDiepte
+    with arcpy.da.SearchCursor(waterloop, ['soortWaterloop']) as cursor:
+        for row in cursor:
+            soortWaterloop = row[0]
+            break
+
+    del cursor
+    print soortWaterloop
+
+
+    if soortWaterloop == "smal":
+        bodemDiepte = bodemDiepteSmal
+    else:
+        pass
+
+    print "Er wordt voor {} een bodemdiepte van {}m gebruikt".format(waterloop, bodemDiepte)
+
 
     # bepaal bufferafstand talud
     buffer_afstand_talud = abs(bodemDiepte/talud) # buffer afstand volgens talud, tot bodemdiepte
@@ -43,29 +59,15 @@ def buffer_waterloop(waterloop, buffer, buffer_lijn, waterloop_lijn_simp):
 
     arcpy.FeatureToLine_management(buffer,"temp_bufferlijn")
 
-    global bodemHoogte
-    try:
-        bodemHoogte
-        with arcpy.da.UpdateCursor("temp_bufferlijn", ['z_nap']) as cursor:
-            for row in cursor:
-                row[0] = bodemHoogte
-                cursor.updateRow(row)
-        del cursor
+    # with arcpy.da.UpdateCursor("temp_bufferlijn", ['z_nap']) as cursor:
+    #     for row in cursor:
+    #         bodemHoogte = insteekHoogte-bodemDiepte
+    #         row[0] = bodemHoogte
+    #         cursor.updateRow(row)
+    # del cursor
 
-        print "Bodemhoogte aangepast op gekoppelde waterloop"
+    print "Buffer gemaakt met afstand van {}m en bodemdiepte {}m".format(buffer_afstand_talud,bodemDiepte)
 
-    except NameError:
-        buffer_max = 1
-        print insteekHoogte, buffer_max, talud
-        bodemHoogte = insteekHoogte-(buffer_max*talud)
-
-        with arcpy.da.UpdateCursor("temp_bufferlijn", ['z_nap']) as cursor:
-            for row in cursor:
-                row[0] = bodemHoogte
-                cursor.updateRow(row)
-        del cursor
-
-        print "Bodemhoogte berekend met standaardwaarde maxtalud"
 
     # maak veld aan voor onderdeel-waterloop
     arcpy.AddField_management("temp_bufferlijn", 'onderdeel', "TEXT", field_length=50)
@@ -79,15 +81,27 @@ def buffer_waterloop(waterloop, buffer, buffer_lijn, waterloop_lijn_simp):
 
     arcpy.CopyFeatures_management("templaag_bufferlijn", buffer_lijn)
 
+    # update features
+    with arcpy.da.SearchCursor(waterloop, ['bodemHoogte']) as cursor:
+        for row in cursor:
+            bodemHoogte = row[0]
+            break
+    del cursor
 
+    with arcpy.da.UpdateCursor(buffer_lijn, ['z_nap']) as cursor:
+        for row in cursor:
+            row[0] = bodemHoogte
+            cursor.updateRow(row)
+
+    del cursor
     print "Binnen-buffer gemaakt voor {}".format(waterloop)
 
 
-def raster_buitenkant(waterloop, buffer_buitenkant, buitenraster, raster_safe):
+def raster_buitenkant(waterloop, buffer_buitenkant, buitenraster, raster_ahn):
     # buffer waterloop
     arcpy.Buffer_analysis(waterloop, "temp_buffer_wl", buffer_buitenkant, "OUTSIDE_ONLY", "FLAT", "NONE", "", "PLANAR")
     # raster clippen met bufferzone
-    arcpy.Clip_management(raster_safe, "",
+    arcpy.Clip_management(raster_ahn, "",
                           "temp_raster_buitenkant", "temp_buffer_wl", "-3,402823e+038", "ClippingGeometry", "MAINTAIN_EXTENT")
     # focal stats op bufferclip
     arcpy.gp.FocalStatistics_sa("temp_raster_buitenkant", buitenraster, "Rectangle 4 4 CELL", "MEAN", "DATA")
@@ -195,9 +209,15 @@ def bepaal_insteek_waterloop(waterloop,waterloop_lijn,waterloop_lijn_simp, punte
         for row in cursor:
             row[0] = insteekHoogte
             cursor.updateRow(row)
+    del cursor
 
-
-    print "Gemiddelde insteekhoogte bepaald voor {}".format(waterloop)
+    arcpy.AddField_management(waterloop, "insteekHoogte", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    with arcpy.da.UpdateCursor(waterloop, ['insteekHoogte']) as cursor:
+        for row in cursor:
+            row[0] = insteekHoogte
+            cursor.updateRow(row)
+    del cursor
+    print "Gemiddelde insteekhoogte van {}m bepaald voor {}".format(insteekHoogte,waterloop)
 
 
 def create_raster(waterloop,waterloop_lijn_simp, buffer_lijn, waterloop_lijn_totaal, waterloop_3d_lijn,tin, raster_waterloop,raster_waterloop_clip, bodemlijn):
@@ -225,9 +245,9 @@ def create_raster(waterloop,waterloop_lijn_simp, buffer_lijn, waterloop_lijn_tot
 
     print "Raster gemaakt voor {}".format(waterloop)
 
-def insert_into_ahn(waterlopen, raster_safe,rasterlijst):
+def insert_into_ahn(waterlopen, raster_ahn,rasterlijst):
     # clip totaalgebied uit ahn
-    arcpy.Clip_management(raster_safe, "", "clip_waterlopen", waterlopen, "-3,402823e+038", "NONE","MAINTAIN_EXTENT")
+    arcpy.Clip_management(raster_ahn, "", "clip_waterlopen", waterlopen, "-3,402823e+038", "NONE","MAINTAIN_EXTENT")
     rasterlijst.append("clip_waterlopen")
 
     # voeg lagen toe van losse waterlopen
@@ -242,8 +262,6 @@ def insert_into_ahn(waterlopen, raster_safe,rasterlijst):
 
 def bodemlijn_bepalen(waterloop_lijn,waterloop,tolerance,dist_mini_buffer, bodemlijn):
 
-    #vlak naar lijn vertalen
-    # arcpy.FeatureToLine_management(waterloop, waterloop_lijn)
     # waterloop buffer afronden (lijn en polygoon)
     arcpy.SmoothPolygon_cartography(waterloop, "poly_smooth", "PAEK", smooth, "FIXED_ENDPOINT", "NO_CHECK")
     # euclidean raster
@@ -305,12 +323,17 @@ def bodemlijn_bepalen(waterloop_lijn,waterloop,tolerance,dist_mini_buffer, bodem
     arcpy.CalculateField_management(bodemlijn, "onderdeel", "\"bodem\"", "PYTHON")
 
     # calculate z value ## temp
-    # print zBodem
+
+
+    # update features
+    bodemHoogte = insteekHoogte-bodemDiepte
+    print bodemHoogte
     arcpy.AddField_management(bodemlijn, "z_nap", "DOUBLE", 2, field_is_nullable="NULLABLE")
     with arcpy.da.UpdateCursor(bodemlijn, ["z_nap"]) as cursor:
         for row in cursor:
             row[0] = bodemHoogte
             cursor.updateRow(row)
+    del cursor
 
 
     # delete features
@@ -318,82 +341,75 @@ def bodemlijn_bepalen(waterloop_lijn,waterloop,tolerance,dist_mini_buffer, bodem
     arcpy.Delete_management("temp_clipper")
     arcpy.Delete_management("temp_rastercalc")
 
-def parameters_talud(inmetingenWaterlopen,waterloop):
+def minimale_breedte(bodemlijn):
+    ## profiles along line ##
+    # dissolve bodemlijn
+    arcpy.Dissolve_management(bodemlijn, "tempDissolveBodemlijn", "onderdeel", "", "MULTI_PART",
+                              "DISSOLVE_LINES")
+    generate_profiles(5,50,50,"tempDissolveBodemlijn","onderdeel",0,"tempProfielenBodem")
 
-    # select nearest waterloop
-    # near
-    arcpy.Near_analysis(waterloop, inmetingenWaterlopen, "", "NO_LOCATION", "NO_ANGLE", "PLANAR")
+    # isect profiles met line_smooth
+    arcpy.Intersect_analysis(["tempProfielenBodem", "line_smooth"], "tempIsect", "ALL", "", "POINT")
+    # split profiles
+    arcpy.SplitLineAtPoint_management("tempProfielenBodem", "tempIsect", 'splitProfielen', 0.2)
+    # select only water part
+    arcpy.MakeFeatureLayer_management('splitProfielen', 'temp_splitProfielen')
+    arcpy.SelectLayerByLocation_management('temp_splitProfielen', "INTERSECT", "tempDissolveBodemlijn", 0.1,
+                                           "NEW_SELECTION", "")
 
-    # select meetpunten met near-fid
-    arcpy.SpatialJoin_analysis(waterloop, inmetingenWaterlopen, "temp_nearest", "JOIN_ONE_TO_ONE", "KEEP_ALL", "",
-                               match_option="CLOSEST")
 
+    arcpy.CopyFeatures_management('temp_splitProfielen', 'tempWaterProfielen')
 
-    # get profielnummer
-    with arcpy.da.SearchCursor("temp_nearest", ["PROFIELNR"]) as cursor:
+    lijstBreedtes = []
+    with arcpy.da.SearchCursor("tempWaterProfielen", ["SHAPE@LENGTH"]) as cursor:
         for row in cursor:
-            profielNummer = row[0]
-
-    # select waterloop
-    arcpy.MakeFeatureLayer_management(inmetingenWaterlopen, "temp_inmetingen")
-    arcpy.SelectLayerByAttribute_management("temp_inmetingen", 'NEW_SELECTION',
-                                            "PROFIELNR = '{}'".format(profielNummer))
-    arcpy.CopyFeatures_management("temp_inmetingen", 'waterloop_near')
-    profiel = "waterloop_near"
-
-    # bereken bodemhoogte
-    with arcpy.da.SearchCursor(profiel, ["PROFIELNR","MEETPUNT","HOOGTE","AFSTAND"]) as cursor:
-        for row in cursor:
-            if row[1] == "Laagste punt":
-                global bodemHoogte
-                bodemHoogte = row[2]
-                break
-    try:
-        bodemHoogte
-        print bodemHoogte
-        # bereken gemiddelde bodembreedte
-        lijstBodembreedtes = []
-        with arcpy.da.SearchCursor(profiel, ["PROFIELNR", "MEETPUNT", "HOOGTE", "AFSTAND"]) as cursor:
-            for row in cursor:
-                if row[2] <= bodemHoogte + 0.2:
-                    lijstBodembreedtes.append(row[3])
-
-        if lijstBodembreedtes:
-            minimum = min(lijstBodembreedtes)
-            maximum = max(lijstBodembreedtes)
-            bodemBreedte = abs(minimum - maximum)
-            print bodemBreedte
-
-        # bereken breedte op waterloop
-        counter = 0
-        lijstWaterspiegelBreedtes = []
-        with arcpy.da.SearchCursor(profiel, ["PROFIELNR", "MEETPUNT", "HOOGTE", "AFSTAND"]) as cursor:
-            for row in cursor:
-                if row[1] == "Waterspiegel" and counter < 2:
-                    lijstWaterspiegelBreedtes.append(row[3])
-                    counter += 1
-        print lijstWaterspiegelBreedtes
-        if lijstWaterspiegelBreedtes:
-            if len(lijstWaterspiegelBreedtes) == 2:
-                waterspiegelBreedte = average(lijstWaterspiegelBreedtes)
+            if row[0] > 0 and row[0] is not None:
+                lijstBreedtes.append(row[0])
             else:
-                print "Waterspiegel is niet berekend, andere waarde nodig"
+                pass
 
-        # bereken talud
-        try:
-            bodemHoogte, bodemBreedte, waterspiegelBreedte
-            horizontaal = abs(bodemBreedte - waterspiegelBreedte) / 2
 
-            # set global
-            global talud
-            talud = bodemDiepte / horizontaal  # waarde aanpassen
-            print talud
+    gemiddeldeBreedte = round(average(lijstBreedtes),2)
+    print "Gemiddelde breedte voor {} is {}m".format(waterloop,gemiddeldeBreedte)
 
-        except NameError:
-            print "Waardes ontbreken voor taludberekening"
+    arcpy.AddField_management(waterloop, 'soortWaterloop', "TEXT", field_length=50)
+    if gemiddeldeBreedte <= maxBreedteSmal:
+        # bodemhoogte bodemlijn aanpassen
+        with arcpy.da.UpdateCursor(bodemlijn, ['z_nap']) as cursor:
+            for row in cursor:
+                bodemHoogte = insteekHoogte-bodemDiepteSmal
+                row[0] = bodemHoogte
+                cursor.updateRow(row)
+        del cursor
+        arcpy.CalculateField_management(waterloop, "soortWaterloop", "\"smal\"", "PYTHON")
+        arcpy.AddField_management(waterloop, "bodemHoogte", "DOUBLE", 2, field_is_nullable="NULLABLE")
+        with arcpy.da.UpdateCursor(waterloop, ["bodemHoogte"]) as cursor:
+            for row in cursor:
+                row[0] = bodemHoogte
+                cursor.updateRow(row)
+        del cursor
 
-    except NameError:
-        print "Geen bodemhoogte gevonden"
+    if gemiddeldeBreedte > maxBreedteSmal:
+        # bodemhoogte bodemlijn aanpassen
+        with arcpy.da.UpdateCursor(bodemlijn, ['z_nap']) as cursor:
+            for row in cursor:
+                bodemHoogte = insteekHoogte-bodemDiepte
+                row[0] = bodemHoogte
+                cursor.updateRow(row)
+        del cursor
+        arcpy.CalculateField_management(waterloop, "soortWaterloop", "\"breed\"", "PYTHON")
+
+        arcpy.AddField_management(waterloop, "bodemHoogte", "DOUBLE", 2, field_is_nullable="NULLABLE")
+        with arcpy.da.UpdateCursor(waterloop, ["bodemHoogte"]) as cursor:
+            for row in cursor:
+                row[0] = bodemHoogte
+                cursor.updateRow(row)
+        del cursor
+
+
+
+
+
 
 def aggregate_input(waterlopen_invoer):
     arcpy.AggregatePolygons_cartography(waterlopen_invoer, "waterlopen_", "0,01 Meters",
@@ -407,71 +423,76 @@ def aggregate_input(waterlopen_invoer):
     print "Aanliggende polygonen gemerged"
 
 
-# aggregate_input(waterlopen_invoer)
-# with arcpy.da.SearchCursor(waterlopen,['SHAPE@',code_waterloop]) as cursor:
-#     for row in cursor:
-#         id = row[1]
-#
-#         waterloop = 'waterloop_' + str(row[1])
-#         waterloop_lijn = 'waterloop_lijn_' + str(row[1])
-#         waterloop_lijn_simp = 'waterloop_lijn_simp_' + str(row[1])
-#         punten_insteek = 'waterloop_punten_insteek_' + str(row[1])
-#         waterloop_lijn_totaal = 'tt_waterloop_lijn_' + str(row[1])
-#         waterloop_3d_lijn = 'waterloop_3d_lijn' + str(row[1])
-#         bodemlijn = "bodemlijn_waterloop_" + str(row[1])
-#
-#
-#         tin = "D:/GoogleDrive/WSRL/tin/waterloop"+str(row[1])
-#         raster_waterloop = 'waterloop_raster_' + str(row[1])
-#         raster_waterloop_clip = 'waterloop_raster_clip_' + str(row[1])
-#         buitenraster = 'waterloop_buitenraster_' + str(row[1])
-#         buffer = 'buffer_waterloop_'+str(row[1])
-#         buffer_lijn = 'buffer_waterloop_lijn_'+str(row[1])
-#
-#
-#
-#         where = '"' + code_waterloop + '" = ' + "'" + str(id) + "'"
-#
-#         arcpy.Select_analysis(waterlopen, waterloop, where)
-#
-#         # voeg veld toe voor z_nap
-#         arcpy.AddField_management(waterloop,"z_nap","DOUBLE", 2, field_is_nullable="NULLABLE")
-#         # algemene functies runnen
-#
-#         raster_buitenkant(waterloop, buffer_buitenkant, buitenraster, raster_safe)
-#         bepaal_insteek_waterloop(waterloop, waterloop_lijn, waterloop_lijn_simp, punten_insteek, min_lengte_segment,code_waterloop)
-#
-#         parameters_talud(inmetingenWaterlopen,waterloop)
-#         buffer_waterloop(waterloop, buffer, buffer_lijn, waterloop_lijn_simp)
-#
-#         bodemlijn_bepalen(waterloop_lijn,waterloop,tolerance,dist_mini_buffer,bodemlijn)
-#         create_raster(waterloop, waterloop_lijn_simp, buffer_lijn, waterloop_lijn_totaal, waterloop_3d_lijn, tin,
-#                       raster_waterloop, raster_waterloop_clip, bodemlijn)
-#
-#
-#         # delete globals
-#         try:
-#             talud
-#             del talud
-#         except NameError:
-#             pass
-#
-#         try:
-#             bodemHoogte
-#             del bodemHoogte
-#         except NameError:
-#             pass
-#
-#         try:
-#             insteekHoogte
-#             del insteekHoogte
-#         except NameError:
-#             pass
-#
+aggregate_input(waterlopen_invoer)
+with arcpy.da.SearchCursor(waterlopen,['SHAPE@',code_waterloop]) as cursor:
+    for row in cursor:
+        id = row[1]
+
+        waterloop = 'waterloop_' + str(row[1])
+        waterloop_lijn = 'waterloop_lijn_' + str(row[1])
+        waterloop_lijn_simp = 'waterloop_lijn_simp_' + str(row[1])
+        punten_insteek = 'waterloop_punten_insteek_' + str(row[1])
+        waterloop_lijn_totaal = 'tt_waterloop_lijn_' + str(row[1])
+        waterloop_3d_lijn = 'waterloop_3d_lijn' + str(row[1])
+        bodemlijn = "bodemlijn_waterloop_" + str(row[1])
+
+
+        tin = "D:/GoogleDrive/WSRL/tin/waterloop"+str(row[1])
+        raster_waterloop = 'waterloop_raster_' + str(row[1])
+        raster_waterloop_clip = 'waterloop_raster_clip_' + str(row[1])
+        buitenraster = 'waterloop_buitenraster_' + str(row[1])
+        buffer = 'buffer_waterloop_'+str(row[1])
+        buffer_lijn = 'buffer_waterloop_lijn_'+str(row[1])
 
 
 
-insert_into_ahn(waterlopen,raster_safe,rasterlijst)
+        where = '"' + code_waterloop + '" = ' + "'" + str(id) + "'"
+
+        arcpy.Select_analysis(waterlopen, waterloop, where)
+
+        # voeg veld toe voor z_nap
+        arcpy.AddField_management(waterloop,"z_nap","DOUBLE", 2, field_is_nullable="NULLABLE")
+
+
+        # algemene functies runnen
+
+        raster_buitenkant(waterloop, buffer_buitenkant, buitenraster, raster_ahn)
+        bepaal_insteek_waterloop(waterloop, waterloop_lijn, waterloop_lijn_simp, punten_insteek, min_lengte_segment,code_waterloop)
+
+
+        bodemlijn_bepalen(waterloop_lijn, waterloop, tolerance, dist_mini_buffer, bodemlijn)
+        minimale_breedte(bodemlijn)
+
+        buffer_waterloop(waterloop, buffer, buffer_lijn, bodemDiepte)
+
+
+
+        create_raster(waterloop, waterloop_lijn_simp, buffer_lijn, waterloop_lijn_totaal, waterloop_3d_lijn, tin,
+                      raster_waterloop, raster_waterloop_clip, bodemlijn)
+
+
+        # delete globals
+        try:
+            talud
+            del talud
+        except NameError:
+            pass
+
+        try:
+            bodemHoogte
+            del bodemHoogte
+        except NameError:
+            pass
+
+        try:
+            insteekHoogte
+            del insteekHoogte
+        except NameError:
+            pass
+
+
+
+# insert_into_ahn(waterlopen,raster_ahn,rasterlijst)
 
 
 
