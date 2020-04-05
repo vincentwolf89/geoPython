@@ -13,6 +13,7 @@ tolerance = 0.3
 bodemDiepte = 1
 bodemDiepteSmal = 0.5
 maxBreedteSmal = 2
+standaardTalud = 0.5
 
 
 smooth = "10 Meters"
@@ -32,6 +33,7 @@ class Basis(object):
             idWaterloop = row[1]
             waterloop = "waterloop" + str(idWaterloop)
             bodemLijn = "waterloopBodemlijn" + str(idWaterloop)
+            bufferLijn = "waterloopBufferlijn" + str(idWaterloop)
             where = '"' + codeWaterloop + '" = ' + "'" + str(idWaterloop) + "'"
             arcpy.Select_analysis(self.waterlopen, waterloop, where)
             # voeg veld toe voor z_nap
@@ -58,9 +60,12 @@ class Basis(object):
             gpObject.bepaalBodemlijn(waterloop,insteekLijn, waterloopPolySmooth, distMiniBuffer, tolerance, bodemLijn)
 
             # bepaal minimale breedte en bodemhoogte
-            bodemHoogte = gpObject.bepaalMinimaleBreedte(waterloop, insteekLijn, bodemLijn, insteekHoogte, bodemDiepte, bodemDiepteSmal,maxBreedteSmal)
+            bodem = gpObject.bepaalMinimaleBreedte(waterloop, insteekLijn, bodemLijn, insteekHoogte, bodemDiepte, bodemDiepteSmal,maxBreedteSmal)
+            _bodemDiepte = bodem[0]
+            _bodemHoogte = bodem[1]
 
             # buffer waterloop
+            gpObject.bufferWaterloop(waterloop,waterloopPolySmooth,standaardTalud,_bodemDiepte,_bodemHoogte,insteekLijn,bufferLijn)
 
 
 
