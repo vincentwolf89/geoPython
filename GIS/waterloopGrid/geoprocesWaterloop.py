@@ -1,7 +1,7 @@
 import arcpy
 from basisfuncties import average, generate_profiles
 
-class gp(object):
+class gpWaterloop(object):
 
     def __init__(self, waterloop,idWaterloop,bodemLijn):
 
@@ -363,27 +363,27 @@ class gp(object):
 
 
 
+class gpGeneral:
 
+    def aggregateInput(self,waterlopenInvoer):
+        arcpy.AggregatePolygons_cartography(waterlopenInvoer, "waterlopenTemp", "0,01 Meters",
+                                            "0 SquareMeters", "0 SquareMeters", "NON_ORTHOGONAL", "",
+                                            "temptabel")
 
-def aggregateInput(waterlopenInvoer):
-    arcpy.AggregatePolygons_cartography(waterlopenInvoer, "waterlopenTemp", "0,01 Meters",
-                                        "0 SquareMeters", "0 SquareMeters", "NON_ORTHOGONAL", "",
-                                        "temptabel")
+        arcpy.AddField_management("waterlopenTemp", 'id_string', "TEXT", field_length=50)
+        arcpy.CalculateField_management("waterlopenTemp", "id_string", '!OBJECTID!', "PYTHON")
+        waterlopen = arcpy.Copy_management("waterlopenTemp",waterlopenInvoer)
 
-    arcpy.AddField_management("waterlopenTemp", 'id_string', "TEXT", field_length=50)
-    arcpy.CalculateField_management("waterlopenTemp", "id_string", '!OBJECTID!', "PYTHON")
-    waterlopen = arcpy.Copy_management("waterlopenTemp",waterlopenInvoer)
+        print "Aanliggende waterloop-polygonen gemerged"
+        return waterlopen
 
-    print "Aanliggende waterloop-polygonen gemerged"
-    return waterlopen
+    def insertAhn(self,rasterLijst,waterlopen,rasterAhn):
 
-def insertAhn(rasterLijst,waterlopen,rasterAhn):
+        # clip totaalgebied uit ahn
+        arcpy.Clip_management(rasterAhn, "", "clipWaterlopen", waterlopen, "-3,402823e+038", "NONE",
+                              "MAINTAIN_EXTENT")
+        rasterLijst.append("clipWaterlopen")
 
-    # clip totaalgebied uit ahn
-    arcpy.Clip_management(rasterAhn, "", "clipWaterlopen", waterlopen, "-3,402823e+038", "NONE",
-                          "MAINTAIN_EXTENT")
-    rasterLijst.append("clipWaterlopen")
-
-    # merge rasterlijst
-    arcpy.MosaicToNewRaster_management(rasterLijst, arcpy.env.workspace, "rasterTotaal",
-                                       "", "32_BIT_FLOAT", "0,5", "1", "LAST", "FIRST")
+        # merge rasterlijst
+        arcpy.MosaicToNewRaster_management(rasterLijst, arcpy.env.workspace, "rasterTotaal",
+                                           "", "32_BIT_FLOAT", "0,5", "1", "LAST", "FIRST")
