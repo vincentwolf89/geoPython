@@ -1,5 +1,5 @@
 import arcpy
-from geoprocesWaterloop import gp, aggregateInput,insertAhn
+from geoprocesWaterloop import gpWaterloop, gpGeneral
 
 arcpy.env.overwriteOutput = True
 arcpy.env.workspace = r'C:\Users\Vincent\Documents\ArcGIS\testDB.gdb'
@@ -23,7 +23,7 @@ codeWaterloop = "id_string"
 class Basis(object):
 
     def __init__(self, waterlopenInvoer):
-        self.waterlopen = aggregateInput(waterlopenInvoer)
+        self.waterlopen = gpGeneral().aggregateInput(waterlopenInvoer)
         # self.waterlopen = gpBasis(waterlopenInvoer).aggregateInput()
         self.cursor = arcpy.da.SearchCursor(self.waterlopen, ['SHAPE@', codeWaterloop])
 
@@ -56,7 +56,7 @@ class Basis(object):
             arcpy.AddField_management(waterloop,"z_nap","DOUBLE", 2, field_is_nullable="NULLABLE")
 
             ## geoprocessing ##
-            gpObject = gp(waterloop,idWaterloop,bodemLijn)
+            gpObject = gpWaterloop(waterloop,idWaterloop,bodemLijn)
 
             # maak raster buitenkant
             rasterBuitenkant = gpObject.rasterBuitenkant(waterloop,bufferBuitenkant,rasterAhn)
@@ -86,7 +86,8 @@ class Basis(object):
 
 
         # maak totaalraster
-        insertAhn(rasterLijst,self.waterlopen,rasterAhn)
+        gpGeneral().insertAhn(rasterLijst,self.waterlopen,rasterAhn)
+
 
 
 
