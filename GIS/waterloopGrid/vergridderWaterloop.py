@@ -1,5 +1,5 @@
 import arcpy
-from geoproces_Waterloop import gp
+from geoproces_Waterloop import gp, gpBasis
 
 arcpy.env.overwriteOutput = True
 arcpy.env.workspace = r'C:\Users\Vincent\Documents\ArcGIS\testDB.gdb'
@@ -22,26 +22,39 @@ codeWaterloop = "id_string"
 
 class Basis(object):
 
-    def __init__(self, waterlopen):
-        self.waterlopen = waterlopen
-        self.cursor = arcpy.da.SearchCursor(waterlopen, ['SHAPE@', codeWaterloop])
+    def __init__(self, waterlopenInvoer):
+        self.waterlopen = gpBasis(waterlopenInvoer).aggregateInput()
+        self.cursor = arcpy.da.SearchCursor(self.waterlopen, ['SHAPE@', codeWaterloop])
 
     def execute(self):
 
+
+        # lijst met totaal aantal rasters
+        rasterLijst = []
+
         for row in self.cursor:
 
+            # id waterloop
             idWaterloop = row[1]
+
+
+            # geometrien per waterloop als uitvoerlagen
             waterloop = "waterloop" + str(idWaterloop)
             bodemLijn = "waterloopBodemlijn" + str(idWaterloop)
             bufferLijn = "waterloopBufferlijn" + str(idWaterloop)
             waterloopLijn = "waterloopLijn" + str(idWaterloop)
+            waterloopLijn3D = "waterloopLijn3D" + str(idWaterloop)
+            tin = "D:/GoogleDrive/WSRL/tin/waterloop"+str(idWaterloop)
+            rasterWaterloop = "waterloopRaster" + str(idWaterloop)
+
+            # selectie waterlopen
             where = '"' + codeWaterloop + '" = ' + "'" + str(idWaterloop) + "'"
             arcpy.Select_analysis(self.waterlopen, waterloop, where)
+
             # voeg veld toe voor z_nap
             arcpy.AddField_management(waterloop,"z_nap","DOUBLE", 2, field_is_nullable="NULLABLE")
 
-
-            # geoprocessing
+            ## geoprocessing ##
             gpObject = gp(waterloop,idWaterloop,bodemLijn)
 
             # maak raster buitenkant
@@ -67,10 +80,16 @@ class Basis(object):
             # buffer waterloop
             gpObject.bufferWaterloop(waterloop,waterloopPolySmooth,standaardTalud,_bodemDiepte,_bodemHoogte,waterloopLijn,bufferLijn)
 
+            # genereer raster van drie geometrien (insteek-talud en bodemlijn)
+            gpObject.maakRaster(waterloop,waterloopLijn, bufferLijn, bodemLijn,waterloopLijn3D, tin,rasterWaterloop, waterloopPolySmooth, rasterLijst)
+
+
+        # maak totaalraster
+        gpBasis(self.waterlopen).insertAhn(rasterLijst,self.waterlopen,rasterAhn)
 
 
 
-        # print "Buiten loop"
+
 
 
 
