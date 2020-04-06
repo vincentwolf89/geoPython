@@ -1,5 +1,5 @@
 import arcpy
-from geoproces_Waterloop import gp, gpBasis
+from geoprocesWaterloop import gp, aggregateInput,insertAhn
 
 arcpy.env.overwriteOutput = True
 arcpy.env.workspace = r'C:\Users\Vincent\Documents\ArcGIS\testDB.gdb'
@@ -23,7 +23,8 @@ codeWaterloop = "id_string"
 class Basis(object):
 
     def __init__(self, waterlopenInvoer):
-        self.waterlopen = gpBasis(waterlopenInvoer).aggregateInput()
+        self.waterlopen = aggregateInput(waterlopenInvoer)
+        # self.waterlopen = gpBasis(waterlopenInvoer).aggregateInput()
         self.cursor = arcpy.da.SearchCursor(self.waterlopen, ['SHAPE@', codeWaterloop])
 
     def execute(self):
@@ -85,7 +86,7 @@ class Basis(object):
 
 
         # maak totaalraster
-        gpBasis(self.waterlopen).insertAhn(rasterLijst,self.waterlopen,rasterAhn)
+        insertAhn(rasterLijst,self.waterlopen,rasterAhn)
 
 
 
