@@ -2,7 +2,7 @@ import arcpy
 from geoprocesWaterloop import gpWaterloop, gpGeneral
 
 arcpy.env.overwriteOutput = True
-arcpy.env.workspace = r'C:\Users\Vincent\Documents\ArcGIS\testDB.gdb'
+arcpy.env.workspace = r'D:\GoogleDrive\WSRL\testWaterlopen.gdb'
 
 global bufferBuitenkant, rasterAhn, codeWaterloop
 
@@ -17,7 +17,7 @@ standaardTalud = 0.5
 
 
 smooth = "10 Meters"
-rasterAhn = r'C:\Users\Vincent\Desktop\ahn3clip_safe'
+rasterAhn = r'D:\Projecten\WSRL\grote_data\ahn3SProk.gdb\ahn3ClipSprok'
 codeWaterloop = "id_string"
 
 class Basis(object):
@@ -68,25 +68,32 @@ class Basis(object):
 
             # bepaal insteek (templayer)
             insteekHoogte = gpObject.bepaalInsteek(waterloop,rasterBuitenkant, minLengteSegment, codeWaterloop, waterloopLineSmooth,waterloopLijn)
+            bodemLijn = gpObject.bepaalBodemlijn(waterloop,waterloopLijn, waterloopPolySmooth, distMiniBuffer, tolerance, bodemLijn)
 
 
-            # bepaal bodemlijn (geen templayer ivm check)
-            gpObject.bepaalBodemlijn(waterloop,waterloopLijn, waterloopPolySmooth, distMiniBuffer, tolerance, bodemLijn)
 
-            # bepaal minimale breedte en bodemhoogte
-            bodem = gpObject.bepaalMinimaleBreedte(waterloop, waterloopLijn, bodemLijn, insteekHoogte, bodemDiepte, bodemDiepteSmal,maxBreedteSmal)
-            _bodemDiepte = bodem[0]
-            _bodemHoogte = bodem[1]
+            # check of bodemlijn bestaat en geometrien bevat
+            if insteekHoogte is not None and bodemLijn is not None:
 
-            # buffer waterloop
-            gpObject.bufferWaterloop(waterloop,waterloopPolySmooth,standaardTalud,_bodemDiepte,_bodemHoogte,waterloopLijn,bufferLijn)
+                # bepaal minimale breedte en bodemhoogte
+                bodem = gpObject.bepaalMinimaleBreedte(waterloop, waterloopLijn, bodemLijn, insteekHoogte, bodemDiepte, bodemDiepteSmal,maxBreedteSmal)
+                _bodemDiepte = bodem[0]
+                _bodemHoogte = bodem[1]
 
-            # genereer raster van drie geometrien (insteek-talud en bodemlijn)
-            gpObject.maakRaster(waterloop,waterloopLijn, bufferLijn, bodemLijn,waterloopLijn3D, tin,rasterWaterloop, waterloopPolySmooth, rasterLijst)
+                # buffer waterloop
+                gpObject.bufferWaterloop(waterloop,waterloopPolySmooth,standaardTalud,_bodemDiepte,_bodemHoogte,waterloopLijn,bufferLijn)
+
+                # genereer raster van drie geometrien (insteek-talud en bodemlijn)
+                gpObject.maakRaster(waterloop,waterloopLijn, bufferLijn, bodemLijn,waterloopLijn3D, tin,rasterWaterloop, waterloopPolySmooth, rasterLijst)
+            else:
+                print "Geen raster gemaakt voor {} vanwege ontbreken onderdeel/onderdelen".format(waterloop)
 
 
         # maak totaalraster
-        gpGeneral().insertAhn(rasterLijst,self.waterlopen,rasterAhn)
+        if rasterLijst:
+            gpGeneral().insertAhn(rasterLijst,self.waterlopen,rasterAhn)
+        else:
+            pass
 
 
 
@@ -97,7 +104,6 @@ class Basis(object):
 
 if __name__ == "__main__":
 
-    test = Basis("testvlakken")
-    test.execute()
+    setWaterlopen = Basis("SprokWaterlopen")
+    setWaterlopen.execute()
 
-# test.printResult()
