@@ -167,59 +167,65 @@ class gpWaterloop(object):
             for row in cursor:
                 listOid.append(row[0])
         del cursor
-        oid = listOid[-2]
-        with arcpy.da.UpdateCursor("tempBufferSmoothLijn", "OID@") as cursor:
-            for row in cursor:
-                if row[0] == oid:
-                    pass
-                else:
-                    cursor.deleteRow()
-        # terugvertaling buffer naar binnenvlak
-        arcpy.FeatureToPolygon_management("tempBufferSmoothLijn", "tempBufferSmoothPoly")
+        try:
+            listOid[-2]
+            oid = listOid[-2]
+            with arcpy.da.UpdateCursor("tempBufferSmoothLijn", "OID@") as cursor:
+                for row in cursor:
+                    if row[0] == oid:
+                        pass
+                    else:
+                        cursor.deleteRow()
+            # terugvertaling buffer naar binnenvlak
+            arcpy.FeatureToPolygon_management("tempBufferSmoothLijn", "tempBufferSmoothPoly")
 
 
-        arcpy.Clip_management("tempRastercalc", "", "tempClipper", "tempBufferSmoothPoly", "127",
-                              "ClippingGeometry", "MAINTAIN_EXTENT")
-        # clip to polygon
-        arcpy.RasterToPolygon_conversion("tempClipper", "tempPoly", "SIMPLIFY", "Value")
-        # remove items with gridcode 0
-        with arcpy.da.UpdateCursor("tempPoly", ["gridcode", "SHAPE@AREA"]) as cursor:
-            for row in cursor:
-                if row[0] is 0 or row[1] < 0.1:
-                    cursor.deleteRow()
-                else:
-                    pass
+            arcpy.Clip_management("tempRastercalc", "", "tempClipper", "tempBufferSmoothPoly", "127",
+                                  "ClippingGeometry", "MAINTAIN_EXTENT")
+            # clip to polygon
+            arcpy.RasterToPolygon_conversion("tempClipper", "tempPoly", "SIMPLIFY", "Value")
+            # remove items with gridcode 0
+            with arcpy.da.UpdateCursor("tempPoly", ["gridcode", "SHAPE@AREA"]) as cursor:
+                for row in cursor:
+                    if row[0] is 0 or row[1] < 0.1:
+                        cursor.deleteRow()
+                    else:
+                        pass
 
-        ## middenlijn maken vanuit raster ##
-        # poly to line
-        arcpy.FeatureToLine_management("tempPoly", "tempPolyLijn")
-        # split line at vertices
-        arcpy.SplitLine_management("tempPolyLijn", "tempPolyLijnSplit")
+            ## middenlijn maken vanuit raster ##
+            # poly to line
+            arcpy.FeatureToLine_management("tempPoly", "tempPolyLijn")
+            # split line at vertices
+            arcpy.SplitLine_management("tempPolyLijn", "tempPolyLijnSplit")
 
-        # select only bodempart
-        arcpy.MakeFeatureLayer_management("tempPolyLijnSplit", "tempPolyLijnSplitFL")
+            # select only bodempart
+            arcpy.MakeFeatureLayer_management("tempPolyLijnSplit", "tempPolyLijnSplitFL")
 
-        # niet smoothline pakken?
-        arcpy.SelectLayerByLocation_management("tempPolyLijnSplitFL", "INTERSECT", smoothWaterloopLine, tolerance,
-                                               "NEW_SELECTION", "INVERT")
-        arcpy.CopyFeatures_management("tempPolyLijnSplitFL", bodemLijn)
+            # niet smoothline pakken?
+            arcpy.SelectLayerByLocation_management("tempPolyLijnSplitFL", "INTERSECT", smoothWaterloopLine, tolerance,
+                                                   "NEW_SELECTION", "INVERT")
+            arcpy.CopyFeatures_management("tempPolyLijnSplitFL", bodemLijn)
 
-        # maak veld aan voor onderdeel-waterloop
-        arcpy.AddField_management(bodemLijn, 'onderdeel', "TEXT", field_length=50)
-        arcpy.CalculateField_management(bodemLijn, "onderdeel", "\"bodem\"", "PYTHON")
-
-
-
-        # add field for bodemhoogte
-        arcpy.AddField_management(bodemLijn, "z_nap", "DOUBLE", 2, field_is_nullable="NULLABLE")
+            # maak veld aan voor onderdeel-waterloop
+            arcpy.AddField_management(bodemLijn, 'onderdeel', "TEXT", field_length=50)
+            arcpy.CalculateField_management(bodemLijn, "onderdeel", "\"bodem\"", "PYTHON")
 
 
-        # delete features
-        arcpy.Delete_management("tempEuclidean")
-        arcpy.Delete_management("tempClipper")
-        arcpy.Delete_management("tempRastercalc")
 
-        print "Bodemlijn gemaakt voor waterloop {}".format(waterloop)
+            # add field for bodemhoogte
+            arcpy.AddField_management(bodemLijn, "z_nap", "DOUBLE", 2, field_is_nullable="NULLABLE")
+
+
+            # delete features
+            arcpy.Delete_management("tempEuclidean")
+            arcpy.Delete_management("tempClipper")
+            arcpy.Delete_management("tempRastercalc")
+
+
+            print "Bodemlijn gemaakt voor waterloop {}".format(waterloop)
+
+        except IndexError:
+            pass
 
 
     def bepaalMinimaleBreedte(self, waterloop, insteekLijn, bodemLijn,insteekHoogte,bodemDiepte, bodemDiepteSmal, maxBreedteSmal):
@@ -247,8 +253,11 @@ class gpWaterloop(object):
                     lijstBreedtes.append(row[0])
                 else:
                     pass
+        try:
+            gemiddeldeBreedte = round(average(lijstBreedtes), 2)
 
-        gemiddeldeBreedte = round(average(lijstBreedtes), 2)
+        except NameError:
+            gemiddeldeBreedte = 0.5
 
 
         arcpy.AddField_management(waterloop, 'soortWaterloop', "TEXT", field_length=50)
@@ -387,3 +396,5 @@ class gpGeneral:
         # merge rasterlijst
         arcpy.MosaicToNewRaster_management(rasterLijst, arcpy.env.workspace, "rasterTotaal",
                                            "", "32_BIT_FLOAT", "0,5", "1", "LAST", "FIRST")
+
+        print "Losse rasters samengevoegd in invoer-raster"
