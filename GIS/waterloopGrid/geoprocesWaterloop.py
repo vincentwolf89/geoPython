@@ -109,124 +109,136 @@ class gpWaterloop(object):
                         break
 
         # koppel gemiddelde laaste waarde terug aan hele waterloop
-        with arcpy.da.UpdateCursor("templijnWaterloopSimpSplit", ['z_nap']) as cursor:
-            for row in cursor:
-                # global insteekHoogte
-                insteekHoogte = round(zNapOg, 2)
-                row[0] = insteekHoogte
-                cursor.updateRow(row)
-
-        # # voeg losse lijndelen weer samen
-        arcpy.Dissolve_management("templijnWaterloopSimpSplit", "tempDissolve", [codeWaterloop, "z_nap"], "", "MULTI_PART",
-                                  "DISSOLVE_LINES")
-
-        arcpy.Copy_management("tempDissolve", "templijnWaterloopSimpSplit")
-
-        # maak veld aan voor onderdeel-waterloop
-        arcpy.AddField_management("templijnWaterloopSimpSplit", 'onderdeel', "TEXT", field_length=50)
-        arcpy.CalculateField_management("templijnWaterloopSimpSplit", "onderdeel", "\"insteek\"", "PYTHON")
-
-        # update lineSmooth
-        with arcpy.da.UpdateCursor(lineSmooth, ['z_nap']) as cursor:
-            for row in cursor:
-                row[0] = insteekHoogte
-                cursor.updateRow(row)
-        del cursor
-
-        arcpy.AddField_management(waterloop, "insteekHoogte", "DOUBLE", 2, field_is_nullable="NULLABLE")
-        with arcpy.da.UpdateCursor(waterloop, ['insteekHoogte']) as cursor:
-            for row in cursor:
-                row[0] = insteekHoogte
-                cursor.updateRow(row)
-        del cursor
-        print "Gemiddelde insteekhoogte van {}m bepaald voor {}".format(insteekHoogte, waterloop)
-
-
-        arcpy.Copy_management(lineSmooth,waterloopLijn)
-        return insteekHoogte
-
-
-    def bepaalBodemlijn(self,waterloop,smoothWaterloopLine, smoothWaterloopPoly, distMiniBuffer, tolerance, bodemLijn):
-        # euclidean raster
-        arcpy.gp.EucDistance_sa(smoothWaterloopLine, "tempEuclidean", "", "0,05", "")
-        # slope euclidean raster
-        arcpy.gp.Slope_sa("tempEuclidean", "tempSlope", "DEGREE", "1")
-        # rastercalc
-        raster = arcpy.Raster("tempSlope")
-        outRaster = raster <= 42
-        outRaster.save("tempRastercalc")
-
-        ## clip raster with polygon
-        # eerst minibuffer op polygoon
-        arcpy.Buffer_analysis(smoothWaterloopPoly, "tempBufferSmooth", distMiniBuffer, "OUTSIDE_ONLY", "FLAT", "NONE",
-                              "", "PLANAR")
-        # minibuffer binnekant bewaren
-        listOid = []
-        arcpy.FeatureToLine_management("tempBufferSmooth", "tempBufferSmoothLijn")
-        with arcpy.da.SearchCursor("tempBufferSmoothLijn", "OID@") as cursor:
-            for row in cursor:
-                listOid.append(row[0])
-        del cursor
         try:
-            listOid[-2]
-            oid = listOid[-2]
-            with arcpy.da.UpdateCursor("tempBufferSmoothLijn", "OID@") as cursor:
+            zNapOg
+            with arcpy.da.UpdateCursor("templijnWaterloopSimpSplit", ['z_nap']) as cursor:
                 for row in cursor:
-                    if row[0] == oid:
-                        pass
-                    else:
-                        cursor.deleteRow()
-            # terugvertaling buffer naar binnenvlak
-            arcpy.FeatureToPolygon_management("tempBufferSmoothLijn", "tempBufferSmoothPoly")
+                    # global insteekHoogte
+                    insteekHoogte = round(zNapOg, 2)
+                    row[0] = insteekHoogte
+                    cursor.updateRow(row)
 
+            # # voeg losse lijndelen weer samen
+            arcpy.Dissolve_management("templijnWaterloopSimpSplit", "tempDissolve", [codeWaterloop, "z_nap"], "", "MULTI_PART",
+                                      "DISSOLVE_LINES")
 
-            arcpy.Clip_management("tempRastercalc", "", "tempClipper", "tempBufferSmoothPoly", "127",
-                                  "ClippingGeometry", "MAINTAIN_EXTENT")
-            # clip to polygon
-            arcpy.RasterToPolygon_conversion("tempClipper", "tempPoly", "SIMPLIFY", "Value")
-            # remove items with gridcode 0
-            with arcpy.da.UpdateCursor("tempPoly", ["gridcode", "SHAPE@AREA"]) as cursor:
-                for row in cursor:
-                    if row[0] is 0 or row[1] < 0.1:
-                        cursor.deleteRow()
-                    else:
-                        pass
-
-            ## middenlijn maken vanuit raster ##
-            # poly to line
-            arcpy.FeatureToLine_management("tempPoly", "tempPolyLijn")
-            # split line at vertices
-            arcpy.SplitLine_management("tempPolyLijn", "tempPolyLijnSplit")
-
-            # select only bodempart
-            arcpy.MakeFeatureLayer_management("tempPolyLijnSplit", "tempPolyLijnSplitFL")
-
-            # niet smoothline pakken?
-            arcpy.SelectLayerByLocation_management("tempPolyLijnSplitFL", "INTERSECT", smoothWaterloopLine, tolerance,
-                                                   "NEW_SELECTION", "INVERT")
-            arcpy.CopyFeatures_management("tempPolyLijnSplitFL", bodemLijn)
+            arcpy.Copy_management("tempDissolve", "templijnWaterloopSimpSplit")
 
             # maak veld aan voor onderdeel-waterloop
-            arcpy.AddField_management(bodemLijn, 'onderdeel', "TEXT", field_length=50)
-            arcpy.CalculateField_management(bodemLijn, "onderdeel", "\"bodem\"", "PYTHON")
+            arcpy.AddField_management("templijnWaterloopSimpSplit", 'onderdeel', "TEXT", field_length=50)
+            arcpy.CalculateField_management("templijnWaterloopSimpSplit", "onderdeel", "\"insteek\"", "PYTHON")
+
+            # update lineSmooth
+            with arcpy.da.UpdateCursor(lineSmooth, ['z_nap']) as cursor:
+                for row in cursor:
+                    row[0] = insteekHoogte
+                    cursor.updateRow(row)
+            del cursor
+
+            arcpy.AddField_management(waterloop, "insteekHoogte", "DOUBLE", 2, field_is_nullable="NULLABLE")
+            with arcpy.da.UpdateCursor(waterloop, ['insteekHoogte']) as cursor:
+                for row in cursor:
+                    row[0] = insteekHoogte
+                    cursor.updateRow(row)
+            del cursor
+            print "Gemiddelde insteekhoogte van {}m bepaald voor {}".format(insteekHoogte, waterloop)
+
+
+            arcpy.Copy_management(lineSmooth,waterloopLijn)
+            return insteekHoogte
+
+        except NameError:
+            return None
+
+    def bepaalBodemlijn(self,waterloop,smoothWaterloopLine, smoothWaterloopPoly, distMiniBuffer, tolerance, bodemLijn):
+        if arcpy.Exists(smoothWaterloopLine):
+            # euclidean raster
+            arcpy.gp.EucDistance_sa(smoothWaterloopLine, "tempEuclidean", "", "0,05", "")
+            # slope euclidean raster
+            arcpy.gp.Slope_sa("tempEuclidean", "tempSlope", "DEGREE", "1")
+            # rastercalc
+            raster = arcpy.Raster("tempSlope")
+            outRaster = raster <= 42
+            outRaster.save("tempRastercalc")
+
+            ## clip raster with polygon
+            # eerst minibuffer op polygoon
+            arcpy.Buffer_analysis(smoothWaterloopPoly, "tempBufferSmooth", distMiniBuffer, "OUTSIDE_ONLY", "FLAT", "NONE",
+                                  "", "PLANAR")
+            # minibuffer binnekant bewaren
+            listOid = []
+            arcpy.FeatureToLine_management("tempBufferSmooth", "tempBufferSmoothLijn")
+            with arcpy.da.SearchCursor("tempBufferSmoothLijn", "OID@") as cursor:
+                for row in cursor:
+                    listOid.append(row[0])
+            del cursor
+            try:
+                listOid[-2]
+                oid = listOid[-2]
+                with arcpy.da.UpdateCursor("tempBufferSmoothLijn", "OID@") as cursor:
+                    for row in cursor:
+                        if row[0] == oid:
+                            pass
+                        else:
+                            cursor.deleteRow()
+                # terugvertaling buffer naar binnenvlak
+                arcpy.FeatureToPolygon_management("tempBufferSmoothLijn", "tempBufferSmoothPoly")
+
+
+                arcpy.Clip_management("tempRastercalc", "", "tempClipper", "tempBufferSmoothPoly", "127",
+                                      "ClippingGeometry", "MAINTAIN_EXTENT")
+                # clip to polygon
+                arcpy.RasterToPolygon_conversion("tempClipper", "tempPoly", "SIMPLIFY", "Value")
+                # remove items with gridcode 0
+                with arcpy.da.UpdateCursor("tempPoly", ["gridcode", "SHAPE@AREA"]) as cursor:
+                    for row in cursor:
+                        if row[0] is 0 or row[1] < 0.1:
+                            cursor.deleteRow()
+                        else:
+                            pass
+
+                ## middenlijn maken vanuit raster ##
+                # poly to line
+                arcpy.FeatureToLine_management("tempPoly", "tempPolyLijn")
+                # split line at vertices
+                arcpy.SplitLine_management("tempPolyLijn", "tempPolyLijnSplit")
+
+                # select only bodempart
+                arcpy.MakeFeatureLayer_management("tempPolyLijnSplit", "tempPolyLijnSplitFL")
+
+                # niet smoothline pakken?
+                arcpy.SelectLayerByLocation_management("tempPolyLijnSplitFL", "INTERSECT", smoothWaterloopLine, tolerance,
+                                                       "NEW_SELECTION", "INVERT")
+                arcpy.CopyFeatures_management("tempPolyLijnSplitFL", bodemLijn)
+
+                # maak veld aan voor onderdeel-waterloop
+                arcpy.AddField_management(bodemLijn, 'onderdeel', "TEXT", field_length=50)
+                arcpy.CalculateField_management(bodemLijn, "onderdeel", "\"bodem\"", "PYTHON")
 
 
 
-            # add field for bodemhoogte
-            arcpy.AddField_management(bodemLijn, "z_nap", "DOUBLE", 2, field_is_nullable="NULLABLE")
+                # add field for bodemhoogte
+                arcpy.AddField_management(bodemLijn, "z_nap", "DOUBLE", 2, field_is_nullable="NULLABLE")
 
 
-            # delete features
-            arcpy.Delete_management("tempEuclidean")
-            arcpy.Delete_management("tempClipper")
-            arcpy.Delete_management("tempRastercalc")
+                # delete features
+                arcpy.Delete_management("tempEuclidean")
+                arcpy.Delete_management("tempClipper")
+                arcpy.Delete_management("tempRastercalc")
 
 
-            print "Bodemlijn gemaakt voor waterloop {}".format(waterloop)
+                bodemItems = int(arcpy.GetCount_management(bodemLijn).getOutput(0))
+                if bodemItems is not 0:
+                    print "Bodemlijn gemaakt voor {}".format(waterloop)
+                    return bodemLijn
+                else:
+                    return None
 
-        except IndexError:
-            pass
 
+            except IndexError:
+                return None
+        else:
+            return None
 
     def bepaalMinimaleBreedte(self, waterloop, insteekLijn, bodemLijn,insteekHoogte,bodemDiepte, bodemDiepteSmal, maxBreedteSmal):
         ## profiles along line ##
