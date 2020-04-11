@@ -4,7 +4,7 @@ from itertools import cycle
 files = r'C:\Users\Vincent\Desktop\testmap'
 
 soortenGrofGef = ['Z','G']
-maxGrof = 1.8
+maxGrof = 1
 for file in os.listdir(files):
     naam = file.split('.txt')[0]
     ingef = os.path.join(files, file)
@@ -105,7 +105,10 @@ for file in os.listdir(files):
     grouped = testdf.groupby('laagNummer')
 
     for group in grouped:
-        print group[1]['laagdikte'].max()
+        if group[1]['laagdikte'].max() > maxGrof:
+            print group[1]['laagdikte'].max(), group[1]['bovenkant'].min()
+            break
+
 
 
     # for i in dct:
