@@ -4,7 +4,7 @@ from itertools import cycle
 files = r'C:\Users\Vincent\Desktop\testmap'
 
 soortenGrofGef = ['Z','G']
-maxGrof = 1.5
+maxGrof = 1.8
 for file in os.listdir(files):
     naam = file.split('.txt')[0]
     ingef = os.path.join(files, file)
@@ -55,130 +55,74 @@ for file in os.listdir(files):
         soortenLijst.append(soort)
         index+=1
 
-    del bovenkant, onderkant,soort
+    del bovenkant, onderkant,soort, index
 
-    # print indexLijst
+
 
     # opbouw pandas df
     dict = {'index': indexLijst,'bovenkant': bovenkantLijst, 'onderkant': onderkantLijst, 'soort': soortenLijst}
     df = pd.DataFrame(dict)
-    df['soortOnder'] = df['soort'].shift(-1)
-    df['onderkantOnder'] = df['onderkant'].shift(1)
     df['laagDikte'] = abs(df['bovenkant']-df['onderkant'])
-    df['indexOnder'] = df['index'].shift(-1)
-    df['indexDif'] = abs(df['index'] - df['indexOnder'])
 
+    testdct = {}
+
+    indexlijstGrof = []
+    laagNummerLijstGrof = []
+    bovenkantLijstGrof = []
+    laagdikteLijstGrof = []
     for index, row in df.iterrows():
-
+        bovenkant = df.iloc[index]['bovenkant']
+        onderkant = df.iloc[index]['onderkant']
         soort = df.iloc[index]['soort']
         laagDikte = df.iloc[index]['laagDikte']
+
+
         if soort in soortenGrofGef:
-            condition = True
+            indexLijstGrof.append(index)
             groveLaag+= laagDikte
+
+            # testdct[index] = grovelaagNummer, bovenkant
+            # indexLijstGrof.append(index)
+            laagNummerLijstGrof.append(grovelaagNummer)
+            bovenkantLijstGrof.append(bovenkant)
+            laagdikteLijstGrof.append(groveLaag)
 
         if soort not in soortenGrofGef:
             grovelaagNummer += 1
-            condition = False
             groveLaag = 0
 
-        dct[grovelaagNummer] = groveLaag, index
-    for i in dct:
-
-        if dct[i][0] is 0:
-            pass
-        else:
-            laag = dct[i][0]
-            loc = dct[i][1]
-            if laag > maxGrof:
-                print loc, laag
-                break
 
 
 
+        # dct[grovelaagNummer] = groveLaag, grovelaagNummer, bovenkant
 
 
+    testdct = {'index': indexLijstGrof,'laagNummer': laagNummerLijstGrof, 'bovenkant': bovenkantLijstGrof,'laagdikte':laagdikteLijstGrof}
+    testdf = pd.DataFrame(testdct)
+
+    # print testdf
+
+    grouped = testdf.groupby('laagNummer')
+
+    for group in grouped:
+        print group[1]['laagdikte'].max()
 
 
-    # row_iterator = df.iterrows()
-    # _, last = row_iterator.next()  # take first item from row_iterator
-    # for i, row in row_iterator:
-    #     # print(row['soort'])
-    #     print(last['bovenkant']), i, last['onderkant']
-    #     last = row
-
-    # # print df
-    # for index, row in df.iterrows():
+    # for i in dct:
     #
-    #     # vervang laatste NaN soortwaarde
-    #     if pd.isna(row['soortOnder']):
-    #         value = row['soort']
-    #         # df.set_value(index,'soortOnder', value)
-    #         df.at[index,'soortOnder']= value
-    #
-    #     # if pd.isna(row['indexOnder']):
-    #     #     value = row['index']+1
-    #     #     df.at[index, 'indexOnder'] = value
-    #
-    #     # huidige regel
-    #     soort = df.iloc[index]['soort']
-    #     soortV = df.iloc[index]['soortOnder']
-    #     bovenkant = df.iloc[index]['bovenkant']
-    #     onderkant = df.iloc[index]['onderkant']
-    #     laagDikte = df.iloc[index]['laagDikte']
-    #
-    #
-    #     if soort in soortenGrofGef:
-    #         groveLaag+= laagDikte
-    #         indexLijstGrof.append(index)
-    #         print groveLaag
-    #
-    #
-    #     elif soortV not in soortenGrofGef:
-    #         groveLaag = 0
-    #
-    # print groveLaag
-
-
-    #     if soort in soortenGrofGef:
-    #         groveLaag+= laagDikte
-    #         dct[grovelaagNummer] = groveLaag
-    #
-    #
-    #     elif soort not in soortenGrofGef:
-    #
-    #         groveLaag = 0
-    #         indexLijstGrof = []
-    #
-    #
-    # print dct
-
-
-    #
-    #     if soort in soortenGrofGef and laagDikte > maxGrof:
-    #         groveLaag = laagDikte
-    #         print laagDikte
-    #         topzandIndex = index
-    #         topzand = df.iloc[index-1]['bovenkant']
-    #         break
-    #
-    #     elif soort in soortenGrofGef and soortV in soortenGrofGef:
-    #         groveLaag+= laagDikte
-    #         indexLijstGrof.append(float(index))
-    #
+    #     if dct[i][0] is 0:
+    #         pass
     #     else:
-    #         groveLaag = 0
-    #         indexLijstGrof = []
+    #         laag = dct[i][0]
     #
-    # if groveLaag is not 0 and groveLaag > maxGrof:
-    #     try:
-    #         topzandIndex
-    #         print "Grove laag met laagdikte groter dan toegestaan gevonden, topzand: {}m".format(topzand)
-    #     except NameError:
-    #         topzandIndex = int(min(indexLijstGrof))
-    #         topzand = df.iloc[topzandIndex]['bovenkant']
-    #         print "Aaneengesloten grove lagen met laagdikte groter dan toegestaan gevonden, topzand: {}m".format(topzand), indexLijstGrof
+    #         loc = dct[i][1]
+    #         topzand = dct[i][2]
     #
-    # else:
-    #     print "Geen grove laag gevonden groter dan {}m".format(maxGrof)
-    #
-    # print df
+    #         if maxGrof <= laag:
+    #             topzand = df.iloc[min(indexLijstGrof)]['bovenkant']
+    #             # print loc, laag, indexLijstGrof
+    #             break
+
+
+
+
