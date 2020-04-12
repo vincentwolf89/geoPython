@@ -26,7 +26,7 @@ class boringXml(object):
         inXml = os.path.join(files, file)
         xml = minidom.parse(inXml)
 
-        return xml
+        return xml, naam
 
     def getBase(self,xml):
         # get location coordinates from xml
@@ -65,7 +65,7 @@ class boringXml(object):
             zOnder = None
 
 
-        print x,y,zMv
+        return x, y, zMv
 
     def createDF(self,xml):
         # create pandas dataframe with layers
@@ -107,8 +107,67 @@ class boringXml(object):
                          'soort': soortenLijst}
             df = pd.DataFrame(dctMeting)
             df['laagDikte'] = abs(df['bovenkant'] - df['onderkant'])
-            print df
+
             return df
+
+    def cleanDF(self,df,soortenGrofXml, maxSlap,naam):
+
+        indexLijstSlap = []
+        laagNummerLijstSlap = []
+        bovenkantLijstSlap = []
+        laagdikteLijstSlap = []
+        slappeLaag = 0
+        slappelaagNummer = 0
+
+        for index, row in df.iterrows():
+            bovenkant = df.iloc[index]['bovenkant']
+            onderkant = df.iloc[index]['onderkant']
+            soort = df.iloc[index]['soort']
+            laagDikte = df.iloc[index]['laagDikte']
+
+
+            if soort in soortenGrofXml:
+                slappelaagNummer +=1
+                slappeLaag = 0
+
+            if soort not in soortenGrofXml:
+
+                indexLijstSlap.append(index)
+                slappeLaag += laagDikte
+
+                laagNummerLijstSlap.append(slappelaagNummer)
+                bovenkantLijstSlap.append(bovenkant)
+                laagdikteLijstSlap.append(slappeLaag)
+
+
+
+
+
+
+
+        dctSlap =  {'index': indexLijstSlap,'laagNummer': laagNummerLijstSlap, 'bovenkant': bovenkantLijstSlap,'laagdikte':laagdikteLijstSlap}
+        dfSlap = pd.DataFrame(dctSlap)
+
+        groupedSlap = dfSlap.groupby('laagNummer')
+
+
+
+        for group in groupedSlap:
+            laagdikteSlap = group[1]['laagdikte'].max()
+            print laagdikteSlap
+
+            indexWaardes = group[1]['index'].tolist()
+            lijstIndexWaardes = []
+            if indexWaardes:
+                for item in indexWaardes:
+                    lijstIndexWaardes.append(int(item))
+
+            if laagdikteSlap < maxSlap:
+                print "droppen", naam
+                df = df.drop(lijstIndexWaardes)
+                df = df.reset_index()
+
+        return df
 
 
 class boringMainXml(object):
@@ -137,12 +196,17 @@ class boringMainXml(object):
 
         for file in os.listdir(files):
             boring = boringXml(file)
-            xml = boring.readFile(file)
-            boring.getBase(xml)
-            boring.createDF(xml)
-            # naam = file[1]
-            # base = boring.getBase(lines)
-            # x, y, zMv, lijstMetingen, sep = base
+            file = boring.readFile(file)
+            xml = file[0]
+            naam = file[1]
+            base = boring.getBase(xml)
+            x, y, zMv = base
+
+            dfRaw = boring.createDF(xml)
+            dfClean = boring.cleanDF(dfRaw, soortenGrofXml, maxSlap, naam)
+
+
+
 
 test = boringMainXml(files,puntenlaag,gdb)
 test.execute()
