@@ -4,18 +4,18 @@ import pandas as pd
 import xml.dom.minidom as minidom
 
 
-files = r'C:\Users\Vincent\Desktop\testmapXml'
+files = r'C:\Users\Vincent\Desktop\testmapBoringenXML'
 arcpy.env.workspace = r'D:\GoogleDrive\WSRL\goTest.gdb'
 gdb = r'D:\GoogleDrive\WSRL\goTest.gdb'
 arcpy.env.overwriteOutput = True
 
 
-puntenlaag = 'testBoringen5m'
+puntenlaag = 'testBoringenXml5m'
 
 soortenGrofGef = ['Z','G']
 soortenGrofXml = ['matigSiltigZand', 'zwakSiltigZand','sterkZandigeLeem','zwakZandigeLeem']
-maxGrof = 2
-maxSlap = 0.5
+maxGrof = 0.5
+minSlap = 0.5
 
 class boringXml(object):
     def __init__(self, file):
@@ -110,7 +110,7 @@ class boringXml(object):
 
             return df
 
-    def cleanDF(self,df,soortenGrofXml, maxSlap,naam):
+    def cleanDF(self,df,soortenGrofXml, minSlap,naam):
 
         indexLijstSlap = []
         laagNummerLijstSlap = []
@@ -154,7 +154,6 @@ class boringXml(object):
 
         for group in groupedSlap:
             laagdikteSlap = group[1]['laagdikte'].max()
-            print laagdikteSlap
 
             indexWaardes = group[1]['index'].tolist()
             lijstIndexWaardes = []
@@ -162,12 +161,87 @@ class boringXml(object):
                 for item in indexWaardes:
                     lijstIndexWaardes.append(int(item))
 
-            if laagdikteSlap < maxSlap:
+            if laagdikteSlap < minSlap:
                 print "droppen", naam
                 df = df.drop(lijstIndexWaardes)
                 df = df.reset_index()
 
         return df
+
+    def findValues(self,df,soortenGrofGef,maxGrof,zMv,naam,x,y):
+        indexLijstGrof = []
+        laagNummerLijstGrof = []
+        bovenkantLijstGrof = []
+        laagdikteLijstGrof = []
+        groveLaag = 0
+        grovelaagNummer = 0
+
+
+        for index, row in df.iterrows():
+            bovenkant = df.iloc[index]['bovenkant']
+            onderkant = df.iloc[index]['onderkant']
+            soort = df.iloc[index]['soort']
+            laagDikte = df.iloc[index]['laagDikte']
+
+            if soort in soortenGrofGef:
+                indexLijstGrof.append(index)
+                groveLaag += laagDikte
+
+                laagNummerLijstGrof.append(grovelaagNummer)
+                bovenkantLijstGrof.append(bovenkant)
+                laagdikteLijstGrof.append(groveLaag)
+
+            if soort not in soortenGrofGef:
+                grovelaagNummer += 1
+                groveLaag = 0
+
+
+        dctGrof = {'index': indexLijstGrof, 'laagNummer': laagNummerLijstGrof, 'bovenkant': bovenkantLijstGrof,
+                   'laagdikte': laagdikteLijstGrof}
+        dfGrof = pd.DataFrame(dctGrof)
+
+
+
+
+        groupedGrof = dfGrof.groupby('laagNummer')
+
+
+        for group in groupedGrof:
+            if group[1]['laagdikte'].max() > maxGrof:
+                deklaag = round(group[1]['bovenkant'].min(), 2)
+                topzand = round(zMv - abs(deklaag), 2)
+                soortOnder = df.iloc[-1]['soort']
+                zOnder = round(zMv - abs(df.iloc[-1]['onderkant']), 2)
+                # print deklaag, naam, "gelimiteerd"
+                break
+            else:
+                deklaag = round(float(df.iloc[-1]['onderkant']), 2)
+                topzand = -999
+                soortOnder = df.iloc[-1]['soort']
+                zOnder = round(zMv - abs(df.iloc[-1]['onderkant']), 2)
+
+                # print deklaag, naam, "geen limiet"
+                break
+
+        try:
+            deklaag, topzand, soortOnder, zOnder
+        except NameError:
+            deklaag = round(float(df.iloc[-1]['onderkant']), 2)
+            topzand = -999
+            soortOnder = df.iloc[-1]['soort']
+            zOnder = round(zMv - abs(df.iloc[-1]['onderkant']), 2)
+
+        # print group[1]['laagdikte'].max(), type(group[1]['index'])
+        # for item in group[1]['index']:
+        #     print item
+
+        print deklaag, naam
+
+
+
+
+        invoegen = (str(naam), zMv, deklaag, topzand, soortOnder, zOnder, (x, y))
+        return invoegen
 
 
 class boringMainXml(object):
@@ -177,18 +251,18 @@ class boringMainXml(object):
         self.gdb = gdb
 
     def execute(self):
-        # # maak nieuwe puntenlaag in gdb
-        # arcpy.CreateFeatureclass_management(gdb, puntenlaag, "POINT", spatial_reference=28992)
-        # arcpy.AddField_management(puntenlaag, 'naam', "TEXT")
-        # arcpy.AddField_management(puntenlaag, 'zMv', "DOUBLE", 2, field_is_nullable="NULLABLE")
-        # arcpy.AddField_management(puntenlaag, 'dikteDeklaag', "DOUBLE", 2, field_is_nullable="NULLABLE")
-        # arcpy.AddField_management(puntenlaag, 'topZandNAP', "DOUBLE", 2, field_is_nullable="NULLABLE")
-        # arcpy.AddField_management(puntenlaag, 'soortOnder', "TEXT")
-        # arcpy.AddField_management(puntenlaag, 'zOnderNAP', "DOUBLE", 2, field_is_nullable="NULLABLE")
-        #
-        # cursor = arcpy.da.InsertCursor(puntenlaag,
-        #                                ['naam', 'zMv', 'dikteDeklaag', 'topZandNAP', 'soortOnder', 'zOnderNAP',
-        #                                 'SHAPE@XY'])
+        # maak nieuwe puntenlaag in gdb
+        arcpy.CreateFeatureclass_management(gdb, puntenlaag, "POINT", spatial_reference=28992)
+        arcpy.AddField_management(puntenlaag, 'naam', "TEXT")
+        arcpy.AddField_management(puntenlaag, 'zMv', "DOUBLE", 2, field_is_nullable="NULLABLE")
+        arcpy.AddField_management(puntenlaag, 'dikteDeklaag', "DOUBLE", 2, field_is_nullable="NULLABLE")
+        arcpy.AddField_management(puntenlaag, 'topZandNAP', "DOUBLE", 2, field_is_nullable="NULLABLE")
+        arcpy.AddField_management(puntenlaag, 'soortOnder', "TEXT")
+        arcpy.AddField_management(puntenlaag, 'zOnderNAP', "DOUBLE", 2, field_is_nullable="NULLABLE")
+
+        cursor = arcpy.da.InsertCursor(puntenlaag,
+                                       ['naam', 'zMv', 'dikteDeklaag', 'topZandNAP', 'soortOnder', 'zOnderNAP',
+                                        'SHAPE@XY'])
 
 
 
@@ -203,9 +277,11 @@ class boringMainXml(object):
             x, y, zMv = base
 
             dfRaw = boring.createDF(xml)
-            dfClean = boring.cleanDF(dfRaw, soortenGrofXml, maxSlap, naam)
-
-
+            dfClean = boring.cleanDF(dfRaw, soortenGrofXml, minSlap, naam)
+            gisLayer = boring.findValues(dfClean, soortenGrofXml, maxGrof, zMv, naam, x, y)
+            # print dfClean
+            cursor.insertRow(gisLayer)
+            print naam+" is toegevoegd"
 
 
 test = boringMainXml(files,puntenlaag,gdb)
