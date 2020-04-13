@@ -113,12 +113,14 @@ class sonderingGef(object):
         # df['cws_onder'] = df['cws'].shift(-1)
         df['laagDikte'] = abs(df['bovenkant']-df['onderkant'])
 
-        # onderste rij repareren
+        # df repareren
         defaultLaagDikte = df.iloc[0]['laagDikte']
         for index, row in df.iterrows():
             if pd.isna(row['onderkant']):
                 df.at[index, 'laagDikte'] = defaultLaagDikte
                 df.at[index,'onderkant'] = (df.iloc[index]['bovenkant'])+defaultLaagDikte
+            if row['cws'] < 0:
+                df.at[index, 'cws'] = 0
 
 
         return df
@@ -136,15 +138,15 @@ class sonderingGef(object):
         for index, row in df.iterrows():
             bovenkant = df.iloc[index]['bovenkant']
             onderkant = df.iloc[index]['onderkant']
-            soort = df.iloc[index]['soort']
+            cws = df.iloc[index]['cws']
             laagDikte = df.iloc[index]['laagDikte']
 
 
-            if soort in soortenGrofGef:
+            if cws > maxCws:
                 slappelaagNummer +=1
                 slappeLaag = 0
 
-            if soort not in soortenGrofGef:
+            if cws < maxCws:
 
                 indexLijstSlap.append(index)
                 slappeLaag += laagDikte
@@ -178,6 +180,81 @@ class sonderingGef(object):
                 df = df.reset_index()
         return df
 
+    def findValues(self,df,maxCws,maxGrof,zMv,naam,x,y):
+        indexLijstGrof = []
+        laagNummerLijstGrof = []
+        bovenkantLijstGrof = []
+        laagdikteLijstGrof = []
+        groveLaag = 0
+        grovelaagNummer = 0
+
+####################################
+        for index, row in df.iterrows():
+            bovenkant = df.iloc[index]['bovenkant']
+            onderkant = df.iloc[index]['onderkant']
+            soort = df.iloc[index]['soort']
+            laagDikte = df.iloc[index]['laagDikte']
+
+            if soort in soortenGrofGef:
+                indexLijstGrof.append(index)
+                groveLaag += laagDikte
+
+                laagNummerLijstGrof.append(grovelaagNummer)
+                bovenkantLijstGrof.append(bovenkant)
+                laagdikteLijstGrof.append(groveLaag)
+
+            if soort not in soortenGrofGef:
+                grovelaagNummer += 1
+                groveLaag = 0
+
+
+        dctGrof = {'index': indexLijstGrof, 'laagNummer': laagNummerLijstGrof, 'bovenkant': bovenkantLijstGrof,
+                   'laagdikte': laagdikteLijstGrof}
+        dfGrof = pd.DataFrame(dctGrof)
+
+
+
+
+        groupedGrof = dfGrof.groupby('laagNummer')
+
+
+        for group in groupedGrof:
+            if group[1]['laagdikte'].max() > maxGrof:
+                deklaag = round(group[1]['bovenkant'].min(), 2)
+                topzand = round(zMv - abs(deklaag), 2)
+                soortOnder = df.iloc[-1]['soort']
+                zOnder = round(zMv - abs(df.iloc[-1]['onderkant']), 2)
+                print deklaag, naam, "gelimiteerd"
+                break
+            else:
+                deklaag = round(float(df.iloc[-1]['onderkant']), 2)
+                topzand = -999
+                soortOnder = df.iloc[-1]['soort']
+                zOnder = round(zMv - abs(df.iloc[-1]['onderkant']), 2)
+
+                print deklaag, naam, "geen limiet"
+                break
+
+        try:
+            deklaag, topzand, soortOnder, zOnder
+        except NameError:
+            deklaag = round(float(df.iloc[-1]['onderkant']), 2)
+            topzand = -999
+            soortOnder = df.iloc[-1]['soort']
+            zOnder = round(zMv - abs(df.iloc[-1]['onderkant']), 2)
+
+        # print group[1]['laagdikte'].max(), type(group[1]['index'])
+        # for item in group[1]['index']:
+        #     print item
+
+        # print deklaag, naam
+
+
+
+
+        invoegen = (str(naam), zMv, deklaag, topzand, soortOnder, zOnder, (x, y))
+        return invoegen
+
 
 
 class sonderingMainGef(object):
@@ -200,6 +277,7 @@ class sonderingMainGef(object):
             x, y, zMv, lijstMetingen, sep = base
 
             dfRaw = sondering.createDF(lijstMetingen, sep)
+            dfClean = sondering.cleanDF(dfRaw,maxCws,minSlap,naam)
 
 
 
