@@ -16,7 +16,7 @@ puntenlaag = 'testBoringen5m'
 
 soortenGrofGef = ['Z','G']
 maxGrof = 2
-maxSlap = 0.5
+minSlap = 0.5
 
 class boringGef(object):
     def __init__(self, file):
@@ -106,7 +106,7 @@ class boringGef(object):
         df['laagDikte'] = abs(df['bovenkant'] - df['onderkant'])
         return df
 
-    def cleanDF(self,df,soortenGrofGef, maxSlap,naam):
+    def cleanDF(self,df,soortenGrofGef, minSlap,naam):
 
         indexLijstSlap = []
         laagNummerLijstSlap = []
@@ -154,10 +154,10 @@ class boringGef(object):
                 for item in indexWaardes:
                     lijstIndexWaardes.append(int(item))
 
-            if laagdikteSlap < maxSlap:
+            if laagdikteSlap < minSlap:
                 print "droppen", naam
                 df = df.drop(lijstIndexWaardes)
-                df = df.reset_index()
+                df = df.reset_index(drop=True)
         return df
 
     def findValues(self,df,soortenGrofGef,maxGrof,zMv,naam,x,y):
@@ -206,15 +206,16 @@ class boringGef(object):
                 zOnder = round(zMv - abs(df.iloc[-1]['onderkant']), 2)
                 print deklaag, naam, "gelimiteerd"
                 break
-            else:
-                deklaag = round(float(df.iloc[-1]['onderkant']), 2)
-                topzand = -999
-                soortOnder = df.iloc[-1]['soort']
-                zOnder = round(zMv - abs(df.iloc[-1]['onderkant']), 2)
 
-                print deklaag, naam, "geen limiet"
-                break
 
+        try:
+            deklaag, topzand, soortOnder, zOnder
+        except NameError:
+            print "Geen limiet gevonden"
+            deklaag = round(float(df.iloc[-1]['onderkant']), 2)
+            topzand = -999
+            soortOnder = df.iloc[-1]['soort']
+            zOnder = round(zMv - abs(df.iloc[-1]['onderkant']), 2)
 
         # print group[1]['laagdikte'].max(), type(group[1]['index'])
         # for item in group[1]['index']:
@@ -239,7 +240,7 @@ class boringGef(object):
 
 
 
-class boringMain(object):
+class boringMainGef(object):
     def __init__(self,files,puntenlaag, gdb):
         self.files = files
         self.puntenlaag = puntenlaag
@@ -272,19 +273,19 @@ class boringMain(object):
             x, y, zMv, lijstMetingen, sep = base
 
             dfRaw = boring.createDF(lijstMetingen,sep)
-            dfClean = boring.cleanDF(dfRaw,soortenGrofGef,maxSlap,naam)
+            dfClean = boring.cleanDF(dfRaw,soortenGrofGef,minSlap,naam)
             gisLayer = boring.findValues(dfClean,soortenGrofGef,maxGrof,zMv,naam,x,y)
 
 
             cursor.insertRow(gisLayer)
-            print naam+"is toegevoegd"
+            print naam+" is toegevoegd"
 
 
 
 
 
 
-test = boringMain(files,puntenlaag,gdb)
+test = boringMainGef(files,puntenlaag,gdb)
 test.execute()
 
 
