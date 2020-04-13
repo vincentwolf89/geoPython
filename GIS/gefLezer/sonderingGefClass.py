@@ -3,7 +3,7 @@ import arcpy
 import pandas as pd
 
 
-files = r'C:\Users\Vincent\Desktop\testmapSonderingen'
+files = r'C:\Users\Vincent\Desktop\GO_WoS\sonderingen'
 arcpy.env.workspace = r'D:\GoogleDrive\WSRL\goTest.gdb'
 gdb = r'D:\GoogleDrive\WSRL\goTest.gdb'
 arcpy.env.overwriteOutput = True
@@ -15,8 +15,8 @@ arcpy.env.overwriteOutput = True
 puntenlaag = 'testSondering'
 
 soortenGrofGef = ['Z','G']
-maxGrof = 4
-minSlap = 0.3
+maxGrof = 2
+minSlap = 0.5
 
 maxCws = 5
 
@@ -107,14 +107,19 @@ class sonderingGef(object):
 
         # df repareren
         defaultLaagDikte = df.iloc[0]['laagDikte']
+        dropLijst = []
         for index, row in df.iterrows():
             if pd.isna(row['onderkant']):
                 df.at[index, 'laagDikte'] = defaultLaagDikte
                 df.at[index,'onderkant'] = (df.iloc[index]['bovenkant'])+defaultLaagDikte
             if row['cws'] < 0:
-                df.at[index, 'cws'] = 0
+                dropLijst.append(index)
+            #     df.at[index, 'cws'] = 0
+            # if round(row['cws'],2) == 0.00:
 
-
+        if dropLijst:
+            df = df.drop(dropLijst)
+            df = df.reset_index(drop=True)
         return df
 
 
@@ -158,6 +163,7 @@ class sonderingGef(object):
 
         groupedSlap = dfSlap.groupby('laagNummer')
 
+        dropLijst = []
         for group in groupedSlap:
             laagdikteSlap = group[1]['laagdikte'].max()
             indexWaardes = group[1]['index'].tolist()
@@ -166,10 +172,16 @@ class sonderingGef(object):
                 for item in indexWaardes:
                     lijstIndexWaardes.append(int(item))
 
-            if laagdikteSlap < minSlap:
-                print "droppen", naam
-                df = df.drop(lijstIndexWaardes)
-                df = df.reset_index(drop=True)
+            if laagdikteSlap < minSlap and lijstIndexWaardes:
+                # print "droppen", naam
+                # print lijstIndexWaardes
+                for item in lijstIndexWaardes:
+                    dropLijst.append(item)
+                # df = df.drop(lijstIndexWaardes)
+                # df = df.reset_index(drop=True)
+        if dropLijst:
+            df = df.drop(lijstIndexWaardes)
+            df = df.reset_index(drop=True)
         return df
 
     def findValues(self,df,maxCws,maxGrof,zMv,naam,x,y):
@@ -223,7 +235,6 @@ class sonderingGef(object):
                 soortOnder = df.iloc[-1]['cws']
                 zOnder = round(zMv - abs(df.iloc[-1]['onderkant']), 2)
                 print deklaag, naam, "gelimiteerd"
-                begrenzing = True
                 break
 
 
@@ -237,11 +248,6 @@ class sonderingGef(object):
             soortOnder = df.iloc[-1]['cws']
             zOnder = round(zMv - abs(df.iloc[-1]['onderkant']), 2)
 
-        # print group[1]['laagdikte'].max(), type(group[1]['index'])
-        # for item in group[1]['index']:
-        #     print item
-
-        # print deklaag, naam
 
 
 
@@ -284,6 +290,7 @@ class sonderingMainGef(object):
             x, y, zMv, lijstMetingen, sep = base
 
             dfRaw = sondering.createDF(lijstMetingen, sep)
+
             dfClean = sondering.cleanDF(dfRaw,maxCws,minSlap,naam)
             gisLayer = sondering.findValues(dfClean, maxCws, maxGrof, zMv, naam, x, y)
 
