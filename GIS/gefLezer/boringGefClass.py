@@ -256,6 +256,23 @@ class boringMainGef(object):
         self.puntenlaag = puntenlaag
         self.gdb = gdb
 
+    def gefTxt(self,files):
+        for gef in os.listdir(files):
+            if gef.endswith(".gef"):
+
+                ingef = os.path.join(files, gef)
+                if not os.path.isfile(ingef): continue
+                nieuwenaam = ingef.replace('.gef', '.txt')
+                output = os.rename(ingef, nieuwenaam)
+            elif gef.endswith(".GEF"):
+                ingef = os.path.join(files, gef)
+                if not os.path.isfile(ingef): continue
+                nieuwenaam = ingef.replace('.GEF', '.txt')
+                output = os.rename(ingef, nieuwenaam)
+
+
+
+
     def execute(self):
         # maak nieuwe puntenlaag in gdb
         arcpy.CreateFeatureclass_management(gdb, puntenlaag, "POINT", spatial_reference=28992)
@@ -271,8 +288,8 @@ class boringMainGef(object):
                                         'SHAPE@XY'])
 
 
-
-
+        # gef to txt
+        self.gefTxt(files)
 
         for file in os.listdir(files):
             boring = boringGef(file)
