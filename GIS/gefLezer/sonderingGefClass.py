@@ -15,8 +15,8 @@ arcpy.env.overwriteOutput = True
 puntenlaag = 'testSondering'
 
 soortenGrofGef = ['Z','G']
-maxGrof = 2
-minSlap = 0.5
+maxGrof = 4
+minSlap = 0.3
 
 maxCws = 5
 
@@ -82,19 +82,11 @@ class sonderingGef(object):
             return "Error"
 
     def createDF(self, lijstMetingen, sep):
-        # lagen zijn 0
-        deklaag = 0
-        groveLaag = 0
-
-        # checker voor aanwezigheid significante grove laag
-        grof = None
-        onderGrof = None
-        # andere_sep = False
 
         # definieer lege lijsten
         bovenkant = []
         cws = []
-        bovenkantGrof = []
+
 
         for item in lijstMetingen:
 
@@ -193,9 +185,11 @@ class sonderingGef(object):
             bovenkant = df.iloc[index]['bovenkant']
             onderkant = df.iloc[index]['onderkant']
             cws = df.iloc[index]['cws']
+
             laagDikte = df.iloc[index]['laagDikte']
 
             if cws > maxCws:
+
                 indexLijstGrof.append(index)
                 groveLaag += laagDikte
 
@@ -204,6 +198,7 @@ class sonderingGef(object):
                 laagdikteLijstGrof.append(groveLaag)
 
             if cws < maxCws:
+
                 grovelaagNummer += 1
                 groveLaag = 0
 
@@ -215,29 +210,28 @@ class sonderingGef(object):
 
 
 
+
         groupedGrof = dfGrof.groupby('laagNummer')
 
 
         for group in groupedGrof:
-            if group[1]['laagdikte'].max() > maxGrof:
+            maxDikte = group[1]['laagdikte'].max()
+            if maxDikte > maxGrof:
+                print maxDikte
                 deklaag = round(group[1]['bovenkant'].min(), 2)
                 topzand = round(zMv - abs(deklaag), 2)
                 soortOnder = df.iloc[-1]['cws']
                 zOnder = round(zMv - abs(df.iloc[-1]['onderkant']), 2)
                 print deklaag, naam, "gelimiteerd"
+                begrenzing = True
                 break
-            else:
-                deklaag = round(float(df.iloc[-1]['onderkant']), 2)
-                topzand = -999
-                soortOnder = df.iloc[-1]['cws']
-                zOnder = round(zMv - abs(df.iloc[-1]['onderkant']), 2)
 
-                print deklaag, naam, "geen limiet"
-                break
+
 
         try:
             deklaag, topzand, soortOnder, zOnder
         except NameError:
+            print "Geen limiet gevonden"
             deklaag = round(float(df.iloc[-1]['onderkant']), 2)
             topzand = -999
             soortOnder = df.iloc[-1]['cws']
@@ -273,11 +267,11 @@ class sonderingMainGef(object):
         arcpy.AddField_management(puntenlaag, 'zMv', "DOUBLE", 2, field_is_nullable="NULLABLE")
         arcpy.AddField_management(puntenlaag, 'dikteDeklaag', "DOUBLE", 2, field_is_nullable="NULLABLE")
         arcpy.AddField_management(puntenlaag, 'topZandNAP', "DOUBLE", 2, field_is_nullable="NULLABLE")
-        arcpy.AddField_management(puntenlaag, 'soortOnder', "TEXT")
+        arcpy.AddField_management(puntenlaag, 'cwsOnder', "TEXT")
         arcpy.AddField_management(puntenlaag, 'zOnderNAP', "DOUBLE", 2, field_is_nullable="NULLABLE")
 
         cursor = arcpy.da.InsertCursor(puntenlaag,
-                                       ['naam', 'zMv', 'dikteDeklaag', 'topZandNAP', 'soortOnder', 'zOnderNAP',
+                                       ['naam', 'zMv', 'dikteDeklaag', 'topZandNAP', 'cwsOnder', 'zOnderNAP',
                                         'SHAPE@XY'])
 
 
