@@ -3,7 +3,7 @@ import arcpy
 import pandas as pd
 
 
-files = r'C:\Users\Vincent\Desktop\testmapBoringen'
+files = r'C:\Users\Vincent\Desktop\GO_WoS\boringen_gef'
 arcpy.env.workspace = r'D:\GoogleDrive\WSRL\goTest.gdb'
 gdb = r'D:\GoogleDrive\WSRL\goTest.gdb'
 arcpy.env.overwriteOutput = True
@@ -213,27 +213,31 @@ class boringGef(object):
                 print deklaag, naam, "gelimiteerd"
                 break
 
-
+        # toevoegen standaard op waar zetten, tenzij lege meting
+        toevoegen = True
         try:
             deklaag, topzand, soortOnder, zOnder
         except NameError:
-            print "Geen limiet gevonden"
-            deklaag = round(float(df.iloc[-1]['onderkant']), 2)
-            topzand = -999
-            soortOnder = df.iloc[-1]['soort']
-            zOnder = round(zMv - abs(df.iloc[-1]['onderkant']), 2)
-
-        # print group[1]['laagdikte'].max(), type(group[1]['index'])
-        # for item in group[1]['index']:
-        #     print item
-
-        # print deklaag, naam
-
+            try:
+                df.iloc[-1]
+                print "Geen limiet gevonden, wel een meting", naam
+                deklaag = round(float(df.iloc[-1]['onderkant']), 2)
+                topzand = -999
+                soortOnder = df.iloc[-1]['soort']
+                zOnder = round(zMv - abs(df.iloc[-1]['onderkant']), 2)
+            except IndexError:
+                print "Lege meting", naam
+                toevoegen = False
 
 
 
-        invoegen = (str(naam), zMv, deklaag, topzand, soortOnder, zOnder, (x, y))
-        return invoegen
+
+
+        if toevoegen is False:
+            return None
+        else:
+            invoegen = (str(naam), zMv, deklaag, topzand, soortOnder, zOnder, (x, y))
+            return invoegen
 
 
 
@@ -280,11 +284,13 @@ class boringMainGef(object):
 
             dfRaw = boring.createDF(lijstMetingen,sep)
             dfClean = boring.cleanDF(dfRaw,soortenGrofGef,minSlap,naam)
-            gisLayer = boring.findValues(dfClean,soortenGrofGef,maxGrof,zMv,naam,x,y)
+            gisLayer = boring.findValues(dfClean, soortenGrofGef, maxGrof, zMv, naam, x, y)
 
-
-            cursor.insertRow(gisLayer)
-            print naam+" is toegevoegd"
+            if gisLayer is None:
+                pass
+            else:
+                cursor.insertRow(gisLayer)
+                print naam+" is toegevoegd"
 
 
 
