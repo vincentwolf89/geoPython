@@ -164,7 +164,7 @@ class boringXml(object):
             if laagdikteSlap < minSlap:
                 print "droppen", naam
                 df = df.drop(lijstIndexWaardes)
-                df = df.reset_index()
+                df = df.reset_index(drop=True)
 
         return df
 
@@ -214,18 +214,13 @@ class boringXml(object):
                 zOnder = round(zMv - abs(df.iloc[-1]['onderkant']), 2)
                 # print deklaag, naam, "gelimiteerd"
                 break
-            else:
-                deklaag = round(float(df.iloc[-1]['onderkant']), 2)
-                topzand = -999
-                soortOnder = df.iloc[-1]['soort']
-                zOnder = round(zMv - abs(df.iloc[-1]['onderkant']), 2)
 
-                # print deklaag, naam, "geen limiet"
-                break
+
 
         try:
             deklaag, topzand, soortOnder, zOnder
         except NameError:
+            print "Geen limiet gevonden"
             deklaag = round(float(df.iloc[-1]['onderkant']), 2)
             topzand = -999
             soortOnder = df.iloc[-1]['soort']
