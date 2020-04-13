@@ -4,7 +4,7 @@ import pandas as pd
 import xml.dom.minidom as minidom
 
 
-files = r'C:\Users\Vincent\Desktop\testmapBoringenXML'
+files = r'C:\Users\Vincent\Desktop\GO_WoS\boringen_xml'
 arcpy.env.workspace = r'D:\GoogleDrive\WSRL\goTest.gdb'
 gdb = r'D:\GoogleDrive\WSRL\goTest.gdb'
 arcpy.env.overwriteOutput = True
@@ -14,8 +14,8 @@ puntenlaag = 'testBoringenXml'
 
 soortenGrofGef = ['Z','G']
 soortenGrofXml = ['matigSiltigZand', 'zwakSiltigZand','sterkZandigeLeem','zwakZandigeLeem']
-maxGrof = 0.1
-minSlap = 0.0
+maxGrof = 2
+minSlap = 0.5
 
 class boringXml(object):
     def __init__(self, file):
@@ -218,28 +218,29 @@ class boringXml(object):
                 # print deklaag, naam, "gelimiteerd"
                 break
 
-
-
+        # toevoegen standaard op waar zetten, tenzij lege meting
+        toevoegen = True
         try:
             deklaag, topzand, soortOnder, zOnder
         except NameError:
-            print "Geen limiet gevonden"
-            deklaag = round(float(df.iloc[-1]['onderkant']), 2)
-            topzand = -999
-            soortOnder = df.iloc[-1]['soort']
-            zOnder = round(zMv - abs(df.iloc[-1]['onderkant']), 2)
-
-        # print group[1]['laagdikte'].max(), type(group[1]['index'])
-        # for item in group[1]['index']:
-        #     print item
-
-        print deklaag, naam
-
+            try:
+                df.iloc[-1]
+                print "Geen limiet gevonden, wel een meting", naam
+                deklaag = round(float(df.iloc[-1]['onderkant']), 2)
+                topzand = -999
+                soortOnder = df.iloc[-1]['soort']
+                zOnder = round(zMv - abs(df.iloc[-1]['onderkant']), 2)
+            except IndexError:
+                print "Lege meting", naam
+                toevoegen = False
 
 
 
-        invoegen = (str(naam), zMv, deklaag, topzand, soortOnder, zOnder, (x, y))
-        return invoegen
+        if toevoegen is False:
+            return None
+        else:
+            invoegen = (str(naam), zMv, deklaag, topzand, soortOnder, zOnder, (x, y))
+            return invoegen
 
 
 class boringMainXml(object):
@@ -277,7 +278,6 @@ class boringMainXml(object):
             dfRaw = boring.createDF(xml)
             dfClean = boring.cleanDF(dfRaw, soortenGrofXml, minSlap, naam)
             gisLayer = boring.findValues(dfClean, soortenGrofXml, maxGrof, zMv, naam, x, y)
-            print dfClean
             cursor.insertRow(gisLayer)
             print naam+" is toegevoegd"
 
