@@ -237,23 +237,30 @@ class sonderingGef(object):
                 print deklaag, naam, "gelimiteerd"
                 break
 
-
-
+        # toevoegen standaard op waar zetten, tenzij lege meting
+        toevoegen = True
         try:
             deklaag, topzand, soortOnder, zOnder
         except NameError:
-            print "Geen limiet gevonden"
-            deklaag = round(float(df.iloc[-1]['onderkant']), 2)
-            topzand = -999
-            soortOnder = df.iloc[-1]['cws']
-            zOnder = round(zMv - abs(df.iloc[-1]['onderkant']), 2)
+            try:
+                df.iloc[-1]
+                print "Geen limiet gevonden, wel een meting ", naam
+                deklaag = round(float(df.iloc[-1]['onderkant']), 2)
+                topzand = -999
+                soortOnder = df.iloc[-1]['cws']
+                zOnder = round(zMv - abs(df.iloc[-1]['onderkant']), 2)
+            except IndexError:
+                print "Lege meting", naam
+                toevoegen = False
 
 
 
 
-
-        invoegen = (str(naam), zMv, deklaag, topzand, soortOnder, zOnder, (x, y))
-        return invoegen
+        if toevoegen is False:
+            return None
+        else:
+            invoegen = (str(naam), zMv, deklaag, topzand, soortOnder, zOnder, (x, y))
+            return invoegen
 
 
 
