@@ -3,7 +3,7 @@ import arcpy
 import pandas as pd
 
 
-files = r'C:\Users\Vincent\Desktop\testmapSondering'
+files = r'C:\Users\Vincent\Desktop\testmapSonderingen'
 arcpy.env.workspace = r'D:\GoogleDrive\WSRL\goTest.gdb'
 gdb = r'D:\GoogleDrive\WSRL\goTest.gdb'
 arcpy.env.overwriteOutput = True
@@ -12,7 +12,7 @@ arcpy.env.overwriteOutput = True
 
 
 
-puntenlaag = 'testSonderingen'
+puntenlaag = 'testSondering'
 
 soortenGrofGef = ['Z','G']
 maxGrof = 2
@@ -177,7 +177,7 @@ class sonderingGef(object):
             if laagdikteSlap < minSlap:
                 print "droppen", naam
                 df = df.drop(lijstIndexWaardes)
-                df = df.reset_index()
+                df = df.reset_index(drop=True)
         return df
 
     def findValues(self,df,maxCws,maxGrof,zMv,naam,x,y):
@@ -188,14 +188,14 @@ class sonderingGef(object):
         groveLaag = 0
         grovelaagNummer = 0
 
-####################################
+
         for index, row in df.iterrows():
             bovenkant = df.iloc[index]['bovenkant']
             onderkant = df.iloc[index]['onderkant']
-            soort = df.iloc[index]['soort']
+            cws = df.iloc[index]['cws']
             laagDikte = df.iloc[index]['laagDikte']
 
-            if soort in soortenGrofGef:
+            if cws > maxCws:
                 indexLijstGrof.append(index)
                 groveLaag += laagDikte
 
@@ -203,7 +203,7 @@ class sonderingGef(object):
                 bovenkantLijstGrof.append(bovenkant)
                 laagdikteLijstGrof.append(groveLaag)
 
-            if soort not in soortenGrofGef:
+            if cws < maxCws:
                 grovelaagNummer += 1
                 groveLaag = 0
 
@@ -222,14 +222,14 @@ class sonderingGef(object):
             if group[1]['laagdikte'].max() > maxGrof:
                 deklaag = round(group[1]['bovenkant'].min(), 2)
                 topzand = round(zMv - abs(deklaag), 2)
-                soortOnder = df.iloc[-1]['soort']
+                soortOnder = df.iloc[-1]['cws']
                 zOnder = round(zMv - abs(df.iloc[-1]['onderkant']), 2)
                 print deklaag, naam, "gelimiteerd"
                 break
             else:
                 deklaag = round(float(df.iloc[-1]['onderkant']), 2)
                 topzand = -999
-                soortOnder = df.iloc[-1]['soort']
+                soortOnder = df.iloc[-1]['cws']
                 zOnder = round(zMv - abs(df.iloc[-1]['onderkant']), 2)
 
                 print deklaag, naam, "geen limiet"
@@ -240,7 +240,7 @@ class sonderingGef(object):
         except NameError:
             deklaag = round(float(df.iloc[-1]['onderkant']), 2)
             topzand = -999
-            soortOnder = df.iloc[-1]['soort']
+            soortOnder = df.iloc[-1]['cws']
             zOnder = round(zMv - abs(df.iloc[-1]['onderkant']), 2)
 
         # print group[1]['laagdikte'].max(), type(group[1]['index'])
@@ -267,6 +267,19 @@ class sonderingMainGef(object):
 
     def execute(self):
 
+        # maak nieuwe puntenlaag in gdb
+        arcpy.CreateFeatureclass_management(gdb, puntenlaag, "POINT", spatial_reference=28992)
+        arcpy.AddField_management(puntenlaag, 'naam', "TEXT")
+        arcpy.AddField_management(puntenlaag, 'zMv', "DOUBLE", 2, field_is_nullable="NULLABLE")
+        arcpy.AddField_management(puntenlaag, 'dikteDeklaag', "DOUBLE", 2, field_is_nullable="NULLABLE")
+        arcpy.AddField_management(puntenlaag, 'topZandNAP', "DOUBLE", 2, field_is_nullable="NULLABLE")
+        arcpy.AddField_management(puntenlaag, 'soortOnder', "TEXT")
+        arcpy.AddField_management(puntenlaag, 'zOnderNAP', "DOUBLE", 2, field_is_nullable="NULLABLE")
+
+        cursor = arcpy.da.InsertCursor(puntenlaag,
+                                       ['naam', 'zMv', 'dikteDeklaag', 'topZandNAP', 'soortOnder', 'zOnderNAP',
+                                        'SHAPE@XY'])
+
 
         for file in os.listdir(files):
             sondering = sonderingGef(file)
@@ -278,9 +291,10 @@ class sonderingMainGef(object):
 
             dfRaw = sondering.createDF(lijstMetingen, sep)
             dfClean = sondering.cleanDF(dfRaw,maxCws,minSlap,naam)
+            gisLayer = sondering.findValues(dfClean, maxCws, maxGrof, zMv, naam, x, y)
 
-
-
+            cursor.insertRow(gisLayer)
+            print naam + " is toegevoegd"
 
 
 test = sonderingMainGef(files,puntenlaag,gdb)
