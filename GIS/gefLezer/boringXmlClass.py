@@ -10,12 +10,12 @@ gdb = r'D:\GoogleDrive\WSRL\goTest.gdb'
 arcpy.env.overwriteOutput = True
 
 
-puntenlaag = 'testBoringenXml5m'
+puntenlaag = 'testBoringenXml'
 
 soortenGrofGef = ['Z','G']
 soortenGrofXml = ['matigSiltigZand', 'zwakSiltigZand','sterkZandigeLeem','zwakZandigeLeem']
-maxGrof = 0.5
-minSlap = 0.5
+maxGrof = 0.1
+minSlap = 0.0
 
 class boringXml(object):
     def __init__(self, file):
@@ -151,7 +151,7 @@ class boringXml(object):
         groupedSlap = dfSlap.groupby('laagNummer')
 
 
-
+        dropLijst = []
         for group in groupedSlap:
             laagdikteSlap = group[1]['laagdikte'].max()
 
@@ -161,11 +161,14 @@ class boringXml(object):
                 for item in indexWaardes:
                     lijstIndexWaardes.append(int(item))
 
-            if laagdikteSlap < minSlap:
-                print "droppen", naam
-                df = df.drop(lijstIndexWaardes)
-                df = df.reset_index(drop=True)
-
+            if laagdikteSlap < minSlap and lijstIndexWaardes:
+                # print "droppen", naam
+                # print lijstIndexWaardes
+                for item in lijstIndexWaardes:
+                    dropLijst.append(item)
+        if dropLijst:
+            df = df.drop(lijstIndexWaardes)
+            df = df.reset_index(drop=True)
         return df
 
     def findValues(self,df,soortenGrofGef,maxGrof,zMv,naam,x,y):
@@ -274,7 +277,7 @@ class boringMainXml(object):
             dfRaw = boring.createDF(xml)
             dfClean = boring.cleanDF(dfRaw, soortenGrofXml, minSlap, naam)
             gisLayer = boring.findValues(dfClean, soortenGrofXml, maxGrof, zMv, naam, x, y)
-            # print dfClean
+            print dfClean
             cursor.insertRow(gisLayer)
             print naam+" is toegevoegd"
 
