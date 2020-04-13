@@ -3,7 +3,7 @@ import arcpy
 import pandas as pd
 
 
-files = r'C:\Users\Vincent\Desktop\testmap'
+files = r'C:\Users\Vincent\Desktop\testmapBoringen'
 arcpy.env.workspace = r'D:\GoogleDrive\WSRL\goTest.gdb'
 gdb = r'D:\GoogleDrive\WSRL\goTest.gdb'
 arcpy.env.overwriteOutput = True
@@ -12,7 +12,7 @@ arcpy.env.overwriteOutput = True
 
 
 
-puntenlaag = 'testBoringen5m'
+puntenlaag = 'testBoringenGef'
 
 soortenGrofGef = ['Z','G']
 maxGrof = 2
@@ -146,6 +146,7 @@ class boringGef(object):
 
         groupedSlap = dfSlap.groupby('laagNummer')
 
+        dropLijst = []
         for group in groupedSlap:
             laagdikteSlap = group[1]['laagdikte'].max()
             indexWaardes = group[1]['index'].tolist()
@@ -154,10 +155,15 @@ class boringGef(object):
                 for item in indexWaardes:
                     lijstIndexWaardes.append(int(item))
 
-            if laagdikteSlap < minSlap:
-                print "droppen", naam
-                df = df.drop(lijstIndexWaardes)
-                df = df.reset_index(drop=True)
+            if laagdikteSlap < minSlap and lijstIndexWaardes:
+                # print "droppen", naam
+                # print lijstIndexWaardes
+                for item in lijstIndexWaardes:
+                    dropLijst.append(item)
+
+        if dropLijst:
+            df = df.drop(lijstIndexWaardes)
+            df = df.reset_index(drop=True)
         return df
 
     def findValues(self,df,soortenGrofGef,maxGrof,zMv,naam,x,y):
