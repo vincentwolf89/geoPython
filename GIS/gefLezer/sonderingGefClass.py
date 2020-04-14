@@ -3,7 +3,7 @@ import arcpy
 import pandas as pd
 
 
-files = r'C:\Users\Vincent\Desktop\GO_WoS\sonderingen'
+files = r'C:\Users\Vincent\Desktop\testmapSonderingen'
 arcpy.env.workspace = r'D:\GoogleDrive\WSRL\goTest.gdb'
 gdb = r'D:\GoogleDrive\WSRL\goTest.gdb'
 arcpy.env.overwriteOutput = True
@@ -12,13 +12,13 @@ arcpy.env.overwriteOutput = True
 
 
 
-puntenlaag = 'testSondering'
+puntenlaag = 'TESTtestSonderingen'
 
 soortenGrofGef = ['Z','G']
-maxGrof = 2
+maxGrof = 5
 minSlap = 0.5
-
 maxCws = 5
+grensHoogte = 0 # in m NAP
 
 class sonderingGef(object):
     def __init__(self,file):
@@ -79,7 +79,7 @@ class sonderingGef(object):
         if coords is True and metingen is True:
             return x,y,zMv, lijstMetingen, sep
         else:
-            return "Error"
+            return None
 
     def createDF(self, lijstMetingen, sep):
 
@@ -123,7 +123,7 @@ class sonderingGef(object):
         return df
 
 
-    def cleanDF(self,df,maxCws, minSlap,naam):
+    def cleanDF(self,df,maxCws, minSlap,naam, zMv, grensHoogte):
 
         indexLijstSlap = []
         laagNummerLijstSlap = []
@@ -180,8 +180,22 @@ class sonderingGef(object):
                 # df = df.drop(lijstIndexWaardes)
                 # df = df.reset_index(drop=True)
         if dropLijst:
-            df = df.drop(lijstIndexWaardes)
+            df = df.drop(dropLijst)
             df = df.reset_index(drop=True)
+
+        # verwijder rijen met hoogtes onder grenshoogte
+        dropLijstGrens = []
+        if zMv < grensHoogte:
+            pass
+        else:
+            for index, row in df.iterrows():
+                if zMv - row['onderkant'] < grensHoogte:
+                    dropLijstGrens.append(index)
+
+        if dropLijstGrens:
+            df = df.drop(dropLijstGrens)
+            df = df.reset_index(drop=True)
+
         return df
 
     def findValues(self,df,maxCws,maxGrof,zMv,naam,x,y):
@@ -241,12 +255,34 @@ class sonderingGef(object):
         toevoegen = True
         try:
             deklaag, topzand, soortOnder, zOnder
+            indicatieTZ = "Aanwezig"
         except NameError:
             try:
                 df.iloc[-1]
-                print "Geen limiet gevonden, wel een meting ", naam
-                deklaag = round(float(df.iloc[-1]['onderkant']), 2)
-                topzand = -999
+
+                soortOnder = df.iloc[-1]['cws']
+                if soortOnder > maxCws:
+                    dfReversed = df.iloc[::-1]
+
+                    for index, row in dfReversed.iterrows():
+                        if row['cws'] < maxCws:
+                            deklaag = round(row['onderkant'], 2)
+                            topzand = round(zMv - abs(deklaag), 2)
+                            indicatieTZ = "Mogelijk aanwezig"
+                            print "Mogelijke waarde topzand gevonden, deklaag aangepast"
+                            break
+                try:
+                    topzand
+                except NameError:
+                    topzand = -999
+                    indicatieTZ = "Niet aanwezig"
+                    deklaag = round(float(df.iloc[-1]['onderkant']), 2)
+
+
+
+                # print "Geen limiet gevonden, wel een meting ", naam
+                # deklaag = round(float(df.iloc[-1]['onderkant']), 2)
+                # topzand = -999
                 soortOnder = df.iloc[-1]['cws']
                 zOnder = round(zMv - abs(df.iloc[-1]['onderkant']), 2)
             except IndexError:
@@ -259,7 +295,7 @@ class sonderingGef(object):
         if toevoegen is False:
             return None
         else:
-            invoegen = (str(naam), zMv, deklaag, topzand, soortOnder, zOnder, (x, y))
+            invoegen = (str(naam), zMv, deklaag, topzand, indicatieTZ, soortOnder, zOnder, (x, y))
             return invoegen
 
 
@@ -295,11 +331,12 @@ class sonderingMainGef(object):
         arcpy.AddField_management(puntenlaag, 'zMv', "DOUBLE", 2, field_is_nullable="NULLABLE")
         arcpy.AddField_management(puntenlaag, 'dikteDeklaag', "DOUBLE", 2, field_is_nullable="NULLABLE")
         arcpy.AddField_management(puntenlaag, 'topZandNAP', "DOUBLE", 2, field_is_nullable="NULLABLE")
+        arcpy.AddField_management(puntenlaag, 'indicatieTZ', "TEXT")
         arcpy.AddField_management(puntenlaag, 'cwsOnder', "TEXT")
         arcpy.AddField_management(puntenlaag, 'zOnderNAP', "DOUBLE", 2, field_is_nullable="NULLABLE")
 
         cursor = arcpy.da.InsertCursor(puntenlaag,
-                                       ['naam', 'zMv', 'dikteDeklaag', 'topZandNAP', 'cwsOnder', 'zOnderNAP',
+                                       ['naam', 'zMv', 'dikteDeklaag', 'topZandNAP','indicatieTZ', 'cwsOnder', 'zOnderNAP',
                                         'SHAPE@XY'])
 
         # gef to txt
@@ -311,15 +348,23 @@ class sonderingMainGef(object):
             lines = file[0]
             naam = file[1]
             base = sondering.getBase(lines)
-            x, y, zMv, lijstMetingen, sep = base
+            if base is not None:
+                x, y, zMv, lijstMetingen, sep = base
+                dfRaw = sondering.createDF(lijstMetingen, sep)
 
-            dfRaw = sondering.createDF(lijstMetingen, sep)
+                dfClean = sondering.cleanDF(dfRaw, maxCws, minSlap, naam, zMv,grensHoogte)
+                gisLayer = sondering.findValues(dfClean, maxCws, maxGrof, zMv, naam, x, y)
 
-            dfClean = sondering.cleanDF(dfRaw,maxCws,minSlap,naam)
-            gisLayer = sondering.findValues(dfClean, maxCws, maxGrof, zMv, naam, x, y)
+                if gisLayer is None or zMv < grensHoogte:
+                    pass
+                else:
+                    cursor.insertRow(gisLayer)
+                    print naam + " is toegevoegd"
+            else:
+                pass
 
-            cursor.insertRow(gisLayer)
-            print naam + " is toegevoegd"
+
+
 
 
 test = sonderingMainGef(files,puntenlaag,gdb)
