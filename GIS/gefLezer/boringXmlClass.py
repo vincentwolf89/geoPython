@@ -10,12 +10,13 @@ gdb = r'D:\GoogleDrive\WSRL\goTest.gdb'
 arcpy.env.overwriteOutput = True
 
 
-puntenlaag = 'testBoringenXml'
+puntenlaag = 'TESTtestBoringenXml'
 
 soortenGrofGef = ['Z','G']
 soortenGrofXml = ['matigSiltigZand', 'zwakSiltigZand','sterkZandigeLeem','zwakZandigeLeem']
-maxGrof = 2
+maxGrof = 5
 minSlap = 0.5
+grensHoogte = 0 # in m NAP
 
 class boringXml(object):
     def __init__(self, file):
@@ -64,8 +65,11 @@ class boringXml(object):
         else:
             zOnder = None
 
-
-        return x, y, zMv
+        try:
+            x, y, zMv
+            return x, y, zMv
+        except NameError:
+            return None
 
     def createDF(self,xml):
         # create pandas dataframe with layers
@@ -110,7 +114,7 @@ class boringXml(object):
 
             return df
 
-    def cleanDF(self,df,soortenGrofXml, minSlap,naam):
+    def cleanDF(self,df,soortenGrofXml, minSlap,naam,zMv,grensHoogte):
 
         indexLijstSlap = []
         laagNummerLijstSlap = []
@@ -167,8 +171,22 @@ class boringXml(object):
                 for item in lijstIndexWaardes:
                     dropLijst.append(item)
         if dropLijst:
-            df = df.drop(lijstIndexWaardes)
+            df = df.drop(dropLijst)
             df = df.reset_index(drop=True)
+
+        # verwijder rijen met hoogtes onder grenshoogte
+        dropLijstGrens = []
+        if zMv < grensHoogte:
+            pass
+        else:
+            for index, row in df.iterrows():
+                if zMv - row['onderkant'] < grensHoogte:
+                    dropLijstGrens.append(index)
+
+        if dropLijstGrens:
+            df = df.drop(dropLijstGrens)
+            df = df.reset_index(drop=True)
+
         return df
 
     def findValues(self,df,soortenGrofGef,maxGrof,zMv,naam,x,y):
@@ -220,14 +238,37 @@ class boringXml(object):
 
         # toevoegen standaard op waar zetten, tenzij lege meting
         toevoegen = True
+
         try:
             deklaag, topzand, soortOnder, zOnder
+            indicatieTZ = "Aanwezig"
         except NameError:
             try:
                 df.iloc[-1]
-                print "Geen limiet gevonden, wel een meting", naam
-                deklaag = round(float(df.iloc[-1]['onderkant']), 2)
-                topzand = -999
+
+                soortOnder = df.iloc[-1]['soort']
+                if soortOnder in soortenGrofGef:
+                    dfReversed = df.iloc[::-1]
+
+                    for index, row in dfReversed.iterrows():
+                        if row['soort'] not in soortenGrofGef:
+                            deklaag = round(row['onderkant'], 2)
+                            topzand = round(zMv - abs(deklaag), 2)
+                            indicatieTZ = "Mogelijk aanwezig"
+                            print "Mogelijke waarde topzand gevonden, deklaag aangepast"
+                            break
+                try:
+                    topzand
+                except NameError:
+                    topzand = -999
+                    indicatieTZ = "Niet aanwezig"
+                    deklaag = round(float(df.iloc[-1]['onderkant']), 2)
+
+
+
+                # print "Geen limiet gevonden, wel een meting", naam
+                # deklaag = round(float(df.iloc[-1]['onderkant']), 2)
+                # topzand = -999
                 soortOnder = df.iloc[-1]['soort']
                 zOnder = round(zMv - abs(df.iloc[-1]['onderkant']), 2)
             except IndexError:
@@ -239,7 +280,7 @@ class boringXml(object):
         if toevoegen is False:
             return None
         else:
-            invoegen = (str(naam), zMv, deklaag, topzand, soortOnder, zOnder, (x, y))
+            invoegen = (str(naam), zMv, deklaag, topzand, indicatieTZ, soortOnder, zOnder, (x, y))
             return invoegen
 
 
@@ -256,11 +297,12 @@ class boringMainXml(object):
         arcpy.AddField_management(puntenlaag, 'zMv', "DOUBLE", 2, field_is_nullable="NULLABLE")
         arcpy.AddField_management(puntenlaag, 'dikteDeklaag', "DOUBLE", 2, field_is_nullable="NULLABLE")
         arcpy.AddField_management(puntenlaag, 'topZandNAP', "DOUBLE", 2, field_is_nullable="NULLABLE")
+        arcpy.AddField_management(puntenlaag, 'indicatieTZ', "TEXT")
         arcpy.AddField_management(puntenlaag, 'soortOnder', "TEXT")
         arcpy.AddField_management(puntenlaag, 'zOnderNAP', "DOUBLE", 2, field_is_nullable="NULLABLE")
 
         cursor = arcpy.da.InsertCursor(puntenlaag,
-                                       ['naam', 'zMv', 'dikteDeklaag', 'topZandNAP', 'soortOnder', 'zOnderNAP',
+                                       ['naam', 'zMv', 'dikteDeklaag', 'topZandNAP','indicatieTZ', 'soortOnder', 'zOnderNAP',
                                         'SHAPE@XY'])
 
 
@@ -273,13 +315,20 @@ class boringMainXml(object):
             xml = file[0]
             naam = file[1]
             base = boring.getBase(xml)
-            x, y, zMv = base
+            if base is not None:
+                x, y, zMv = base
+                dfRaw = boring.createDF(xml)
+                dfClean = boring.cleanDF(dfRaw, soortenGrofXml, minSlap, naam,zMv,grensHoogte)
+                gisLayer = boring.findValues(dfClean, soortenGrofXml, maxGrof, zMv, naam, x, y)
+                if gisLayer is None or zMv < grensHoogte:
+                    pass
+                else:
+                    cursor.insertRow(gisLayer)
+                    print naam + " is toegevoegd"
+            else:
+                pass
 
-            dfRaw = boring.createDF(xml)
-            dfClean = boring.cleanDF(dfRaw, soortenGrofXml, minSlap, naam)
-            gisLayer = boring.findValues(dfClean, soortenGrofXml, maxGrof, zMv, naam, x, y)
-            cursor.insertRow(gisLayer)
-            print naam+" is toegevoegd"
+
 
 
 test = boringMainXml(files,puntenlaag,gdb)
