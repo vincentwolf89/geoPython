@@ -3,22 +3,22 @@ import arcpy
 import pandas as pd
 
 
-files = r'C:\Users\Vincent\Desktop\testmapSonderingen'
-arcpy.env.workspace = r'D:\GoogleDrive\WSRL\goTest.gdb'
-gdb = r'D:\GoogleDrive\WSRL\goTest.gdb'
+files = r'D:\Projecten\WSRL\GoSafe\sonderingen_safe'
+arcpy.env.workspace = r'D:\GoogleDrive\WSRL\go_safe.gdb'
+gdb = r'D:\GoogleDrive\WSRL\go_safe.gdb'
 arcpy.env.overwriteOutput = True
 
 
 
 
 
-puntenlaag = 'TESTtestSonderingen'
+puntenlaag = 'sonderingenSafeGef'
 
 soortenGrofGef = ['Z','G']
 maxGrof = 5
 minSlap = 0.5
 maxCws = 5
-grensHoogte = 0 # in m NAP
+grensHoogte = -30 # in m NAP
 
 class sonderingGef(object):
     def __init__(self,file):
@@ -63,6 +63,7 @@ class sonderingGef(object):
             coords = True
         except NameError:
             print "Geen coordinaten gevonden"
+            coords = False
             # break
         try:
             sep
