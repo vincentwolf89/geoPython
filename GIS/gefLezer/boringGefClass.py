@@ -3,21 +3,21 @@ import arcpy
 import pandas as pd
 
 
-files = r'D:\Projecten\WSRL\GoSprok\WSRL_eigen\HB'
-arcpy.env.workspace = r'D:\GoogleDrive\WSRL\sprok_sterrenschans.gdb'
-gdb = r'D:\GoogleDrive\WSRL\sprok_sterrenschans.gdb'
+files = r'D:\Projecten\WSRL\GoSafe\boringen_safe'
+arcpy.env.workspace = r'D:\GoogleDrive\WSRL\go_safe.gdb'
+gdb = r'D:\GoogleDrive\WSRL\go_safe.gdb'
 arcpy.env.overwriteOutput = True
 
 
 
 
 
-puntenlaag = 'hbSprokWSRL'
+puntenlaag = 'boringenSafeGef'
 
 soortenGrofGef = ['Z','G']
 maxGrof = 5
 minSlap = 0.5
-grensHoogte = 0 # in m NAP
+grensHoogte = -30 # in m NAP
 
 class boringGef(object):
     def __init__(self, file):
@@ -61,7 +61,7 @@ class boringGef(object):
             coords = True
         except NameError:
             print "Geen coordinaten gevonden"
-            coords = None
+            coords = False
             # break
         try:
             sep
@@ -100,8 +100,6 @@ class boringGef(object):
 
 
 
-            print soort
-            # soort = (onderdelen[2])[1]
 
             indexLijst.append(index)
             bovenkantLijst.append(bovenkant)
