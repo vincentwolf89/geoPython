@@ -12,7 +12,7 @@ arcpy.env.overwriteOutput = True
 
 
 
-puntenlaag = 'boringenSafeGef'
+puntenlaag = 'test_boringenSafeGef'
 
 soortenGrofGef = ['Z','G']
 maxGrof = 5
