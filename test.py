@@ -5,7 +5,7 @@ from arcpy.sa import *
 import xlwt
 import pandas as pd
 from itertools import groupby
-# uitzetten melding pandas
+# uitzetten melding pandas#
 pd.set_option('mode.chained_assignment', None)
 from basisfuncties import*
 import matplotlib.pyplot as plt
