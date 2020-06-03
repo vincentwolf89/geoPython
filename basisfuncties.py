@@ -231,7 +231,7 @@ def extract_z_arcpy(invoerpunten, uitvoerpunten, raster): #
     arcpy.AlterField_management(uitvoerpunten, 'RASTERVALU', 'z_ahn')
     print "Hoogtewaarde aan punten gekoppeld"
 
-def add_xy(uitvoerpunten,code):
+def add_xy(uitvoerpunten,code,trajectlijn):
 
     existing_fields = arcpy.ListFields(uitvoerpunten)
     needed_fields = ['OBJECTID', 'Shape', 'profielnummer', 'afstand', 'z_ahn', code]
@@ -1685,3 +1685,5 @@ def excelWriterTraject(uitvoerpunten,excel):
 
     #export excel
     df.to_excel(excel)  
+
+    print ("Excel gemaakt van profieldata")
