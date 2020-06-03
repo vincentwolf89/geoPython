@@ -1678,5 +1678,10 @@ def bereken_restlevensduur(profielen,bodemdalingskaart,afstand_zichtjaar,toetspe
     print 'Restlevensduur berekend'
 
 
+def excelWriterTraject(uitvoerpunten,excel):
+    # df van profielpunten
+    array = arcpy.da.FeatureClassToNumPyArray(uitvoerpunten, ('profielnummer', 'afstand', 'z_ahn', 'x', 'y'))
+    df = pd.DataFrame(array)
 
-
+    #export excel
+    df.to_excel(excel)  
