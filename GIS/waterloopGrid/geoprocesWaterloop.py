@@ -1,4 +1,6 @@
 import arcpy
+import sys
+sys.path.append('.')
 from basisfuncties import average, generate_profiles
 
 class gpWaterloop(object):

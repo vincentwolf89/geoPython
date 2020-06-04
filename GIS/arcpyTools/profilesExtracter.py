@@ -31,6 +31,7 @@ profielen = "profielen"
 invoerpunten = "punten_profielen"
 uitvoerpunten = "punten_profielen_z"
 excel = r'C:\Users\Vincent\Desktop\profielenShV1.xlsx'
+veldnamen =['profielnummer','metreringDp', 'afstand', 'z_ahn', 'x', 'y']
 
 
 ## runner
@@ -44,9 +45,9 @@ extract_z_arcpy(invoerpunten,uitvoerpunten,raster)
 
 add_xy(uitvoerpunten, code,trajectlijn)
 
-excelWriterTraject(uitvoerpunten,excel)
+excelWriterTraject(uitvoerpunten,excel,veldnamen)
 
-# excel_writer(uitvoerpunten,code,excel,code,trajectlijn,999,-200,200)
+
 
 
 
