@@ -7,26 +7,26 @@ import os, sys
 
 
 # from basisfuncties import*
-arcpy.env.workspace = r'D:\Projecten\WSRL\go_overzetten.gdb'
-gdb = r'D:\Projecten\WSRL\go_overzetten.gdb'
+arcpy.env.workspace = r'D:\Projecten\WSRL\goNieuw2020.gdb'
+gdb = r'D:\Projecten\WSRL\goNieuw2020.gdb'
 arcpy.env.overwriteOutput = True
 
 
-gefmap_origin = "C:/Users/Vincent/Desktop/totaal_zakbaken_gef"
-gef_extensie = ".gef"
+gefmap_origin = "C:\Users\Vincent\Desktop\goNieuwVincent\goNieuwVincent\C_Sonderingen\PDF"
+gef_extensie = ".PDF"
 
-gefmap = r'C:\Users\Vincent\Desktop\totaal_zakbaken'
-puntenlaag = 'zakbaken_safe'
+gefmap = r'C:\Users\Vincent\Desktop\gefmap'
+puntenlaag = 'sonderingenSafe2020PDF'
 nan = -9999
 
-def gef_txt(gefmap):
+def gef_txt(gefmap, gef_extensie):
     for gef in os.listdir(gefmap):
         ingef = os.path.join(gefmap, gef)
         if not os.path.isfile(ingef): continue
-        nieuwenaam = ingef.replace('.gef', '.txt')
+        nieuwenaam = ingef.replace(gef_extensie, '.txt')
         output = os.rename(ingef, nieuwenaam)
 
-def gef_to_gis(gefmap, puntenlaag, gefmap_origin):
+def gef_to_gis(gefmap, puntenlaag, gefmap_origin,gef_extensie):
     # create leeg df
     velden = ['naam', 'x_rd', 'y_rd', 'z_nap', 'datum', 'bedrijf']
     df = pd.DataFrame(columns=velden)
@@ -186,6 +186,6 @@ def attach_gef(puntenlaag):
     arcpy.DeleteField_management(puntenlaag,"origin")
     print "Bijlages toegevoegd"
 
-# gef_txt(gefmap)
-gef_to_gis(gefmap,puntenlaag,gefmap_origin)
+gef_txt(gefmap, gef_extensie)
+gef_to_gis(gefmap,puntenlaag,gefmap_origin, gef_extensie)
 attach_gef(puntenlaag)
