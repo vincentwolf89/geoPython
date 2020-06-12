@@ -3,21 +3,24 @@ import arcpy
 import pandas as pd
 
 
-files = r'D:\Projecten\WSRL\GoSafe\boringen_safe'
-arcpy.env.workspace = r'D:\GoogleDrive\WSRL\go_safe.gdb'
-gdb = r'D:\GoogleDrive\WSRL\go_safe.gdb'
+files = r'C:\Users\Vincent\Desktop\goSH\goSH\dino\boringen'
+arcpy.env.workspace = r'D:\Projecten\WSRL\goSH.gdb'
+gdb = r'D:\Projecten\WSRL\goSH.gdb'
 arcpy.env.overwriteOutput = True
 
 
 
 
 
-puntenlaag = 'test_boringenSafeGef'
+puntenlaag = 'boringenDinoSH'
 
 soortenGrofGef = ['Z','G']
-maxGrof = 5
-minSlap = 0.5
+maxGrof = 1
+minSlap = 0.1 # aangepast van 0.5 naar ...
 grensHoogte = -30 # in m NAP
+begrenzingOnderMaaiveld = True
+maxOnderMv = 5 
+beginWaarde = 0 
 
 class boringGef(object):
     def __init__(self, file):
@@ -175,14 +178,23 @@ class boringGef(object):
             df = df.drop(dropLijst)
             df = df.reset_index(drop=True)
 
-        # verwijder rijen met hoogtes onder grenshoogte
+        # verwijder rijen met hoogtes onder grenshoogte of onder ingegeven maxniveau onder maaiveld
         dropLijstGrens = []
-        if zMv < grensHoogte:
-            pass
-        else:
+        if begrenzingOnderMaaiveld is True:
             for index, row in df.iterrows():
-                if zMv-row['onderkant'] < grensHoogte:
+                if abs(beginWaarde-row['onderkant']) > maxOnderMv:
                     dropLijstGrens.append(index)
+                else:
+                    pass
+
+  
+        else:            
+            if zMv < grensHoogte:
+                pass
+            else:
+                for index, row in df.iterrows():
+                    if zMv-row['onderkant'] < grensHoogte:
+                        dropLijstGrens.append(index)
 
         if dropLijstGrens:
             df = df.drop(dropLijstGrens)

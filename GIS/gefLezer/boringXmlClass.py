@@ -174,18 +174,28 @@ class boringXml(object):
             df = df.drop(dropLijst)
             df = df.reset_index(drop=True)
 
-        # verwijder rijen met hoogtes onder grenshoogte
+        # verwijder rijen met hoogtes onder grenshoogte of onder ingegeven maxniveau onder maaiveld
         dropLijstGrens = []
-        if zMv < grensHoogte:
-            pass
-        else:
+        if begrenzingOnderMaaiveld is True:
             for index, row in df.iterrows():
-                if zMv - row['onderkant'] < grensHoogte:
+                if abs(beginWaarde-row['onderkant']) > maxOnderMv:
                     dropLijstGrens.append(index)
+                else:
+                    pass
+
+  
+        else:            
+            if zMv < grensHoogte:
+                pass
+            else:
+                for index, row in df.iterrows():
+                    if zMv-row['onderkant'] < grensHoogte:
+                        dropLijstGrens.append(index)
 
         if dropLijstGrens:
             df = df.drop(dropLijstGrens)
             df = df.reset_index(drop=True)
+
 
         return df
 
