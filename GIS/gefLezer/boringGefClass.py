@@ -3,7 +3,7 @@ import arcpy
 import pandas as pd
 
 
-files = r'C:\Users\Vincent\Desktop\goSH\goSH\dino\boringen'
+files = r'C:\Users\Vincent\Desktop\goSH\goSH\wsrl\MB'
 arcpy.env.workspace = r'D:\Projecten\WSRL\goSH.gdb'
 gdb = r'D:\Projecten\WSRL\goSH.gdb'
 arcpy.env.overwriteOutput = True
@@ -12,11 +12,11 @@ arcpy.env.overwriteOutput = True
 
 
 
-puntenlaag = 'boringenDinoSH'
+puntenlaag = 'boringenMbWsrlSH'
 
 soortenGrofGef = ['Z','G']
 maxGrof = 1
-minSlap = 0.1 # aangepast van 0.5 naar ...
+minSlap = 0.5 # aangepast van 0.5 naar ...
 grensHoogte = -30 # in m NAP
 begrenzingOnderMaaiveld = True
 maxOnderMv = 5 

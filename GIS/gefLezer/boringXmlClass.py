@@ -17,6 +17,9 @@ soortenGrofXml = ['matigSiltigZand', 'zwakSiltigZand','sterkZandigeLeem','zwakZa
 maxGrof = 5
 minSlap = 0.5
 grensHoogte = 0 # in m NAP
+begrenzingOnderMaaiveld = True
+maxOnderMv = 5 
+beginWaarde = 0 
 
 class boringXml(object):
     def __init__(self, file):
