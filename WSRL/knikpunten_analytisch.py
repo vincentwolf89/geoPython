@@ -7,7 +7,7 @@ from scipy.interpolate import UnivariateSpline
 import scipy.signal
 from rdp import rdp
 
-stapgrootte_punten = 2
+stapgrootte_punten = 0.5
 max_talud = 0.2
 
 max_voorland = -75
@@ -22,14 +22,14 @@ def average(lijst):
 
 
 
-arcpy.env.workspace = 'C:/Users/vince/Desktop/GIS/test.gdb'
+arcpy.env.workspace = r'D:\Projecten\WSRL\temp_sh.gdb'
 arcpy.env.overwriteOutput = True
 
 
 invoer = 'punten_profielen_z'
 
 
-array = arcpy.da.FeatureClassToNumPyArray(invoer, ('OBJECTID','profielnummer','dv_nummer', 'afstand', 'z_ahn'))
+array = arcpy.da.FeatureClassToNumPyArray(invoer, ('OBJECTID','profielnummer','dijktraject', 'afstand', 'z_ahn'))
 df = pd.DataFrame(array)
 df2 = df.dropna()
 sorted = df2.sort_values(['profielnummer', 'afstand'], ascending=[True, True])
@@ -63,7 +63,11 @@ for name, group in grouped:
     for index, row in landzijde.iterrows():
         if row['afstand'] > min_achterland and row['afstand'] < max_achterland :
             mv_achterland_lijst.append(row['z_ahn'])
-    mv_achterland = average(mv_achterland_lijst)
+
+    if mv_achterland_lijst:        
+        mv_achterland = average(mv_achterland_lijst)
+    else:
+        break
     # print mv_achterland
 
 
