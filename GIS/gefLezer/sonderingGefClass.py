@@ -3,16 +3,16 @@ import arcpy
 import pandas as pd
 
 
-files = r'C:\Users\Vincent\Desktop\goSH\goSH\wsrl\sonderingen'
-arcpy.env.workspace = r'D:\Projecten\WSRL\goSH.gdb'
-gdb = r'D:\Projecten\WSRL\goSH.gdb'
+files = r'D:\Projecten\WSRL\sterreschans_heteren\go\datadino14-7\Geotechnisch sondeeronderzoek BRO'
+arcpy.env.workspace = r'D:\Projecten\WSRL\sterreschans_heteren\GIS\datadino14_7.gdb'
+gdb = r'D:\Projecten\WSRL\sterreschans_heteren\GIS\datadino14_7.gdb'
 arcpy.env.overwriteOutput = True
 
 
 
 
 
-puntenlaag = 'sonderingenWsrlSH'
+puntenlaag = 'ShDinoSonderingen'
 
 soortenGrofGef = ['Z','G']
 maxGrof = 1

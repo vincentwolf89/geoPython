@@ -3,16 +3,16 @@ import arcpy
 import pandas as pd
 
 
-files = r'C:\Users\Vincent\Desktop\goSH\goSH\wsrl\MB'
-arcpy.env.workspace = r'D:\Projecten\WSRL\goSH.gdb'
-gdb = r'D:\Projecten\WSRL\goSH.gdb'
+files = r'D:\Projecten\WSRL\sterreschans_heteren\go\datadino14-7\Boormonsterprofiel_Geologisch booronderzoek'
+arcpy.env.workspace = r'D:\Projecten\WSRL\sterreschans_heteren\GIS\datadino14_7.gdb'
+gdb = r'D:\Projecten\WSRL\sterreschans_heteren\GIS\datadino14_7.gdb'
 arcpy.env.overwriteOutput = True
 
 
 
 
 
-puntenlaag = 'boringenMbWsrlSH'
+puntenlaag = 'ShDinoBoringenGeo'
 
 soortenGrofGef = ['Z','G']
 maxGrof = 1

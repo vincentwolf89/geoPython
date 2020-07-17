@@ -516,6 +516,95 @@ def generate_profiles(profiel_interval,profiel_lengte_land,profiel_lengte_rivier
 
     print 'Profielen gemaakt op trajectlijn'
 
+
+def locate_profiles(profielen,dijkpalen,split_traject,RID,profileID,profielenUitvoer):
+    
+
+    # bepaal overgangen (snijpunten dijkpalen)
+    tempOvergangen = "tempOvergangen"
+    arcpy.FeatureVerticesToPoints_management(split_traject, tempOvergangen, "BOTH_ENDS")
+    
+    #### non splits
+    arcpy.MakeFeatureLayer_management(profielen, 'templayer') 
+    arcpy.SelectLayerByLocation_management('templayer', "INTERSECT", tempOvergangen, "", "NEW_SELECTION", "INVERT")
+    arcpy.CopyFeatures_management('templayer', "profielenNonSplit")
+
+    # templayer for intersect points:
+    tempIntersect = "tempIntersect"
+    arcpy.Intersect_analysis(["profielenNonSplit",split_traject], tempIntersect, "ALL", "", "POINT")
+
+    # locate features along route: "temp_intersect"
+    tempLocTable = "tempLocTable"
+    arcpy.LocateFeaturesAlongRoutes_lr(tempIntersect, split_traject, RID, "1 Meters", tempLocTable,
+    "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS", "M_DIRECTON")
+
+    # join meas and dp to profiles
+    arcpy.JoinField_management("profielenNonSplit", profileID, tempLocTable, profileID, "MEAS;RFTIDENT")
+
+    # add field for locatie
+    arcpy.AddField_management("profielenNonSplit", 'metreringDp', "TEXT")
+    arcpy.CalculateField_management("profielenNonSplit", "metreringDp", "!RFTIDENT!+\"+\"+str(round( !MEAS!))", "PYTHON", "")
+
+    ####
+    # splits
+    arcpy.MakeFeatureLayer_management(profielen, 'templayer') 
+    arcpy.SelectLayerByLocation_management('templayer', "INTERSECT", tempOvergangen, "", "NEW_SELECTION", "")
+    arcpy.CopyFeatures_management('templayer', "profielenSplit")
+
+    arcpy.SpatialJoin_analysis("profielenSplit", dijkpalen, "profielenSplitDp", "#", "#", match_option="CLOSEST")
+    
+    # add field for locatie
+    arcpy.AddField_management("profielenSplitDp", 'metreringDp', "TEXT")
+    arcpy.CalculateField_management("profielenSplitDp", "metreringDp", "!RFTIDENT!+\"+0.0\"", "PYTHON", "")
+
+
+    #### samenvoegen
+    arcpy.Merge_management(["profielenSplitDp","profielenNonSplit"], profielenUitvoer)
+
+    veldenNodig = ["OBJECTID","Shape","Shape_Length","profielnummer","metreringDp","dijkvak","dijkpaal"]
+
+    veldenTotaalObject = arcpy.ListFields(profielenUitvoer)
+    veldenTotaal = []
+            
+    for veld in veldenTotaalObject:
+        veldenTotaal.append(str(veld.name))
+
+    for veld in veldenTotaal:
+        if veld in veldenNodig:
+            pass
+        else:
+            arcpy.DeleteField_management(profielenUitvoer,veld)
+
+    
+
+    #### schoonmaken
+    arcpy.Delete_management(tempOvergangen)
+    arcpy.Delete_management(tempLocTable)
+    arcpy.Delete_management("profielenNonSplit")
+    arcpy.Delete_management("profielenSplit")
+    arcpy.Delete_management("profielenSplitDp")
+
+
+
+    print ("Profielen gekoppeld aan dijkpalen en metrering berekend")
+
+    
+    
+    
+
+
+
+    # arcpy.Delete_management(tempIntersect)
+    # arcpy.Delete_management(tempLocTable)
+
+
+
+
+
+
+    
+
+
 def join_mg_profiles(trajectlijn, profielen,profielen_mg,profielen_plus):
     # select from trajectlijn
     arcpy.MakeFeatureLayer_management(profielen_mg, 'templaag_profielen_mg')

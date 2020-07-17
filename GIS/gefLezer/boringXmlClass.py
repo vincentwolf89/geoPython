@@ -4,19 +4,19 @@ import pandas as pd
 import xml.dom.minidom as minidom
 
 
-files = r'C:\Users\Vincent\Desktop\GO_WoS\boringen_xml'
-arcpy.env.workspace = r'D:\GoogleDrive\WSRL\goTest.gdb'
-gdb = r'D:\GoogleDrive\WSRL\goTest.gdb'
+files = r'D:\Projecten\WSRL\sterreschans_heteren\go\datadino14-7\Bodemkundig booronderzoek BRO'
+arcpy.env.workspace = r'D:\Projecten\WSRL\sterreschans_heteren\GIS\datadino14_7.gdb'
+gdb = r'D:\Projecten\WSRL\sterreschans_heteren\GIS\datadino14_7.gdb'
 arcpy.env.overwriteOutput = True
 
 
-puntenlaag = 'TESTtestBoringenXml'
+puntenlaag = 'ShDinoBoringenXml'
 
 soortenGrofGef = ['Z','G']
 soortenGrofXml = ['matigSiltigZand', 'zwakSiltigZand','sterkZandigeLeem','zwakZandigeLeem']
-maxGrof = 5
+maxGrof = 1
 minSlap = 0.5
-grensHoogte = 0 # in m NAP
+grensHoogte = -30 # in m NAP
 begrenzingOnderMaaiveld = True
 maxOnderMv = 5 
 beginWaarde = 0 

@@ -7,16 +7,16 @@ import os, sys
 
 
 # from basisfuncties import*
-arcpy.env.workspace = r'D:\Projecten\WSRL\goNieuw2020.gdb'
-gdb = r'D:\Projecten\WSRL\goNieuw2020.gdb'
+arcpy.env.workspace = r'D:\Projecten\WSRL\goSafeTemp.gdb'
+gdb = r'D:\Projecten\WSRL\goSafeTemp.gdb'
 arcpy.env.overwriteOutput = True
 
 
-gefmap_origin = "C:\Users\Vincent\Desktop\goNieuwVincent\goNieuwVincent\C_Sonderingen\PDF"
-gef_extensie = ".PDF"
+gefmap_origin = "C:\Users\Vincent\Desktop\gef"
+gef_extensie = ".gef"
 
-gefmap = r'C:\Users\Vincent\Desktop\gefmap'
-puntenlaag = 'sonderingenSafe2020PDF'
+gefmap = r'C:\Users\Vincent\Desktop\dinosafe'
+puntenlaag = 'sonderingenDinoSafe2020'
 nan = -9999
 
 def gef_txt(gefmap, gef_extensie):

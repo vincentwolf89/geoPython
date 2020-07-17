@@ -2,7 +2,7 @@ import arcpy
 from geoprocesWaterloop import gpWaterloop, gpGeneral
 
 arcpy.env.overwriteOutput = True
-arcpy.env.workspace = r'D:\GoogleDrive\WSRL\testWaterlopen.gdb'
+arcpy.env.workspace = r'D:\Projecten\WSRL\sterreschans_heteren\GIS\waterlopen300m.gdb'
 
 global bufferBuitenkant, rasterAhn, codeWaterloop
 
@@ -17,8 +17,9 @@ standaardTalud = 0.5
 
 
 smooth = "10 Meters"
-rasterAhn = r'D:\Projecten\WSRL\grote_data\ahn3SProk.gdb\ahn3ClipSprok'
-codeWaterloop = "id_string"
+rasterAhn = r'D:\Projecten\WSRL\sterreschans_heteren\GIS\waterlopen300m.gdb\ahn3clipsh1'
+codeWaterloop = "id_string" 
+sr = arcpy.SpatialReference(28992)
 
 class Basis(object):
 
@@ -91,7 +92,7 @@ class Basis(object):
 
         # maak totaalraster
         if rasterLijst:
-            gpGeneral().insertAhn(rasterLijst,self.waterlopen,rasterAhn)
+            gpGeneral().insertAhn(rasterLijst,self.waterlopen,rasterAhn,sr)
         else:
             pass
 
@@ -104,6 +105,6 @@ class Basis(object):
 
 if __name__ == "__main__":
 
-    setWaterlopen = Basis("SprokWaterlopen")
+    setWaterlopen = Basis("waterlopenSH_300m")
     setWaterlopen.execute()
 

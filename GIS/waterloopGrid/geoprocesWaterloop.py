@@ -400,7 +400,7 @@ class gpGeneral:
         print "Aanliggende waterloop-polygonen gemerged"
         return waterlopen
 
-    def insertAhn(self,rasterLijst,waterlopen,rasterAhn):
+    def insertAhn(self,rasterLijst,waterlopen,rasterAhn,sr):
 
         # clip totaalgebied uit ahn
         arcpy.Clip_management(rasterAhn, "", "clipWaterlopen", waterlopen, "-3,402823e+038", "NONE",
@@ -409,6 +409,6 @@ class gpGeneral:
 
         # merge rasterlijst
         arcpy.MosaicToNewRaster_management(rasterLijst, arcpy.env.workspace, "rasterTotaal",
-                                           "", "32_BIT_FLOAT", "0,5", "1", "LAST", "FIRST")
+                                           sr, "32_BIT_FLOAT", "0,5", "1", "LAST", "FIRST")
 
         print "Losse rasters samengevoegd in invoer-raster"

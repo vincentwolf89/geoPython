@@ -1,0 +1,144 @@
+import arcpy
+import sys
+sys.path.append('.')
+
+from basisfuncties import average
+
+arcpy.env.workspace = r'D:\Projecten\HDSR\2020\gisData\werkdatabase.gdb'
+
+arcpy.env.overwriteOutput = True
+
+featureclasses = arcpy.ListFeatureClasses()
+
+def inventarisatieDG(featureclasses):
+    for fc in featureclasses:
+        name = str(fc)
+        if name.startswith('deelgebied'):
+            
+            
+            profielMerge = []
+
+            profielenVoldoende = 0
+            profielenOnvoldoende = 0
+            profielenNan = 0
+            kHmLijst = []
+
+            veldenDeelgebiedObject = arcpy.ListFields(fc)
+            veldenDeelgebied = []
+            
+            for veld in veldenDeelgebiedObject:
+                veldenDeelgebied.append(str(veld.name))
+            
+            veldenNodig = ["mVol","mOnv","mNan","kHmGem"]
+
+            for item in veldenNodig:
+                if item in veldenDeelgebied:
+                    pass
+                else:
+                    arcpy.AddField_management(fc,item,"DOUBLE", 2, field_is_nullable="NULLABLE")
+
+
+            cursor = arcpy.da.SearchCursor(fc, "Naam")
+
+            
+            for row in cursor:
+                profielen = "profielen_{}".format(row[0])
+                
+                
+                if arcpy.Exists(profielen):
+
+
+                    # check of kHm in profielen zit
+                    veldenProfielenObject = arcpy.ListFields(profielen)
+                    veldenProfielen = []
+                    for veld in veldenProfielenObject:
+                        veldenProfielen.append(str(veld.name))
+
+                        if veld.name == "profielUniek":
+                            arcpy.DeleteField_management(profielen,"profielUniek")
+                        else:
+                            pass
+
+                    
+                    if all(elem in veldenProfielen for elem in ["profielnummer","kHm","Naam"]):
+                
+
+                        # doorgaan
+                        arcpy.AddField_management(profielen, 'profielUniek', "TEXT")
+                        profielMerge.append(profielen)
+                        profielCursor = arcpy.da.UpdateCursor(profielen, ["profielnummer","profielUniek","kHm","Naam"])
+                        for row in profielCursor:
+                            row[1] = row[3]+"_"+str(int(row[0]))
+
+                            if row[2] >= 0:
+                                profielenVoldoende +=1
+                                kHmLijst.append(row[2])
+                                
+                                
+                                
+                            elif row[2] <= 0 and row[2] > -9999:
+                                profielenOnvoldoende +=1
+                                kHmLijst.append(row[2])
+                                
+                            else:  
+                                if row[2] == -9999:
+                                    profielenNan +=1
+
+                        
+
+
+
+
+
+
+                            profielCursor.updateRow(row)
+                        del profielCursor
+                    else:
+                        # niet doorgaan
+                        pass
+
+
+                    
+                    
+                
+
+                else:
+                    pass
+                
+
+
+                
+            if profielMerge:
+                if len(profielMerge)>1:
+                    arcpy.Merge_management(profielMerge, "profielen_{}".format(name))
+                else:
+                    arcpy.CopyFeatures_management(profielen, "profielen_{}".format(name))
+                print ("profielen_{} gemaakt".format(name))
+
+            else:
+                pass
+            
+
+            cursorFinal = arcpy.da.UpdateCursor(fc, ["mVol","mOnv","mNan","kHmGem"])
+
+            for row in cursorFinal:
+                row[0] = profielenVoldoende * 25
+                row[1] = profielenOnvoldoende *25
+                row[2] = profielenNan * 25
+                if kHmLijst:
+
+                    row[3] = average(kHmLijst)
+                else:
+                    pass
+                cursorFinal.updateRow(row)
+
+
+            del cursor,profielMerge, profielenVoldoende, profielenOnvoldoende, profielenNan, cursorFinal, kHmLijst
+            
+            # dissolve
+            arcpy.Dissolve_management(fc, "samenvoeging_"+name, ["mVol","mOnv","mNan","kHmGem"], "", "MULTI_PART", "DISSOLVE_LINES")
+            
+
+        else:
+            pass
+
