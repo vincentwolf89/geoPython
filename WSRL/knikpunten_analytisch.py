@@ -22,14 +22,14 @@ def average(lijst):
 
 
 
-arcpy.env.workspace = r'D:\Projecten\WSRL\temp_sh.gdb'
+arcpy.env.workspace = r'D:\Projecten\WW\test.gdb'
 arcpy.env.overwriteOutput = True
 
 
-invoer = 'punten_profielen_z'
+invoer = "testlaaghdsr"
 
 
-array = arcpy.da.FeatureClassToNumPyArray(invoer, ('OBJECTID','profielnummer','dijktraject', 'afstand', 'z_ahn'))
+array = arcpy.da.FeatureClassToNumPyArray(invoer, ('OBJECTID','profielnummer','Naam', 'afstand', 'z_ahn'))
 df = pd.DataFrame(array)
 df2 = df.dropna()
 sorted = df2.sort_values(['profielnummer', 'afstand'], ascending=[True, True])
@@ -132,7 +132,7 @@ for name, group in grouped:
         delta_h = abs(hoogte1-hoogte2)
         delta_a = abs(afstand1-afstand2)
         talud = delta_h/delta_a
-        if afstand2 < 0 and hoogte2 < mv_voorland+1 and talud < max_talud and afstand2>-40:
+        if afstand2 < 0 and hoogte2 < mv_voorland+0.2 and talud < max_talud and afstand2>-40:
             x_but = row['afstand']
             y_but = row['z_ahn']
             print row['afstand']
@@ -152,32 +152,32 @@ for name, group in grouped:
 
 
 
-    # fig = plt.figure(figsize=(25, 2))
-    # ax = fig.add_subplot(111)
-    # ax.plot(x1, y1, linewidth=2, color="red")
-    #
-    # try:
-    #     x_bik
-    #     ax.plot(x_bik, y_bik, 'ro', markersize=6)
-    # except NameError:
-    #     pass
-    #
-    # try:
-    #     x_buk
-    #     ax.plot(x_buk, y_buk, 'ro', markersize=6)
-    # except NameError:
-    #     pass
-    # try:
-    #     x_bit
-    #     ax.plot(x_bit, y_bit, 'ro', markersize=6)
-    # except NameError:
-    #     pass
-    # try:
-    #     x_but
-    #     ax.plot(x_but, y_but, 'ro', markersize=6)
-    # except NameError:
-    #     pass
-    # plt.show()
+    fig = plt.figure(figsize=(25, 2))
+    ax = fig.add_subplot(111)
+    ax.plot(x1, y1, linewidth=2, color="red")
+    
+    try:
+        x_bik
+        ax.plot(x_bik, y_bik, 'ro', markersize=6)
+    except NameError:
+        pass
+    
+    try:
+        x_buk
+        ax.plot(x_buk, y_buk, 'ro', markersize=6)
+    except NameError:
+        pass
+    try:
+        x_bit
+        ax.plot(x_bit, y_bit, 'ro', markersize=6)
+    except NameError:
+        pass
+    try:
+        x_but
+        ax.plot(x_but, y_but, 'ro', markersize=6)
+    except NameError:
+        pass
+    plt.show()
 
 
 

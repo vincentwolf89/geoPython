@@ -1,16 +1,30 @@
 import arcpy
 import sys
 sys.path.append('.')
+import pandas as pd
 
 from basisfuncties import average
 
-arcpy.env.workspace = r'D:\Projecten\HDSR\2020\gisData\werkdatabase.gdb'
+arcpy.env.workspace = r'D:\Projecten\HDSR\2020\gisData\deelgebieden.gdb'
 
 arcpy.env.overwriteOutput = True
 
-featureclasses = arcpy.ListFeatureClasses()
+# featureclasses = arcpy.ListFeatureClasses()
+# for fc in featureclasses:
+
+#     name = str(fc)
+#     if name.startswith('samenvoeging'):
+#         arcpy.AddField_management(fc, 'naamKering', "TEXT")
+
+# data = arcpy.da.FeatureClassToNumPyArray('samenvoegingTotaalTrajecten', ('mVol','mOnv','mNan','kHmGem','typeKering','naamKering','nrKering','Shape_Length'))
+# df = pd.DataFrame(data)
+# df.to_excel(r'D:\Projecten\HDSR\2020\deel_inventarisatie\uitvoer.xlsx') 
+
+
 
 def inventarisatieDG(featureclasses):
+
+
     for fc in featureclasses:
         name = str(fc)
         if name.startswith('deelgebied'):
@@ -141,4 +155,50 @@ def inventarisatieDG(featureclasses):
 
         else:
             pass
+
+def koppelVerval(deelgebieden, totaalprofielen):
+
+    for deelgebied in deelgebieden:
+        object = str(deelgebied)
+        name =object.strip('deelgebied')
+        
+        
+        
+        # bereken gemiddelde verval van de betreffende profielen
+        vervallijst = []
+        profCur = arcpy.da.SearchCursor(totaalprofielen,['nrKering','verval'])
+
+        for row in profCur:
+            if row[0] is None or row[1]==-999:
+                pass
+            else:
+                gebiedsnaam= str(int(row[0]))
+                if name == gebiedsnaam:
+                    vervallijst.append(round(row[1],2))
+        
+        gemVerval = average(vervallijst)
+        print gemVerval, name
+
+        # check of gemVerval in deelgebied zit
+        veldenObject = arcpy.ListFields(deelgebied)
+        velden = []
+        for veld in veldenObject:
+            velden.append(str(veld.name))
+
+            if veld.name == "gemVerval":
+                arcpy.DeleteField_management(deelgebied,"gemVerval")
+            else:
+                arcpy.AddField_management(deelgebied,"gemVerval","DOUBLE", 2, field_is_nullable="NULLABLE")
+                arcpy.CalculateField_management(deelgebied, "gemVerval", gemVerval, "PYTHON")
+
+        del vervallijst, gemVerval
+
+        print "Gemiddeld verval berekend voor deelgebied {}".format(name)
+
+
+deelgebieden = arcpy.ListFeatureClasses()
+profielen = r'D:\Projecten\HDSR\2020\gisData\basisData.gdb\profielenTotaal'
+
+koppelVerval(deelgebieden,profielen)
+
 

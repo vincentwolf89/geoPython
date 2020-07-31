@@ -2,7 +2,7 @@ import arcpy
 from geoprocesWaterloop import gpWaterloop, gpGeneral
 
 arcpy.env.overwriteOutput = True
-arcpy.env.workspace = r'D:\Projecten\WSRL\sterreschans_heteren\GIS\waterlopen300m.gdb'
+arcpy.env.workspace = r'D:\Projecten\WSRL\safe\waterlopen_batches\batch1.gdb'
 
 global bufferBuitenkant, rasterAhn, codeWaterloop
 
@@ -15,9 +15,11 @@ bodemDiepteSmal = 0.5
 maxBreedteSmal = 3
 standaardTalud = 0.5
 
+tinLoc = "D:/Projecten/WSRL/tin"
+
 
 smooth = "10 Meters"
-rasterAhn = r'D:\Projecten\WSRL\sterreschans_heteren\GIS\waterlopen300m.gdb\ahn3clipsh1'
+rasterAhn = r'D:\Projecten\WSRL\grote_data\ahn3clip_safe'
 codeWaterloop = "id_string" 
 sr = arcpy.SpatialReference(28992)
 
@@ -46,7 +48,7 @@ class Basis(object):
             bufferLijn = "waterloopBufferlijn" + str(idWaterloop)
             waterloopLijn = "waterloopLijn" + str(idWaterloop)
             waterloopLijn3D = "waterloopLijn3D" + str(idWaterloop)
-            tin = "D:/GoogleDrive/WSRL/tin/waterloop"+str(idWaterloop)
+            tin = tinLoc+"/waterloop"+str(idWaterloop)
             rasterWaterloop = "waterloopRaster" + str(idWaterloop)
 
             # selectie waterlopen
@@ -105,6 +107,6 @@ class Basis(object):
 
 if __name__ == "__main__":
 
-    setWaterlopen = Basis("waterlopenSH_300m")
+    setWaterlopen = Basis("waterlopenBatch1")
     setWaterlopen.execute()
 
