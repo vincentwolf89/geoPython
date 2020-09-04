@@ -3,16 +3,16 @@ import arcpy
 import pandas as pd
 
 
-files = r'D:\Projecten\WSRL\sterreschans_heteren\go\datadino14-7\Boormonsterprofiel_Geologisch booronderzoek'
-arcpy.env.workspace = r'D:\Projecten\WSRL\sterreschans_heteren\GIS\datadino14_7.gdb'
-gdb = r'D:\Projecten\WSRL\sterreschans_heteren\GIS\datadino14_7.gdb'
+files = r'C:\Users\Vincent\Desktop\opruimen\GO_SAFE\BORINGEN\BORINGEN 2018\Handboringen'
+arcpy.env.workspace = r'D:\Projecten\HDSR\2020\gisData\gefInlezen.gdb'
+gdb = r'D:\Projecten\HDSR\2020\gisData\gefInlezen.gdb'
 arcpy.env.overwriteOutput = True
 
 
 
 
 
-puntenlaag = 'ShDinoBoringenGeo'
+puntenlaag = 'boringenHDSR'
 
 soortenGrofGef = ['Z','G']
 maxGrof = 1
@@ -41,11 +41,18 @@ class boringGef(object):
         # lijst voor meetgedeelte
         lijstMetingen = []
         # ophalen benodigde data
+
+        
+        
         for item in lines:
+                
             if item.startswith('#'):
+
                 # bepalen separator
                 if item.startswith('#COLUMNSEP'):
                     sep = item.strip()[-1:]
+
+        
                 # ophalen locatiegegevens
                 if item.startswith('#XYID'):
                     coLocs = item.split(',')
@@ -57,6 +64,7 @@ class boringGef(object):
             # anders doorgaan met metingen opbouw
             else:
                 lijstMetingen.append(item)
+
 
         # check of voldoende informatie aanwezig is om door te gaan
         try:
@@ -82,6 +90,7 @@ class boringGef(object):
             return x,y,zMv, lijstMetingen, sep
         else:
             return None
+  
 
     def createDF(self,lijstMetingen,sep):
         index = 0
@@ -99,6 +108,7 @@ class boringGef(object):
             for item in onderdelen:
                 if item.startswith("'"):
                     soort = item[1]
+                    print soort
                     break
 
 

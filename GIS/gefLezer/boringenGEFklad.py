@@ -3,16 +3,16 @@ import arcpy
 import pandas as pd
 
 
-files = r'C:\Users\Vincent\Desktop\GO_WoS\boringen_gef'
-arcpy.env.workspace = r'D:\GoogleDrive\WSRL\goTest.gdb'
-gdb = r'D:\GoogleDrive\WSRL\goTest.gdb'
+files = r'C:\Users\Vincent\Desktop\GEF\GEF'
+arcpy.env.workspace = r'D:\Projecten\HDSR\2020\gisData\gefInlezen.gdb'
+gdb = r'D:\Projecten\HDSR\2020\gisData\gefInlezen.gdb'
 arcpy.env.overwriteOutput = True
 
 
 
 
 
-puntenlaag = 'testBoringen5m'
+puntenlaag = 'boringenHDSR'
 
 soortenGrofGef = ['Z','G']
 maxGrof = 5

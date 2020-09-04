@@ -2,7 +2,7 @@ import arcpy
 from geoprocesWaterloop import gpWaterloop, gpGeneral
 
 arcpy.env.overwriteOutput = True
-arcpy.env.workspace = r'D:\Projecten\WSRL\safe\waterlopen_batches\batch1.gdb'
+arcpy.env.workspace = r'D:\Projecten\HDSR\2020\gisData\batchesWaterlopen\batch7.gdb'
 
 global bufferBuitenkant, rasterAhn, codeWaterloop
 
@@ -15,11 +15,17 @@ bodemDiepteSmal = 0.5
 maxBreedteSmal = 3
 standaardTalud = 0.5
 
-tinLoc = "D:/Projecten/WSRL/tin"
+
+## invoegen
+# maxbreedte (6m?)
+# terugkoppeling van wel/niet vergridde waterlopen
+
+
+tinLoc = "D:/Projecten/HDSR/2020/gisData/batchesWaterlopen/tin"
 
 
 smooth = "10 Meters"
-rasterAhn = r'D:\Projecten\WSRL\grote_data\ahn3clip_safe'
+rasterAhn = r'D:\Projecten\HDSR\2019\data\hoogteData.gdb\AHN3grondfilter'
 codeWaterloop = "id_string" 
 sr = arcpy.SpatialReference(28992)
 
@@ -27,7 +33,7 @@ class Basis(object):
 
     def __init__(self, waterlopenInvoer):
         self.waterlopen = gpGeneral().aggregateInput(waterlopenInvoer)
-        # self.waterlopen = gpBasis(waterlopenInvoer).aggregateInput()
+        # self.waterlopen = gpBasis(waterlopenInvoerw).aggregateInput()
         self.cursor = arcpy.da.SearchCursor(self.waterlopen, ['SHAPE@', codeWaterloop])
 
     def execute(self):
@@ -107,6 +113,6 @@ class Basis(object):
 
 if __name__ == "__main__":
 
-    setWaterlopen = Basis("waterlopenBatch1")
+    setWaterlopen = Basis("tm5029")
     setWaterlopen.execute()
 

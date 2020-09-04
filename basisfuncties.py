@@ -58,7 +58,7 @@ def CopyParallelR(plyP,sLength): #functie voor profielen maken haaks op trajectl
     section=arcpy.Polyline(array)
     return section
 
-def copy_trajectory_lr(trajectlijn,code):
+def copy_trajectory_lr(trajectlijn,code,afstand):
     existing_fields = arcpy.ListFields(trajectlijn)
     needed_fields = ['OBJECTID','Shape','Shape_Length','SHAPE', 'SHAPE_Length',code]
     for field in existing_fields:
@@ -66,7 +66,7 @@ def copy_trajectory_lr(trajectlijn,code):
             arcpy.DeleteField_management(trajectlijn, field.name)
 
     arcpy.AddField_management(trajectlijn, "Width", "DOUBLE", 2, field_is_nullable="NULLABLE")
-    arcpy.CalculateField_management(trajectlijn, "Width", 5, "PYTHON")
+    arcpy.CalculateField_management(trajectlijn, "Width", afstand, "PYTHON")
 
     arcpy.CopyFeatures_management(trajectlijn, "river")
     arcpy.CopyFeatures_management(trajectlijn, "land")
@@ -83,7 +83,7 @@ def copy_trajectory_lr(trajectlijn,code):
         for shp, w in cursor:
             RightLine = CopyParallelR(shp, w)
             cursor.updateRow((RightLine, w))
-    print "Water- en landdelen gemaakt"
+    # print "Water- en landdelen gemaakt"
 
 def set_measurements_trajectory(profielen,trajectlijn,code,stapgrootte_punten,toetspeil): #rechts = rivier, profielen van binnen naar buiten
     # clean feature
