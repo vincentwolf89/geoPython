@@ -16,7 +16,7 @@ pd.set_option('mode.chained_assignment', None)
 from RWK_ht_2019 import*
 
 # definieer de werkomgeving
-arcpy.env.workspace = r'D:\Projecten\HDSR\data\test_oplevering.gdb'
+arcpy.env.workspace = r'D:\Projecten\HDSR\2020\gisData\ht2019v2\ht2019v2.gdb'
 # sta arcpy toe oude data te overschrijven
 arcpy.env.overwriteOutput = True
 
@@ -30,13 +30,13 @@ max_afstand = 5 # maximale waarde voor bandbreedte kruinpunten
 min_achterland = 5 # minimale waarde voor afstand t.b.v. bepaling hoogte achterland
 max_achterland = 20 # maximale waarde voor afstand t.b.v. bepaling hoogte achterland
 
-excelmap = 'D:/Projecten/HDSR/xlsx_uitvoer/' # gewenste map voor .xlsx-uitvoer
-raster = r'D:\Projecten\HDSR\data\ahn_hdsr.gdb\AHN3grondfilter' # hoogtegrid
+excelmap = 'D:/Projecten/HDSR/2020/gisData/ht2019v2/Excel/' # gewenste map voor .xlsx-uitvoer
+raster = r'D:\Projecten\HDSR\2020\gisData\basisData.gdb\BAG2mPlusWaterlopenAHN3' # hoogtegrid
 bodemdalingskaart = r'D:\GIS\losse rasters\bodemdalingskaart_app_data_geotiff_Bodemdalingskaart_10de_percentiel_mm_per_jaar_verticale_richting_v2018002.tif'
 afstand_zichtjaar = 10 # het aantal jaren waarmee de bodemdaling (per jaar) moet worden vermenigvuldigd.
 code_hdsr = 'Naam' # naamgeving van traject
 toetspeil = 'th2024' # naam van kolom met toetspeil/toetshoogte
-trajecten = 'test_111' # door te rekenen trajecten
+trajecten = 'RWK_areaal_2024' # door te rekenen trajecten
 
 # bij standaard gebruik niet veranderen
 verschil_maxkruin = 0.2 # specifieke invoer bepaling binnenteen/buitenteen

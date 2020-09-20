@@ -83,7 +83,7 @@ def copy_trajectory_lr(trajectlijn,code,afstand):
         for shp, w in cursor:
             RightLine = CopyParallelR(shp, w)
             cursor.updateRow((RightLine, w))
-    # print "Water- en landdelen gemaakt"
+    print "Trajectlijnen-offset gemaakt"
 
 def set_measurements_trajectory(profielen,trajectlijn,code,stapgrootte_punten,toetspeil): #rechts = rivier, profielen van binnen naar buiten
     # clean feature

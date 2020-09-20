@@ -2,13 +2,13 @@ import os
 import arcpy
 import pandas as pd
 
-files = r'C:\Users\Vincent\Desktop\GEF\GEF'
-arcpy.env.workspace = r'D:\Projecten\HDSR\2020\gisData\gefInlezen.gdb'
-gdb = r'D:\Projecten\HDSR\2020\gisData\gefInlezen.gdb'
+files = r'C:\Users\Vincent\Desktop\a7f3d94b-e499-4a01-aa69-46d31f0bfcbc\GEF'
+arcpy.env.workspace = r'D:\Projecten\WSRL\safe\safeGOinv.gdb'
+gdb = r'D:\Projecten\WSRL\safe\safeGOinv.gdb'
 arcpy.env.overwriteOutput = True
 
 
-puntenlaag = 'boringenHDSR'
+puntenlaag = 'goBROsept2020'
 
 arcpy.CreateFeatureclass_management(gdb, puntenlaag, "POINT", spatial_reference=28992)
 arcpy.AddField_management(puntenlaag, 'Naam', "TEXT")
