@@ -1776,3 +1776,51 @@ def excelWriterTraject(uitvoerpunten,excel, veldnamen):
     df.to_excel(excel)  
 
     print ("Excel gemaakt van profieldata")
+
+
+def splitByAttributes(features, field):
+    shapeList = []
+    outputNameList = []
+
+    # list features in layer
+    with arcpy.da.SearchCursor(features,[field]) as cursor:
+        for row in cursor:
+            shapeName = str(row[0])
+            shapeName = (shapeName.replace('+', '_'))
+            shapeName = (shapeName.replace('.', '_'))
+            shapeName = "splitsing_"+shapeName
+            if shapeName in shapeList:
+                pass
+            else:
+                shapeList.append(shapeName)
+
+
+    # add field for selecting
+    fields = arcpy.ListFields(features)
+    for item in fields:  
+        if item.name == "splitID":
+            pass
+        else:   
+            arcpy.AddField_management(features, "splitID", "TEXT", field_length=200)
+
+    cursor = arcpy.da.UpdateCursor(features,[field,"splitID"])
+    for row in cursor:
+        splitID = str(row[0])
+        splitID = (splitID.replace('+', '_'))
+        splitID = (splitID.replace('.', '_'))
+        row[1] = "splitsing_"+splitID
+        cursor.updateRow(row)
+
+    # select features in layer 
+    for item in shapeList:
+
+        lyr = arcpy.MakeFeatureLayer_management(features, 'templyr') 
+        where = '"' + "splitID" + '" = ' + "'" + item + "'"
+        selected = arcpy.SelectLayerByAttribute_management(lyr, "NEW_SELECTION", where)
+        outputName = item
+
+
+        arcpy.CopyFeatures_management(selected,outputName)
+
+    print "Splitsing gemaakt op basis van veldnaam: {}".format(field)
+    return shapeList

@@ -4,8 +4,10 @@ import pandas as pd
 import numpy as np
 from itertools import groupby
 sys.path.append('.')
-from basisfuncties import average
+from basisfuncties import average, splitByAttributes
 from arcpy.sa import *
+
+
 
 arcpy.env.workspace = r'D:\Projecten\HDSR\2020\gisData\testgdb.gdb'
 arcpy.env.overwriteOutput = True
@@ -15,6 +17,7 @@ taludValue = 0.09
 
 inritDistance = 3 #meter
 pandDistance = 2 #meter 
+minLengteTalud = 1,5 #meter
 
 hoogtedata = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\BAG2mPlusWaterlopenAHN3"
 # hoogtedata = r"D:\GIS\losse rasters\ahn3clip\ahn3clip_2m"
@@ -174,6 +177,7 @@ def taludDelen():
 
 
 
+
                         
 
                         # maak taludlijn
@@ -315,10 +319,9 @@ def getBitBut():
         arcpy.LocateFeaturesAlongRoutes_lr("binnenTaludPoints", "testRoute", "rid", "0,1 Meters", "binnenTaludPointsTable", "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS", "M_DIRECTON")
         arcpy.JoinField_management("binnenTaludPoints","OBJECTID","binnenTaludPointsTable","OBJECTID","MEAS")
         
-        # Koppel z-waardes
+        # koppel z-waardes
         arcpy.CheckOutExtension("Spatial")
         ExtractValuesToPoints("binnenTaludPoints", hoogtedata, "binnenTaludPointsZ","INTERPOLATE", "VALUE_ONLY")
-        # Pas het veld 'RASTERVALU' aan naar 'z_ahn'
         arcpy.AlterField_management("binnenTaludPointsZ", 'RASTERVALU', 'z_ahn')
 
         zListBit = [z[0] for z in arcpy.da.SearchCursor ("binnenTaludPointsZ", ["z_ahn"])] 
@@ -350,8 +353,190 @@ def getBitBut():
 
 
     if taludDelenBinnenkant > 1:
+        print "binnenberm gevonden"
         # bepaal verloop taluddelen
-        pass
+        # afsnijden eventueel waterdeel
+        arcpy.Intersect_analysis(["taludLijnenBinnenkant",bgtWaterdelenTotaal], "isectTaludeelBinnen", "ALL", "", "POINT")
+        bitWaterKruising = int(arcpy.GetCount_management("taludLijnenBinnenkant").getOutput(0))
+        if bitWaterKruising > 0:
+            arcpy.SplitLineAtPoint_management("taludLijnenBinnenkant", "isectTaludeelBinnen", "taludLijnenBinnenkantSplit", 1)
+            arcpy.MakeFeatureLayer_management("taludLijnenBinnenkantSplit", "temp_taludLijnenBinnenkantSplit") 
+            arcpy.SelectLayerByLocation_management("temp_taludLijnenBinnenkantSplit", "WITHIN", bgtWaterdelenTotaal, "", "NEW_SELECTION", "INVERT")
+            arcpy.CopyFeatures_management("temp_taludLijnenBinnenkantSplit", "taludLijnenBinnenkant")
+
+
+
+        else:
+            pass
+
+        
+
+        # voeg lengte toe om later te kunnen filteren
+        arcpy.AddField_management("taludLijnenBinnenkant","lengteTalud","DOUBLE", 2, field_is_nullable="NULLABLE")
+        taludCursor = arcpy.da.UpdateCursor("taludLijnenBinnenkant",["SHAPE@LENGTH","lengteTalud"])
+        for row in taludCursor:
+            row[1] = row[0]
+            taludCursor.updateRow(row)
+
+        del taludCursor
+
+        # check of ieder taluddeel z-waardes heeft of begin en eindpunten
+        arcpy.FeatureVerticesToPoints_management("taludLijnenBinnenkant", "binnenTaludPoints", "BOTH_ENDS")
+        arcpy.LocateFeaturesAlongRoutes_lr("binnenTaludPoints", "testRoute", "rid", "0,1 Meters", "binnenTaludPointsTable", "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS", "M_DIRECTON")
+        arcpy.JoinField_management("binnenTaludPoints","OBJECTID","binnenTaludPointsTable","OBJECTID","MEAS")
+
+        # koppel z-waardes
+        arcpy.CheckOutExtension("Spatial")
+        ExtractValuesToPoints("binnenTaludPoints", hoogtedata, "binnenTaludPointsZ","INTERPOLATE", "VALUE_ONLY")
+        arcpy.AlterField_management("binnenTaludPointsZ", 'RASTERVALU', 'z_ahn')
+
+        # koppel aan contourwaardes en geef z-waarde contour-waarde indien niet aanwezig (raster nodata)
+        arcpy.SpatialJoin_analysis("binnenTaludPointsZ", "testIsectFocalPoint_", "binnenTaludPointsZJoin", "JOIN_ONE_TO_ONE", "KEEP_ALL","","CLOSEST", "", "")
+        taludCursor = arcpy.da.UpdateCursor("binnenTaludPointsZJoin",["z_ahn","Contour"])
+        for row in taludCursor:
+            if row[0] == None:
+                row[0] = row[1]
+                taludCursor.updateRow(row)
+        
+
+        # indien het geval, controleer of talud afloopt en niet stijgt t.o.v. de kruin
+        # split in losse delen
+        taludDelenB = splitByAttributes("binnenTaludPointsZJoin","groupNr")
+        removeList = []
+
+        for taludDeel in taludDelenB:
+            zList = [z[0] for z in arcpy.da.SearchCursor (taludDeel, ["z_ahn"])] 
+            measList = [z[0] for z in arcpy.da.SearchCursor (taludDeel, ["MEAS"])]
+
+            maxZ = round(max(zList),2)
+            minZ = round(min(zList),2)
+            maxMeas = round(max(measList),2)
+            minMeas = round(min(measList),2)
+
+            # veld toevoegen voor gemiddelde hoogte taluddeel
+            arcpy.AddField_management(taludDeel,"gemZ","DOUBLE", 2, field_is_nullable="NULLABLE")
+
+            
+
+
+            taludDeelCursor = arcpy.da.UpdateCursor(taludDeel,["MEAS","z_ahn","lengteTalud","gemZ"])
+            for row in taludDeelCursor:
+                meas = round(row[0],2)
+                z_ahn = round(row[1],2)
+                row[3] = average([minZ,maxZ])
+
+                taludDeelCursor.updateRow(row)
+
+                if (meas == minMeas and z_ahn == minZ) or (meas == maxMeas and z_ahn == maxZ):
+                    pass
+                else:
+                    if row[2] < minLengteTalud:
+                        # print "Dit taluddeel moet eruit {}".format(taludDeel)
+                        removeList.append(taludDeel)
+                        
+                        break
+                    else:
+                        return "STOP" 
+
+        if removeList:
+            for item in removeList:
+                arcpy.Delete_management(item)
+                taludDelenB.remove(item)
+
+        print taludDelenB
+        taludDelenFinal = taludDelenB
+        # check of twee taluddelen over zijn, anders stoppen
+        if len(taludDelenB) == 2:
+            # ophalen gemiddelde hoogtes van taluddelen
+            hoogtes = []
+            for taludDeel in taludDelenFinal:
+                arcpy.AddField_management(taludDeel,"taludDeel","TEXT", field_length=200)
+                gemZ = [z[0] for z in arcpy.da.SearchCursor (taludDeel, ["gemZ"])] 
+                for item in gemZ:
+                    hoogtes.append(round(item,2))
+                    break
+            
+            
+
+            # onderverdeling in bovendeel-onderdeel
+            for talud in taludDelenFinal:
+                taludCursor = arcpy.da.UpdateCursor(talud,["taludDeel","gemZ"])
+                for row in taludCursor:
+                    if round(row[1],2) == max(hoogtes):
+                        row[0] = "bovendeel"
+                    else:
+                        if round(row[1],2) == min(hoogtes):
+                            row[0] = "benedendeel"
+
+                    taludCursor.updateRow(row)
+
+                del taludCursor
+            # karakteristieke punten toekennen
+            for talud in taludDelenFinal:
+
+                
+
+                zList = [z[0] for z in arcpy.da.SearchCursor (talud, ["z_ahn"])]
+                maxZ = round(max(zList),2)
+                minZ = round(min(zList),2)
+
+
+                taludCursor = arcpy.da.UpdateCursor(talud,["z_ahn","taludDeel"])
+                for row in taludCursor:
+                    onderdeel = row[1]
+                    if onderdeel == "benedendeel":
+                        if round(row[0],2) == minZ:
+                            arcpy.CopyFeatures_management(talud,"binnenteen")
+                            bitCursor = arcpy.da.UpdateCursor("binnenteen",["z_ahn"])
+                            for rij in bitCursor:
+                                if round(rij[0],2) == minZ:
+                                    pass
+                                else:
+                                    bitCursor.deleteRow()
+                            row[1] = "onderzijde_"+onderdeel
+                            taludCursor.updateRow(row)
+                        
+                        else:
+                            arcpy.CopyFeatures_management(talud,"bovenkantOndertalud")
+                            boCursor = arcpy.da.UpdateCursor("bovenkantOndertalud",["z_ahn"])
+                            for rij in boCursor:
+                                if round(rij[0],2) == maxZ:
+                                    pass
+                                else:
+                                    boCursor.deleteRow()
+
+                            row[1] = "onderzijde_"+onderdeel
+                            taludCursor.updateRow(row)
+                    
+                    if onderdeel == "bovendeel":
+                            if round(row[0],2) == minZ:
+                                arcpy.CopyFeatures_management(talud,"onderkantBoventalud")
+                                obCursor = arcpy.da.UpdateCursor("onderkantBoventalud",["z_ahn"])
+                                for rij in obCursor:
+                                    if round(rij[0],2) == minZ:
+                                        pass
+                                    else:
+                                        obCursor.deleteRow()
+                                row[1] = "onderzijde_"+onderdeel
+                                taludCursor.updateRow(row)
+
+                            else:
+                                row[1] = "bovenzijde_"+onderdeel
+                                taludCursor.updateRow(row)      
+
+                del zList, maxZ, minZ, taludCursor
+
+
+        else:
+            return "STOP"
+
+
+
+            
+
+
+
+
 
     if taludDelenBinnenkant < 1:
         # berekening afbreken
@@ -372,7 +557,7 @@ def getBitBut():
         # afsnijden eventueel waterdeel
         arcpy.Intersect_analysis(["taludLijnenBuitenkant",bgtWaterdelenTotaal], "isectTaludeelBuiten", "ALL", "", "POINT")
         butWaterKruising = int(arcpy.GetCount_management("taludLijnenBuitenkant").getOutput(0))
-        if bitWaterKruising > 0:
+        if butWaterKruising > 0:
             arcpy.SplitLineAtPoint_management("taludLijnenBuitenkant", "isectTaludeelBuiten", "taludLijnenBuitenkantSplit", 1)
             arcpy.MakeFeatureLayer_management("taludLijnenBuitenkantSplit", "temp_taludLijnenBuitenkantSplit") 
             arcpy.SelectLayerByLocation_management("temp_taludLijnenBuitenkantSplit", "WITHIN", bgtWaterdelenTotaal, "", "NEW_SELECTION", "INVERT")
@@ -425,6 +610,7 @@ def getBitBut():
 
     if taludDelenBuitenkant > 1:
         # bepaal verloop taluddelen
+
         pass
 
     if taludDelenBuitenkant < 1:
