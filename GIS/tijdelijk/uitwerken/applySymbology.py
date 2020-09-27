@@ -18,21 +18,21 @@ for veld in veldenObject:
 
 
     # velden.append(str(veld.name))
-# mxd = arcpy.mapping.MapDocument("CURRENT")  
-# df = arcpy.mapping.ListDataFrames(mxd, "Layers")[0]  
-# layers = arcpy.mapping.ListLayers(mxd,"",df)  
+mxd = arcpy.mapping.MapDocument("CURRENT")  
+df = arcpy.mapping.ListDataFrames(mxd, "Layers")[0]  
+layers = arcpy.mapping.ListLayers(mxd,"",df)  
 
 
-# layernames = []
-# for layer in layers:
-#     if layer.name.startswith("profielen_"):
+layernames = []
+for layer in layers:
+    if layer.name.startswith("profiel"):
 
-#         layernames.append(str(layer.name))
+        layernames.append(str(layer.name))
 
-# in_symbology_layer = 'profielenTotaalKH'
+in_symbology_layer = 'profiel_1'
 
-# for item in layernames:
-#     arcpy.ApplySymbologyFromLayer_management(item,in_symbology_layer)  
+for item in layernames:
+    arcpy.ApplySymbologyFromLayer_management(item,in_symbology_layer)  
 
 
 # out = r"C:\Users\Vincent\Dropbox\Wolfwater\SAFE_eindsprint\Vigerend\04_gis\dropboxdbSafe.gdb"
