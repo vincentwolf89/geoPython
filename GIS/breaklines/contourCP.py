@@ -8,37 +8,59 @@ from basisfuncties import average, splitByAttributes
 from arcpy.sa import *
 
 
-workspaceProfielen = r"D:\Projecten\HDSR\2020\gisData\testbatchGrechtkade.gdb"
-
-arcpy.env.workspace = r"D:\Projecten\HDSR\2020\gisData\testbatchGrechtkade.gdb"
+workspaceProfielen = r"D:\Projecten\HDSR\2020\gisData\testbatchSafe.gdb"
+arcpy.env.workspace = r"D:\Projecten\HDSR\2020\gisData\testbatchSafe.gdb"
 arcpy.env.overwriteOutput = True
-# profiel = "testprofiel_safe"
-# profiel = "testprofiel"
-trajectLijn = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\RWK_areaal_2024"
-# trajectLijn = r"D:\GoogleDrive\WSRL\safe_basis.gdb\buitenkruinlijn_safe_wsrl"
+
+
 taludValue = 0.09
 taludDistance = "1 Meters"
 taludDistance2 = "1,5 Meters"
+pointDistance = 0.5
+outputFigures = r"C:\Users\Vincent\Desktop\cPointFigures"
 
 inritDistance = 3 #meter
 pandDistance = 2 #meter 
 minLengteTalud = 1.5 #meter wordt niet meer gebruikt! 
 minLengteTaludBasis = 1 # meter
 
-hoogtedata = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\BAG2mPlusWaterlopenAHN3"
-# hoogtedata = r"D:\Projecten\WSRL\safe\waterlopenSafe300m.gdb\waterlopen300mTotaalFocal3m"
 
-bgtPanden = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_pand"
-bgtWaterdelen = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_waterdeel"
-bgtWaterdelenOndersteunend = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_ondersteunendWaterdeel"
-bgtWaterdelenTotaal = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_waterdeel_totaal"
-bgtWegdelen = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_wegdeel"
-bgtWegdelenInritten = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_wegdeel_inritten"
 
-# taludLijnLijst = []
-# taludPuntLijst = []
 
-profielen = 'testbatch_grechtkade'
+# invoer hdsr
+# hoogtedata = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\BAG2mPlusWaterlopenAHN3"
+# trajectLijn = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\RWK_areaal_2024"
+
+# bgtPanden = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_pand"
+# bgtWaterdelen = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_waterdeel"
+# bgtWaterdelenOndersteunend = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_ondersteunendWaterdeel"
+# bgtWaterdelenTotaal = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_waterdeel_totaal"
+# bgtWegdelen = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_wegdeel"
+# bgtWegdelenInritten = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_wegdeel_inritten"
+
+# profielen = 'testbatch_grechtkade'
+
+
+# invoer safe
+hoogtedata = r"D:\Projecten\WSRL\safe\waterlopenSafe300m.gdb\waterlopen300mTotaalFocal3m"
+trajectLijn = r"D:\GoogleDrive\WSRL\safe_basis.gdb\buitenkruinlijn_safe_wsrl"
+
+bgtPanden = r"D:\GoogleDrive\WSRL\safe_basis.gdb\panden_bag"
+bgtWaterdelen = r"D:\GoogleDrive\WSRL\safe_basis.gdb\bgt_waterdeel_500m"
+bgtWaterdelenOndersteunend = r"D:\GoogleDrive\WSRL\safe_basis.gdb\bgt_ondersteunend_waterdeel_500m"
+bgtWaterdelenTotaal = r"D:\GoogleDrive\WSRL\safe_basis.gdb\bgt_waterdelen_safe_totaal"
+bgtWegdelen = r"D:\GoogleDrive\WSRL\safe_basis.gdb\bgt_wegdelen_500m"
+bgtWegdelenInritten = r"D:\GoogleDrive\WSRL\safe_basis.gdb\bgt_wegdelen_inritten_500m"
+
+profielen = 'testProfiel'
+
+
+
+
+
+
+
+
 profielVelden = ['SHAPE@','profielnummer']
 spatialRef = arcpy.Describe(profielen).spatialReference
 
@@ -844,11 +866,6 @@ def getBitBut(profiel):
 
 
 
-
-
-
-
-
     # knip profiel op waterlopen, alleen deel overhouden dat tussen waterlopen in ligt en dus snijdt met trajectlijn
     arcpy.Intersect_analysis([profiel,bgtWaterdelenTotaal], "isectWaterlopen", "ALL", "", "POINT")
     arcpy.SplitLineAtPoint_management(profiel, "isectWaterlopen", "splitProfielWaterloop", 1)
@@ -871,12 +888,12 @@ def getBitBut(profiel):
         arcpy.SplitLineAtPoint_management("taludLijnenTotaal", "isectTaluddelen", "taludLijnenSplit", 1)
         arcpy.MakeFeatureLayer_management("taludLijnenSplit", "temp_taludLijnenSplit") 
         arcpy.SelectLayerByLocation_management("temp_taludLijnenSplit", "WITHIN", bgtWaterdelenTotaal, "", "NEW_SELECTION", "INVERT")
-        # arcpy.CopyFeatures_management("temp_taludLijnenSplit", "taludLijnenTotaal_")
+        arcpy.CopyFeatures_management("temp_taludLijnenSplit", "taludLijnenTotaal_")
 
         # select alleen waar profieldeelbasis 
-        arcpy.MakeFeatureLayer_management("taludLijnenBinnenkant_", "temp_taludLijnenBinnenkant")
-        arcpy.SelectLayerByLocation_management("temp_taludLijnenSplit", "WITHIN", "profielDeelBasis", "", "NEW_SELECTION", "NOT_INVERT")
-        arcpy.CopyFeatures_management("temp_taludLijnenSplit", "taludLijnenTotaal")
+        arcpy.MakeFeatureLayer_management("taludLijnenTotaal_", "temp_taludLijnenTotaal_")
+        arcpy.SelectLayerByLocation_management("temp_taludLijnenTotaal_", "WITHIN", "profielDeelBasis", "", "NEW_SELECTION", "NOT_INVERT")
+        arcpy.CopyFeatures_management("temp_taludLijnenTotaal_", "taludLijnenTotaal")
 
     else:
         pass
@@ -1562,6 +1579,74 @@ def getBitBut(profiel):
             arcpy.Delete_management(dataset)
 
 
+
+def writeOutput(profiel,cPoints):
+    # profiel voorzien van z-waardes op afstand van .. m
+    arcpy.GeneratePointsAlongLines_management("testRoute", "puntenRoute", "DISTANCE", Distance= pointDistance)
+  
+
+    # punten lokaliseren
+    arcpy.LocateFeaturesAlongRoutes_lr("puntenRoute", "testRoute", "rid", "0,1 Meters", "profileRouteTable", "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS", "M_DIRECTON")
+
+    # veld uit tabel koppelen
+    arcpy.JoinField_management("puntenRoute","OBJECTID","profileRouteTable","OBJECTID","MEAS")
+
+    # z-waarde aan punten koppelen
+    arcpy.CheckOutExtension("Spatial")
+    ExtractValuesToPoints("puntenRoute", hoogtedata, "puntenRouteZ","INTERPOLATE", "VALUE_ONLY")
+    arcpy.AlterField_management("puntenRouteZ", 'RASTERVALU', 'z_ahn')
+
+
+    # cPoints voorzien van z-waarde (indien aanwezig)
+    ExtractValuesToPoints(cPoints, hoogtedata, "tempCpoints","INTERPOLATE", "VALUE_ONLY")
+    arcpy.AlterField_management("tempCpoints", 'RASTERVALU', 'z_ahn')
+    
+
+
+    # koppel aan contourwaardes en geef z-waarde contour-waarde indien niet aanwezig (raster nodata)
+    arcpy.SpatialJoin_analysis("tempCpoints", "testIsectFocalPoint_", cPoints, "JOIN_ONE_TO_ONE", "KEEP_ALL","","CLOSEST", "", "")
+   
+    cPointCursor = arcpy.da.UpdateCursor(cPoints,["z_ahn","Contour"])
+    for cRow in cPointCursor:
+        if cRow[0] == None:
+            cRow[0] = cRow[1]
+            cPointCursor.updateRow(cRow)
+    del cPointCursor
+
+
+    # verwijder onnodige velden
+    veldenCpoints= [f.name for f in arcpy.ListFields(cPoints)]
+    veldenCpoint = ["OID@","OBJECTID","Shape","cPoint","profielNaam","z_ahn"]
+    for veld in veldenCpoint:
+        if veld in veldenCpoint:
+            pass
+        else: 
+            arcpy.DeleteField_management(cPoints,veld)
+
+
+
+    # plotten van profiel en cPoints
+    profiel = "puntenRouteZ"
+    knikpunten = 'testknikpunten542'
+
+    arrayProfiel = arcpy.da.FeatureClassToNumPyArray("puntenRouteZ", ('z_ahn','MEAS'))
+    dfProfiel = pd.DataFrame(arrayProfiel)
+    sortProfiel = dfProfiel.sort_values(by=['MEAS'])
+
+    arrayCpoint = arcpy.da.FeatureClassToNumPyArray(cPoints, ('z_ahn','MEAS'))
+    dfCpoint= pd.DataFrame(arrayCpoint)
+    sortCpoint = dfCpoint.sort_values(by=['MEAS'])
+
+    plt.rcParams["figure.figsize"] = [50, 10]
+    plt.plot(sortProfiel['MEAS'],sortProfiel['z_ahn'])
+    plt.plot(sortCpoint['MEAS'],sortCpoint['z_ahn'],'bo')
+
+    # plt.show()
+    plt.savefig("{}/{}.jpg".format(outputFigures,outPath))
+    plt.close()
+    
+
+
     
 
 
@@ -1617,6 +1702,8 @@ for row in profielIterator:
             for pRow in profielCursor:
                 pRow[0] = outName
                 profielCursor.updateRow(pRow)
+
+            writeOutput("tempProfiel",outPath)
 
 
 

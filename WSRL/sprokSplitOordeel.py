@@ -5,15 +5,15 @@ from itertools import groupby
 
 # from basisfuncties import*
 
-arcpy.env.workspace = r'D:\GoogleDrive\WSRL\sprok_sterrenschans.gdb'
-gdb = r'D:\GoogleDrive\WSRL\sprok_sterrenschans.gdb'
+arcpy.env.workspace = r'D:\Projecten\WSRL\sterreschans_heteren\GIS\kaartmateriaal.gdb'
+gdb = r'D:\Projecten\WSRL\sterreschans_heteren\GIS\kaartmateriaal.gdb'
 arcpy.env.overwriteOutput = True
 
-puntenOordeel ="OutputAggregatiePerUittredepunt" #invoer uitvoerpunten
-outputOordeelLijn = "oordeel_hoofd_v2" # uitvoer gesplitte trajectlijn
-profielen = "profielen_ss"
+puntenOordeel ="dijkbasisregel" #invoer uitvoerpunten
+outputOordeelLijn = "oordeel_dijkbasisregel" # uitvoer gesplitte trajectlijn
+profielen = "profielen_sh"
 minTrajectLengte = 50
-trajectLijn = "trajectlijn"
+trajectLijn = "trajectlijn_sh"
 veldenOordeelPunten = ['Eindoordeel','profielnummer']
 veldenProfielen = ['profielnummer','eindoordeelPiping']
 lijstOnvoldoende = ["IVv", "Vv", "VIv","Voldoet niet vanwege dijkbasisregel"]

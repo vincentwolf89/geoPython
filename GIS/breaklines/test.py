@@ -1,21 +1,25 @@
-list1 = [1,2,3,4]
-list2 = [345,345]
+import arcpy
+import matplotlib.pyplot as plt
+import pandas as pd
 
+arcpy.env.workspace = r'D:\Projecten\HDSR\2020\gisData\testbatchSafe.gdb'
 
-list1.insert(2,"5")
+profiel = 'testIsectFocalPoint'
+knikpunten = 'testknikpunten542'
+outputFigures = r"C:\Users\Vincent\Desktop\cPointFigures"
 
-thisdict = {
-  "brand": ("Ford","Tesla"),
-  "model": ("Mustang","Opel"),
-  "year": (1964,1953)
-}
+arrayProfiel = arcpy.da.FeatureClassToNumPyArray(profiel, ('Contour','MEAS'))
+dfProfiel = pd.DataFrame(arrayProfiel)
+sortProfiel = dfProfiel.sort_values(by=['MEAS'])
 
-thisdict["test"] = "aap","noot"
-for key, value in thisdict.items():
-    print value[0]
+arrayKnik = arcpy.da.FeatureClassToNumPyArray(knikpunten, ('Contour','MEAS'))
+dfKnik = pd.DataFrame(arrayKnik)
+sortKnik = dfKnik.sort_values(by=['MEAS'])
 
+plt.rcParams["figure.figsize"] = [50, 10]
+plt.plot(sortProfiel['MEAS'],sortProfiel['Contour'])
+plt.plot(sortKnik['MEAS'],sortKnik['Contour'],'bo')
 
-item =2 
-
-item -= 1 
-print item
+# plt.show()
+plt.savefig(outputFigures+"/naam.jpg")
+plt.close()
