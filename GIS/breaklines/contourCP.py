@@ -22,12 +22,14 @@ outputFigures = r"C:\Users\Vincent\Desktop\cPointFigures"
 inritDistance = 3 #meter
 pandDistance = 2 #meter 
 minLengteTalud = 1.5 #meter wordt niet meer gebruikt! 
-minLengteTaludBasis = 1 # meter
+
 
 
 
 
 # invoer hdsr
+# minLengteTaludBasis = 1 # meter
+
 # hoogtedata = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\BAG2mPlusWaterlopenAHN3"
 # trajectLijn = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\RWK_areaal_2024"
 
@@ -42,6 +44,8 @@ minLengteTaludBasis = 1 # meter
 
 
 # invoer safe
+minLengteTaludBasis = 3 # meter
+
 hoogtedata = r"D:\Projecten\WSRL\safe\waterlopenSafe300m.gdb\waterlopen300mTotaalFocal3m"
 trajectLijn = r"D:\GoogleDrive\WSRL\safe_basis.gdb\buitenkruinlijn_safe_wsrl"
 
@@ -52,7 +56,7 @@ bgtWaterdelenTotaal = r"D:\GoogleDrive\WSRL\safe_basis.gdb\bgt_waterdelen_safe_t
 bgtWegdelen = r"D:\GoogleDrive\WSRL\safe_basis.gdb\bgt_wegdelen_500m"
 bgtWegdelenInritten = r"D:\GoogleDrive\WSRL\safe_basis.gdb\bgt_wegdelen_inritten_500m"
 
-profielen = 'testProfiel'
+profielen = 'profielenSafeTest2'
 
 
 
@@ -913,12 +917,12 @@ def getBitBut(profiel):
 
     ## binnenzijde en buitenzijde loskoppelen
     whereBinnen = '"' + "locatie" + '" = ' + "'" + "binnenzijde" + "'"
-    arcpy.Select_analysis("taludLijnenProfielBasis", "taludLijnenBinnenkant", whereBinnen)
+    arcpy.Select_analysis("taludLijnenTotaal", "taludLijnenBinnenkant", whereBinnen)
     taludDelenBinnenkant = int(arcpy.GetCount_management("taludLijnenBinnenkant").getOutput(0))
     print "Aantal taluddelen binnenkant: {}".format(taludDelenBinnenkant)
 
     whereBuiten = '"' + "locatie" + '" = ' + "'" + "buitenzijde" + "'"
-    arcpy.Select_analysis("taludLijnenProfielBasis", "taludLijnenBuitenkant", whereBuiten)
+    arcpy.Select_analysis("taludLijnenTotaal", "taludLijnenBuitenkant", whereBuiten)
     taludDelenBuitenkant = int(arcpy.GetCount_management("taludLijnenBuitenkant").getOutput(0))
     print "Aantal taluddelen buitenkant: {}".format(taludDelenBuitenkant)
 
@@ -1585,13 +1589,12 @@ def writeOutput(profiel,cPoints):
     arcpy.GeneratePointsAlongLines_management("testRoute", "puntenRoute", "DISTANCE", Distance= pointDistance)
   
 
-    # punten lokaliseren
+    # profielpunten lokaliseren
     arcpy.LocateFeaturesAlongRoutes_lr("puntenRoute", "testRoute", "rid", "0,1 Meters", "profileRouteTable", "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS", "M_DIRECTON")
-
-    # veld uit tabel koppelen
     arcpy.JoinField_management("puntenRoute","OBJECTID","profileRouteTable","OBJECTID","MEAS")
+    arcpy.AlterField_management("puntenRoute", 'MEAS', 'afstand')
 
-    # z-waarde aan punten koppelen
+    # z-waarde aan profielpunten koppelen (indien aanwezig)
     arcpy.CheckOutExtension("Spatial")
     ExtractValuesToPoints("puntenRoute", hoogtedata, "puntenRouteZ","INTERPOLATE", "VALUE_ONLY")
     arcpy.AlterField_management("puntenRouteZ", 'RASTERVALU', 'z_ahn')
@@ -1600,6 +1603,11 @@ def writeOutput(profiel,cPoints):
     # cPoints voorzien van z-waarde (indien aanwezig)
     ExtractValuesToPoints(cPoints, hoogtedata, "tempCpoints","INTERPOLATE", "VALUE_ONLY")
     arcpy.AlterField_management("tempCpoints", 'RASTERVALU', 'z_ahn')
+
+    #cPoints lokaliseren
+    arcpy.LocateFeaturesAlongRoutes_lr("tempCpoints", "testRoute", "rid", "0,1 Meters", "cPointRouteTable", "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS", "M_DIRECTON")
+    arcpy.JoinField_management("tempCpoints","OBJECTID","cPointRouteTable","OBJECTID","MEAS")
+    arcpy.AlterField_management("tempCpoints", 'MEAS', 'afstand')
     
 
 
@@ -1615,10 +1623,10 @@ def writeOutput(profiel,cPoints):
 
 
     # verwijder onnodige velden
-    veldenCpoints= [f.name for f in arcpy.ListFields(cPoints)]
-    veldenCpoint = ["OID@","OBJECTID","Shape","cPoint","profielNaam","z_ahn"]
+    veldenCpoint= [f.name for f in arcpy.ListFields(cPoints)]
+    veldenCpointEnd = ["OID@","OBJECTID","Shape","cPoint","profielNaam","z_ahn","afstand"]
     for veld in veldenCpoint:
-        if veld in veldenCpoint:
+        if veld in veldenCpointEnd:
             pass
         else: 
             arcpy.DeleteField_management(cPoints,veld)
@@ -1629,17 +1637,52 @@ def writeOutput(profiel,cPoints):
     profiel = "puntenRouteZ"
     knikpunten = 'testknikpunten542'
 
-    arrayProfiel = arcpy.da.FeatureClassToNumPyArray("puntenRouteZ", ('z_ahn','MEAS'))
+    arrayProfiel = arcpy.da.FeatureClassToNumPyArray("puntenRouteZ", ('z_ahn','afstand'))
     dfProfiel = pd.DataFrame(arrayProfiel)
-    sortProfiel = dfProfiel.sort_values(by=['MEAS'])
+    sortProfiel = dfProfiel.sort_values(by=['afstand'])
 
-    arrayCpoint = arcpy.da.FeatureClassToNumPyArray(cPoints, ('z_ahn','MEAS'))
+    arrayCpoint = arcpy.da.FeatureClassToNumPyArray(cPoints, ('z_ahn','afstand','cPoint'))
     dfCpoint= pd.DataFrame(arrayCpoint)
-    sortCpoint = dfCpoint.sort_values(by=['MEAS'])
+    sortCpoint = dfCpoint.sort_values(by=['afstand'])
 
-    plt.rcParams["figure.figsize"] = [50, 10]
-    plt.plot(sortProfiel['MEAS'],sortProfiel['z_ahn'])
-    plt.plot(sortCpoint['MEAS'],sortCpoint['z_ahn'],'bo')
+    plt.style.use('seaborn-whitegrid') #seaborn-ticks
+    fig = plt.figure(figsize=(60, 10))
+    ax1 = fig.add_subplot(111, label ="1")
+
+    # cPoints
+    buitenteen = sortCpoint.loc[sortCpoint['cPoint'] == 'buitenteen']
+    binnenteen = sortCpoint.loc[sortCpoint['cPoint'] == 'binnenteen']
+    binnenkruin = sortCpoint.loc[sortCpoint['cPoint'] == 'binnenkruin']
+    buitenkruin = sortCpoint.loc[sortCpoint['cPoint'] == 'buitenkruin']
+
+    insteekbbBinnen = sortCpoint.loc[sortCpoint['cPoint'] == 'bovenkantBermBinnen']
+    insteekbbBuiten = sortCpoint.loc[sortCpoint['cPoint'] == 'bovenkantBermBuiten']
+    kruinbBinnen = sortCpoint.loc[sortCpoint['cPoint'] == 'onderkantBermBinnen']
+    kruinbBuiten = sortCpoint.loc[sortCpoint['cPoint'] == 'onderkantBermBuiten']
+
+    ax1.plot(sortProfiel['afstand'],sortProfiel['z_ahn'],label="AHN3-profiel")
+
+
+    if not buitenteen.empty:
+        ax1.plot(buitenteen['afstand'],buitenteen['z_ahn'],'bo',markersize=10,color='yellow',label="Buitenteen")
+    if not binnenteen.empty:
+        ax1.plot(binnenteen['afstand'],binnenteen['z_ahn'],'bo',markersize=10,color='orange',label="Binnenteen")
+    if not binnenkruin.empty:
+        ax1.plot(binnenkruin['afstand'],binnenkruin['z_ahn'],'bo',markersize=10,color='sienna',label="Binnenkruin")
+    if not buitenkruin.empty:
+        ax1.plot(buitenkruin['afstand'],buitenkruin['z_ahn'],'bo',markersize=10,color='sandybrown',label="Buitenkruin")
+    if not insteekbbBinnen.empty:
+        ax1.plot(insteekbbBinnen['afstand'],insteekbbBinnen['z_ahn'],'bo',markersize=10,color='navy',label="Insteek binnenberm")
+    if not insteekbbBuiten.empty:
+        ax1.plot(insteekbbBuiten['afstand'],insteekbbBuiten['z_ahn'],'bo',markersize=10,color='violet',label="Insteek buitenberm")
+    if not kruinbBinnen.empty:
+        ax1.plot(kruinbBinnen['afstand'],kruinbBinnen['z_ahn'],'bo',markersize=10,color='hotpink',label="Kruin binnenberm")
+    if not kruinbBuiten.empty:
+        ax1.plot(kruinbBuiten['afstand'],kruinbBuiten['z_ahn'],'bo',markersize=10,color='mediumblue',label="Kruin buitenberm")
+
+    ax1.legend(frameon=False, loc='upper left',prop={'size': 30})
+
+
 
     # plt.show()
     plt.savefig("{}/{}.jpg".format(outputFigures,outPath))
