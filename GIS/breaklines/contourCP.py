@@ -8,55 +8,57 @@ from basisfuncties import average, splitByAttributes
 from arcpy.sa import *
 
 
-workspaceProfielen = r"D:\Projecten\HDSR\2020\gisData\testbatchSafe.gdb"
-arcpy.env.workspace = r"D:\Projecten\HDSR\2020\gisData\testbatchSafe.gdb"
+workspaceProfielen = r"D:\Projecten\HDSR\2020\gisData\testbatchGrechtkade.gdb"
+arcpy.env.workspace = r"D:\Projecten\HDSR\2020\gisData\testbatchGrechtkade.gdb"
 arcpy.env.overwriteOutput = True
 
 
-taludValue = 0.09
+taludValue = 0.06
 taludDistance = "1 Meters"
 taludDistance2 = "1,5 Meters"
 pointDistance = 0.5
-outputFigures = r"C:\Users\Vincent\Desktop\cPointFigures"
+
 
 inritDistance = 3 #meter
 pandDistance = 2 #meter 
-minLengteTalud = 1.5 #meter wordt niet meer gebruikt! 
+# minLengteTalud = 1.5 #meter wordt niet meer gebruikt! 
 
 
 
 
 
 # invoer hdsr
-# minLengteTaludBasis = 1 # meter
+minLengteTaludBasis = 1 # meter
 
-# hoogtedata = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\BAG2mPlusWaterlopenAHN3"
-# trajectLijn = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\RWK_areaal_2024"
+hoogtedata = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\BAG2mPlusWaterlopenAHN3"
+trajectLijn = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\RWK_areaal_2024"
 
-# bgtPanden = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_pand"
-# bgtWaterdelen = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_waterdeel"
-# bgtWaterdelenOndersteunend = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_ondersteunendWaterdeel"
-# bgtWaterdelenTotaal = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_waterdeel_totaal"
-# bgtWegdelen = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_wegdeel"
-# bgtWegdelenInritten = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_wegdeel_inritten"
+bgtPanden = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_pand"
+bgtWaterdelen = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_waterdeel"
+bgtWaterdelenOndersteunend = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_ondersteunendWaterdeel"
+bgtWaterdelenTotaal = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_waterdeel_totaal"
+bgtWegdelen = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_wegdeel"
+bgtWegdelenInritten = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_wegdeel_inritten"
 
-# profielen = 'testbatch_grechtkade'
+profielen = 'profiel49'
+outputFigures = r"C:\Users\Vincent\Desktop\cPointsFiguresGrechtkade"
 
 
-# invoer safe
-minLengteTaludBasis = 3 # meter
+# # invoer safe
+# minLengteTaludBasis = 3 # meter
 
-hoogtedata = r"D:\Projecten\WSRL\safe\waterlopenSafe300m.gdb\waterlopen300mTotaalFocal3m"
-trajectLijn = r"D:\GoogleDrive\WSRL\safe_basis.gdb\buitenkruinlijn_safe_wsrl"
+# hoogtedata = r"D:\Projecten\WSRL\safe\waterlopenSafe300m.gdb\waterlopen300mTotaalFocal3m"
+# trajectLijn = r"D:\GoogleDrive\WSRL\safe_basis.gdb\buitenkruinlijn_safe_wsrl"
 
-bgtPanden = r"D:\GoogleDrive\WSRL\safe_basis.gdb\panden_bag"
-bgtWaterdelen = r"D:\GoogleDrive\WSRL\safe_basis.gdb\bgt_waterdeel_500m"
-bgtWaterdelenOndersteunend = r"D:\GoogleDrive\WSRL\safe_basis.gdb\bgt_ondersteunend_waterdeel_500m"
-bgtWaterdelenTotaal = r"D:\GoogleDrive\WSRL\safe_basis.gdb\bgt_waterdelen_safe_totaal"
-bgtWegdelen = r"D:\GoogleDrive\WSRL\safe_basis.gdb\bgt_wegdelen_500m"
-bgtWegdelenInritten = r"D:\GoogleDrive\WSRL\safe_basis.gdb\bgt_wegdelen_inritten_500m"
+# bgtPanden = r"D:\GoogleDrive\WSRL\safe_basis.gdb\panden_bag"
+# bgtWaterdelen = r"D:\GoogleDrive\WSRL\safe_basis.gdb\bgt_waterdeel_500m"
+# bgtWaterdelenOndersteunend = r"D:\GoogleDrive\WSRL\safe_basis.gdb\bgt_ondersteunend_waterdeel_500m"
+# bgtWaterdelenTotaal = r"D:\GoogleDrive\WSRL\safe_basis.gdb\bgt_waterdelen_safe_totaal"
+# bgtWegdelen = r"D:\GoogleDrive\WSRL\safe_basis.gdb\bgt_wegdelen_500m"
+# bgtWegdelenInritten = r"D:\GoogleDrive\WSRL\safe_basis.gdb\bgt_wegdelen_inritten_500m"
 
-profielen = 'profielenSafeTest2'
+# profielen = 'profielenSafeTest2'
+# outputFigures = r"C:\Users\Vincent\Desktop\cPointsFiguresSafe"
 
 
 
@@ -1583,6 +1585,147 @@ def getBitBut(profiel):
             arcpy.Delete_management(dataset)
 
 
+def getWaterPoints(profiel):
+    # bepaal binnenzijde en buitenzijde profieldeel
+    arcpy.Merge_management(["binnenkruin","buitenkruin"],"kruinPunten")
+    arcpy.SplitLineAtPoint_management(profiel, "kruinPunten", "profielSplitWater", 1)
+
+    arcpy.MakeFeatureLayer_management("profielSplitWater", "temp_profielSplitWater") 
+   
+    arcpy.SelectLayerByLocation_management("temp_profielSplitWater", "WITHIN", "kruinLijn", "", "NEW_SELECTION", "INVERT")
+    arcpy.CopyFeatures_management("temp_profielSplitWater", "profielSplitWaterZK")
+
+    arcpy.MakeFeatureLayer_management("profielSplitWaterZK", "temp_profielSplitWaterZK") 
+    arcpy.SelectLayerByLocation_management("temp_profielSplitWaterZK", "INTERSECT", "binnenkruin","", "NEW_SELECTION", "NOT_INVERT")
+    arcpy.CopyFeatures_management("temp_profielSplitWaterZK", "profielBinnenzijde")
+
+    arcpy.MakeFeatureLayer_management("profielSplitWaterZK", "temp_profielSplitWaterZK") 
+    arcpy.SelectLayerByLocation_management("temp_profielSplitWaterZK", "INTERSECT", "buitenkruin","", "NEW_SELECTION", "NOT_INVERT")
+    arcpy.CopyFeatures_management("temp_profielSplitWaterZK", "profielBuitenzijde")
+
+
+    # check voor snijpunten met waterlopen
+    arcpy.Intersect_analysis(["profielBuitenzijde",bgtWaterdelenTotaal], "isectWaterBuiten", "ALL", "", "POINT")
+    snijpuntenWaterBuiten = int(arcpy.GetCount_management("isectWaterBuiten").getOutput(0))
+
+    arcpy.Intersect_analysis(["profielBinnenzijde",bgtWaterdelenTotaal], "isectWaterBinnen", "ALL", "", "POINT")
+    snijpuntenWaterBinnen= int(arcpy.GetCount_management("isectWaterBinnen").getOutput(0))
+
+
+
+    if snijpuntenWaterBuiten > 0:
+        # waterpunten lokaliseren
+        arcpy.LocateFeaturesAlongRoutes_lr("isectWaterBuiten", "testRoute", "rid", "0,1 Meters", "waterBuitenRouteTable", "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS", "M_DIRECTON")
+        arcpy.JoinField_management("isectWaterBuiten","OBJECTID","waterBuitenRouteTable","OBJECTID","MEAS")
+        arcpy.AlterField_management("isectWaterBuiten", 'MEAS', 'afstand')
+
+        # z-waarde aan waterpunten koppelen (indien aanwezig)
+        arcpy.MultipartToSinglepart_management("isectWaterBuiten","isectWaterBuiten_")
+        arcpy.CheckOutExtension("Spatial")
+        ExtractValuesToPoints("isectWaterBuiten_", hoogtedata, "isectWaterBuitenZ_","INTERPOLATE", "VALUE_ONLY")
+        arcpy.AlterField_management("isectWaterBuitenZ_", 'RASTERVALU', 'z_ahn')
+        
+
+        # koppel aan contourwaardes en geef z-waarde contour-waarde indien niet aanwezig (raster nodata)
+        arcpy.SpatialJoin_analysis("isectWaterBuitenZ_", "testIsectFocalPoint_", "isectWaterBuitenZ", "JOIN_ONE_TO_ONE", "KEEP_ALL","","CLOSEST", "", "")
+
+        waterpuntCursor = arcpy.da.UpdateCursor("isectWaterBuitenZ",["z_ahn","Contour"])
+        for wRow in waterpuntCursor:
+            if wRow[0] == None:
+                wRow[0] = cRow[1]
+                waterpuntCursor.updateRow(wRow)
+        del waterpuntCursor
+
+
+        # schoonmaken 
+        fields = [f.name for f in arcpy.ListFields("isectWaterBuitenZ")]
+        keepFields = ["OBJECTID","Shape","afstand","z_ahn","BGTPlusType"]
+        for field in fields:
+            if field in keepFields:
+                pass
+            else:
+                arcpy.DeleteField_management("isectWaterBuitenZ",field)
+
+        arcpy.AddField_management("isectWaterBuitenZ","locatie","TEXT", field_length=200)
+
+        # verwijder overlappende punten, selectie op hoogte en meas!
+
+
+        # meas van waterlijnpunten:
+        arcpy.CopyFeatures_management("isectWaterBuitenZ", "oeverpuntenBuiten_")
+        waterpuntCursor = arcpy.da.UpdateCursor("oeverpuntenBuiten_",["z_ahn","afstand","BGTPlusType","locatie"])
+        for wRow in waterpuntCursor:
+            
+            if "oever" in wRow[2]:
+                pass
+            else: 
+                waterpuntCursor.deleteRow()
+        del waterpuntCursor
+
+
+
+
+        arcpy.CopyFeatures_management("isectWaterBuitenZ", "waterlijnpuntenBuiten")
+        waterpuntCursor = arcpy.da.UpdateCursor("waterlijnpuntenBuiten",["z_ahn","afstand","BGTPlusType","locatie"])
+        for wRow in waterpuntCursor:
+            
+            
+            if "waterloop" in wRow[2]:
+                pass
+            else: 
+                waterpuntCursor.deleteRow()
+            
+            
+        del waterpuntCursor
+        
+
+
+
+        # overlap verwijderen 
+        arcpy.MakeFeatureLayer_management("oeverpuntenBuiten_", "temp_oeverpuntenBuiten") 
+        arcpy.SelectLayerByLocation_management("temp_oeverpuntenBuiten", "INTERSECT", "waterlijnpuntenBuiten", "", "NEW_SELECTION", "INVERT")
+        arcpy.CopyFeatures_management("temp_oeverpuntenBuiten","oeverpuntenBuiten")
+
+
+        waterpuntCursor = arcpy.da.UpdateCursor("oeverpuntenBuiten",["z_ahn","afstand","BGTPlusType","locatie"])
+        for wRow in waterpuntCursor:
+            wRow[3] = "oever"
+            waterpuntCursor.updateRow(wRow)
+
+        del waterpuntCursor
+
+        waterpuntCursor = arcpy.da.UpdateCursor("waterlijnpuntenBuiten",["z_ahn","afstand","BGTPlusType","locatie"])
+        for wRow in waterpuntCursor:
+            wRow[3] = "waterlijn"
+            waterpuntCursor.updateRow(wRow)
+        del waterpuntCursor
+
+
+
+
+
+
+    
+
+
+
+
+
+
+
+    print "Profiel gesplit op water en landdelen"
+
+
+
+
+
+
+
+
+    
+    # controleer of binnenzijde/buitenzijde snijdt met waterloop
+    # 
+
 
 def writeOutput(profiel,cPoints):
     # profiel voorzien van z-waardes op afstand van .. m
@@ -1735,18 +1878,19 @@ for row in profielIterator:
     if test == "DOORGAAN":
         taludDelen("tempProfiel")
         getKruin("tempProfiel")
-        geomCheck = voorbewerkingTest("tempProfiel")
-        if geomCheck == "DOORGAAN":
+        getWaterPoints("tempProfiel")
+        # geomCheck = voorbewerkingTest("tempProfiel")
+        # if geomCheck == "DOORGAAN":
 
-            getBitBut("tempProfiel")
+        #     getBitBut("tempProfiel")
             
-            # voeg naam toe aan rijen in profiel
-            profielCursor = arcpy.da.UpdateCursor(outPath,"profielNaam")
-            for pRow in profielCursor:
-                pRow[0] = outName
-                profielCursor.updateRow(pRow)
+        #     # voeg naam toe aan rijen in profiel
+        #     profielCursor = arcpy.da.UpdateCursor(outPath,"profielNaam")
+        #     for pRow in profielCursor:
+        #         pRow[0] = outName
+        #         profielCursor.updateRow(pRow)
 
-            writeOutput("tempProfiel",outPath)
+        #     writeOutput("tempProfiel",outPath)
 
 
 
