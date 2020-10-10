@@ -1857,7 +1857,7 @@ def getWaterPoints(profiel,output):
                 tabelCursor = arcpy.da.InsertCursor("invoegtabel",["locatie","afstand","z_ahn","RID"])
 
                 bodempunt1 = ("slootbodem_dijkzijde_buiten",afstandBodem1,hoogteBodem1,1)
-                bodempunt2 = ("slootbodem_dijkzijde_buiten",afstandBodem2,hoogteBodem2,1)
+                bodempunt2 = ("slootbodem_polderzijde_buiten",afstandBodem2,hoogteBodem2,1)
                 oeverpunt = ("insteek_sloot_dijkzijde_buiten",afstandOever,hoogteOever,1)
 
                 tabelCursor.insertRow(bodempunt1)
@@ -1940,9 +1940,9 @@ def getWaterPoints(profiel,output):
                 tabelCursor = arcpy.da.InsertCursor("invoegtabel",["locatie","afstand","z_ahn","RID"])
 
                 bodempunt1 = ("slootbodem_dijkzijde_buiten",afstandBodem1,hoogteBodem1,1)
-                bodempunt2 = ("slootbodem_dijkzijde_buiten",afstandBodem2,hoogteBodem2,1)
+                bodempunt2 = ("slootbodem_polderzijde_buiten",afstandBodem2,hoogteBodem2,1)
                 oeverpunt1 = ("insteek_sloot_dijkzijde_buiten",afstandOever1,hoogteOever1,1)
-                oeverpunt2 = ("insteek_sloot_dijkzijde_buiten",afstandOever2,hoogteOever2,1)
+                oeverpunt2 = ("insteek_sloot_polderzijde_buiten",afstandOever2,hoogteOever2,1)
 
                 tabelCursor.insertRow(bodempunt1)
                 tabelCursor.insertRow(bodempunt2)
@@ -2196,7 +2196,7 @@ def getWaterPoints(profiel,output):
                 tabelCursor = arcpy.da.InsertCursor("invoegtabel",["locatie","afstand","z_ahn","RID"])
 
                 bodempunt1 = ("slootbodem_dijkzijde_binnen",afstandBodem1,hoogteBodem1,1)
-                bodempunt2 = ("slootbodem_dijkzijde_binnen",afstandBodem2,hoogteBodem2,1)
+                bodempunt2 = ("slootbodem_polderzijde_binnen",afstandBodem2,hoogteBodem2,1)
                 oeverpunt = ("insteek_sloot_dijkzijde_binnen",afstandOever,hoogteOever,1)
 
                 tabelCursor.insertRow(bodempunt1)
@@ -2277,9 +2277,9 @@ def getWaterPoints(profiel,output):
                 tabelCursor = arcpy.da.InsertCursor("invoegtabel",["locatie","afstand","z_ahn","RID"])
 
                 bodempunt1 = ("slootbodem_dijkzijde_binnen",afstandBodem1,hoogteBodem1,1)
-                bodempunt2 = ("slootbodem_dijkzijde_binnen",afstandBodem2,hoogteBodem2,1)
+                bodempunt2 = ("slootbodem_polderzijde_binnen",afstandBodem2,hoogteBodem2,1)
                 oeverpunt1 = ("insteek_sloot_dijkzijde_binnen",afstandOever1,hoogteOever1,1)
-                oeverpunt2 = ("insteek_sloot_dijkzijde_binnen",afstandOever2,hoogteOever2,1)
+                oeverpunt2 = ("insteek_sloot_polderzijde_binnen",afstandOever2,hoogteOever2,1)
 
                 tabelCursor.insertRow(bodempunt1)
                 tabelCursor.insertRow(bodempunt2)
