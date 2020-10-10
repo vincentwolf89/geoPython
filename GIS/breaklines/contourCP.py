@@ -8,8 +8,6 @@ from basisfuncties import average, splitByAttributes
 from arcpy.sa import *
 
 
-workspaceProfielen = r"D:\Projecten\HDSR\2020\gisData\testbatchGrechtkade.gdb"
-arcpy.env.workspace = r"D:\Projecten\HDSR\2020\gisData\testbatchGrechtkade.gdb"
 arcpy.env.overwriteOutput = True
 
 
@@ -19,8 +17,16 @@ taludDistance2 = "1,5 Meters"
 pointDistance = 0.5
 
 
+
+
 inritDistance = 3 #meter
 pandDistance = 2 #meter 
+
+diepteSmal = 0.5
+diepteBreed = 1 
+standaardTalud = 0.5 #1/2
+breedteSmal = 3
+
 # minLengteTalud = 1.5 #meter wordt niet meer gebruikt! 
 
 
@@ -28,6 +34,11 @@ pandDistance = 2 #meter
 
 
 # invoer hdsr
+workspaceProfielen = r"D:\Projecten\HDSR\2020\gisData\testbatchGrechtkade.gdb"
+arcpy.env.workspace = r"D:\Projecten\HDSR\2020\gisData\testbatchGrechtkade.gdb"
+
+
+
 minLengteTaludBasis = 1 # meter
 
 hoogtedata = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\BAG2mPlusWaterlopenAHN3"
@@ -45,6 +56,9 @@ outputFigures = r"C:\Users\Vincent\Desktop\cPointsFiguresGrechtkade"
 
 
 # # invoer safe
+# workspaceProfielen = r"D:\Projecten\HDSR\2020\gisData\testbatchSafe.gdb"
+# arcpy.env.workspace = r"D:\Projecten\HDSR\2020\gisData\testbatchSafe.gdb"
+
 # minLengteTaludBasis = 3 # meter
 
 # hoogtedata = r"D:\Projecten\WSRL\safe\waterlopenSafe300m.gdb\waterlopen300mTotaalFocal3m"
@@ -1585,7 +1599,11 @@ def getBitBut(profiel):
             arcpy.Delete_management(dataset)
 
 
-def getWaterPoints(profiel):
+def getWaterPoints(profiel,output):
+
+    # droge sloten en greppels worden (nog) niet meegenomen
+
+
     # bepaal binnenzijde en buitenzijde profieldeel
     arcpy.Merge_management(["binnenkruin","buitenkruin"],"kruinPunten")
     arcpy.SplitLineAtPoint_management(profiel, "kruinPunten", "profielSplitWater", 1)
@@ -1614,13 +1632,14 @@ def getWaterPoints(profiel):
 
 
     if snijpuntenWaterBuiten > 0:
+    
+        arcpy.MultipartToSinglepart_management("isectWaterBuiten","isectWaterBuiten_")
         # waterpunten lokaliseren
-        arcpy.LocateFeaturesAlongRoutes_lr("isectWaterBuiten", "testRoute", "rid", "0,1 Meters", "waterBuitenRouteTable", "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS", "M_DIRECTON")
-        arcpy.JoinField_management("isectWaterBuiten","OBJECTID","waterBuitenRouteTable","OBJECTID","MEAS")
-        arcpy.AlterField_management("isectWaterBuiten", 'MEAS', 'afstand')
+        arcpy.LocateFeaturesAlongRoutes_lr("isectWaterBuiten_", "testRoute", "rid", "0,1 Meters", "waterBuitenRouteTable", "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS", "M_DIRECTON")
+        arcpy.JoinField_management("isectWaterBuiten_","OBJECTID","waterBuitenRouteTable","OBJECTID","MEAS")
+        arcpy.AlterField_management("isectWaterBuiten_", 'MEAS', 'afstand')
 
         # z-waarde aan waterpunten koppelen (indien aanwezig)
-        arcpy.MultipartToSinglepart_management("isectWaterBuiten","isectWaterBuiten_")
         arcpy.CheckOutExtension("Spatial")
         ExtractValuesToPoints("isectWaterBuiten_", hoogtedata, "isectWaterBuitenZ_","INTERPOLATE", "VALUE_ONLY")
         arcpy.AlterField_management("isectWaterBuitenZ_", 'RASTERVALU', 'z_ahn')
@@ -1632,7 +1651,7 @@ def getWaterPoints(profiel):
         waterpuntCursor = arcpy.da.UpdateCursor("isectWaterBuitenZ",["z_ahn","Contour"])
         for wRow in waterpuntCursor:
             if wRow[0] == None:
-                wRow[0] = cRow[1]
+                wRow[0] = wRow[1]
                 waterpuntCursor.updateRow(wRow)
         del waterpuntCursor
 
@@ -1670,7 +1689,7 @@ def getWaterPoints(profiel):
         for wRow in waterpuntCursor:
             
             
-            if "waterloop" in wRow[2]:
+            if "water" in wRow[2]:
                 pass
             else: 
                 waterpuntCursor.deleteRow()
@@ -1700,12 +1719,623 @@ def getWaterPoints(profiel):
             waterpuntCursor.updateRow(wRow)
         del waterpuntCursor
 
-
-
+        # samenvoegen punten
+        arcpy.Merge_management(["waterlijnpuntenBuiten","oeverpuntenBuiten"],"waterpuntenTotaalBuiten")
 
 
 
     
+        # check voor max vier punten op profieldeel, meer kan/hoeft niet, sort op afstand ASC (binnen naar buiten)
+        waterpuntCursor = arcpy.da.UpdateCursor("waterpuntenTotaalBuiten",["z_ahn","afstand","BGTPlusType","locatie"],sql_clause=(None, 'ORDER BY afstand ASC'))
+        wPointsBuiten = 0
+
+        for wRow in waterpuntCursor:
+            wPointsBuiten += 1
+            if wPointsBuiten <= 4:
+                pass
+            else:
+                waterpuntCursor.deleteRow()
+
+        del waterpuntCursor
+
+        # check waterlijnpunten
+
+        aantalPunten = int(arcpy.GetCount_management("waterpuntenTotaalBuiten")[0])
+        # indien 2: twee soorten 
+        if aantalPunten == 2:
+            print "2 waterpunten gevonden buitenzijde, uitgaan van brede waterloop"
+
+            soortlist= [z[0] for z in arcpy.da.SearchCursor ("waterpuntenTotaalBuiten", ["locatie","afstand"],sql_clause=(None, 'ORDER BY afstand ASC'))]
+
+            soort1 = soortlist[0]
+            soort2 = soortlist[1]
+
+            if soort1 == "oever" and soort2 == "waterlijn":
+                print "Volgorde klopt, bereken talud en punten"
+
+                # bereken bodempunt
+                # bereken talud
+                hoogtelist= [z[0] for z in arcpy.da.SearchCursor ("waterpuntenTotaalBuiten", ["z_ahn","afstand"],sql_clause=(None, 'ORDER BY afstand ASC'))]
+                afstandlist = [z[1] for z in arcpy.da.SearchCursor ("waterpuntenTotaalBuiten", ["z_ahn","afstand"],sql_clause=(None, 'ORDER BY afstand ASC'))]
+                
+                
+                # oeverpunt
+                hoogteOever = hoogtelist[0]
+                afstandOever = afstandlist[0]
+                
+                #bodempunt
+                offsetBodem = (diepteBreed/standaardTalud)
+                hoogteBodem = (round(hoogtelist[1],2))-diepteBreed
+                afstandBodem = afstandlist[1]+offsetBodem
+                
+
+
+                # tabel aanmaken voor localisatie
+                arcpy.CreateTable_management(workspaceProfielen, "invoegtabel", "", "")
+                arcpy.AddField_management("invoegtabel","locatie","TEXT", field_length=200)
+                arcpy.AddField_management("invoegtabel","afstand","DOUBLE",field_is_nullable="NULLABLE")
+                arcpy.AddField_management("invoegtabel","z_ahn","DOUBLE",field_is_nullable="NULLABLE")
+                arcpy.AddField_management("invoegtabel","RID","DOUBLE", field_is_nullable="NULLABLE")
+
+                tabelCursor = arcpy.da.InsertCursor("invoegtabel",["locatie","afstand","z_ahn","RID"])
+                bodempunt = ("slootbodem_dijkzijde_buiten",afstandBodem,hoogteBodem,1)
+                oeverpunt = ("insteek_sloot_dijkzijde_buiten",afstandOever,hoogteOever,1)
+                tabelCursor.insertRow(bodempunt)
+                tabelCursor.insertRow(oeverpunt)
+                del tabelCursor
+
+
+
+                # route event layer
+                invoegtabelEvent = arcpy.MakeRouteEventLayer_lr("testRoute", "RID", "invoegtabel", "RID POINT afstand", "invoegtabel_event", "", "NO_ERROR_FIELD", "NO_ANGLE_FIELD", "NORMAL", "ANGLE", "LEFT", "POINT")
+
+                # definitieve layer
+                arcpy.CopyFeatures_management(invoegtabelEvent,"waterpunten_buiten_{}".format(output))
+                
+        
+
+
+            else:
+                print "Probleem in volgorde waterpunten, berekening overslaan"
+                return "STOP"
+
+            
+
+        if aantalPunten == 3:
+            print "3 waterpunten gevonden buitenzijde, controle waterloopbreedte op waterlijn"
+            # check voor een oeverpunt en twee waterlijnpunten, eerste punt moet oever zijn!
+
+            soortlist= [z[0] for z in arcpy.da.SearchCursor ("waterpuntenTotaalBuiten", ["locatie","z_ahn","afstand"],sql_clause=(None, 'ORDER BY afstand ASC'))]
+            hoogtelist = [z[1] for z in arcpy.da.SearchCursor ("waterpuntenTotaalBuiten", ["locatie","z_ahn","afstand"],sql_clause=(None, 'ORDER BY afstand ASC'))]
+            afstandlist = [z[2] for z in arcpy.da.SearchCursor ("waterpuntenTotaalBuiten", ["locatie","z_ahn","afstand"],sql_clause=(None, 'ORDER BY afstand ASC'))]
+
+            soort1 = soortlist[0]
+            soort2 = soortlist[1]
+            soort3 = soortlist[2]
+
+            print soort1, soort2, soort3
+            if soort1 == "oever" and soort2 == "waterlijn" and soort3 == "waterlijn":
+
+                # doorgaan
+                # bereken breedte
+                afstandWaterlijnDijk = hoogtelist[1]
+                afstandWaterlijnBuiten = hoogtelist[2]
+                breedteWaterloop = abs(afstandWaterlijnDijk-afstandWaterlijnBuiten)
+
+                if breedteWaterloop <= breedteSmal:
+                    diepte = diepteSmal
+                else:
+                    diepte = diepteBreed
+
+
+                # oeverpunt
+                hoogteOever = hoogtelist[0]
+                afstandOever = afstandlist[0]
+                
+                
+                offsetBodem = (diepte/standaardTalud)
+                
+                #bodempunt 1 dijkzijde
+                hoogteBodem1 = (round(hoogtelist[1],2))-diepte
+                afstandBodem1 = afstandlist[1]+offsetBodem
+
+                # bodempunt 2 buitenzijde
+                hoogteBodem2 = (round(hoogtelist[2],2))-diepte
+                afstandBodem2 = afstandlist[2]-offsetBodem
+                
+
+
+                # tabel aanmaken voor localisatie
+                arcpy.CreateTable_management(workspaceProfielen, "invoegtabel", "", "")
+                arcpy.AddField_management("invoegtabel","locatie","TEXT", field_length=200)
+                arcpy.AddField_management("invoegtabel","afstand","DOUBLE",field_is_nullable="NULLABLE")
+                arcpy.AddField_management("invoegtabel","z_ahn","DOUBLE",field_is_nullable="NULLABLE")
+                arcpy.AddField_management("invoegtabel","RID","DOUBLE", field_is_nullable="NULLABLE")
+
+                tabelCursor = arcpy.da.InsertCursor("invoegtabel",["locatie","afstand","z_ahn","RID"])
+
+                bodempunt1 = ("slootbodem_dijkzijde_buiten",afstandBodem1,hoogteBodem1,1)
+                bodempunt2 = ("slootbodem_dijkzijde_buiten",afstandBodem2,hoogteBodem2,1)
+                oeverpunt = ("insteek_sloot_dijkzijde_buiten",afstandOever,hoogteOever,1)
+
+                tabelCursor.insertRow(bodempunt1)
+                tabelCursor.insertRow(bodempunt2)
+                tabelCursor.insertRow(oeverpunt)
+                del tabelCursor
+
+
+
+                # route event layer
+                invoegtabelEvent = arcpy.MakeRouteEventLayer_lr("testRoute", "RID", "invoegtabel", "RID POINT afstand", "invoegtabel_event", "", "NO_ERROR_FIELD", "NO_ANGLE_FIELD", "NORMAL", "ANGLE", "LEFT", "POINT")
+
+                # definitieve layer
+                arcpy.CopyFeatures_management(invoegtabelEvent,"waterpunten_buiten_{}".format(output))
+               
+            
+            
+            else:
+                print "Probleem in volgorde waterpunten, berekening overslaan"
+                return "STOP"
+                
+
+
+
+        if aantalPunten == 4:
+            print "4 waterpunten gevonden buitenzijde, controle waterloopbreedte op waterlijn"
+            # check voor twee oeverpunten en twee waterlijnpunten
+            soortlist= [z[0] for z in arcpy.da.SearchCursor ("waterpuntenTotaalBuiten", ["locatie","z_ahn","afstand"],sql_clause=(None, 'ORDER BY afstand ASC'))]
+            hoogtelist = [z[1] for z in arcpy.da.SearchCursor ("waterpuntenTotaalBuiten", ["locatie","z_ahn","afstand"],sql_clause=(None, 'ORDER BY afstand ASC'))]
+            afstandlist = [z[2] for z in arcpy.da.SearchCursor ("waterpuntenTotaalBuiten", ["locatie","z_ahn","afstand"],sql_clause=(None, 'ORDER BY afstand ASC'))]
+            
+            soort1 = soortlist[0]
+            soort2 = soortlist[1]
+            soort3 = soortlist[2]
+            soort4 = soortlist[3]
+
+            if soort1 == "oever" and soort2 =="waterlijn" and soort3 =="waterlijn" and soort4 =="oever":
+                # doorgaan
+                # bereken breedte
+                afstandWaterlijnDijk = hoogtelist[1]
+                afstandWaterlijnBuiten = hoogtelist[2]
+                breedteWaterloop = abs(afstandWaterlijnDijk-afstandWaterlijnBuiten)
+
+                if breedteWaterloop <= breedteSmal:
+                    diepte = diepteSmal
+                else:
+                    diepte = diepteBreed
+
+
+                # oeverpunt dijkzijde
+                hoogteOever1 = hoogtelist[0]
+                afstandOever1 = afstandlist[0]
+
+                # oeverpunt buitenzijde
+                hoogteOever2 = hoogtelist[3]
+                afstandOever2 = afstandlist[3]
+                
+                
+                offsetBodem = (diepte/standaardTalud)
+                
+                #bodempunt 1 dijkzijde
+                hoogteBodem1 = (round(hoogtelist[1],2))-diepte
+                afstandBodem1 = afstandlist[1]+offsetBodem
+
+                # bodempunt 2 buitenzijde
+                hoogteBodem2 = (round(hoogtelist[1],2))-diepte
+                afstandBodem2 = afstandlist[2]-offsetBodem
+                
+
+
+                # tabel aanmaken voor localisatie
+                arcpy.CreateTable_management(workspaceProfielen, "invoegtabel", "", "")
+                arcpy.AddField_management("invoegtabel","locatie","TEXT", field_length=200)
+                arcpy.AddField_management("invoegtabel","afstand","DOUBLE",field_is_nullable="NULLABLE")
+                arcpy.AddField_management("invoegtabel","z_ahn","DOUBLE",field_is_nullable="NULLABLE")
+                arcpy.AddField_management("invoegtabel","RID","DOUBLE", field_is_nullable="NULLABLE")
+
+                tabelCursor = arcpy.da.InsertCursor("invoegtabel",["locatie","afstand","z_ahn","RID"])
+
+                bodempunt1 = ("slootbodem_dijkzijde_buiten",afstandBodem1,hoogteBodem1,1)
+                bodempunt2 = ("slootbodem_dijkzijde_buiten",afstandBodem2,hoogteBodem2,1)
+                oeverpunt1 = ("insteek_sloot_dijkzijde_buiten",afstandOever1,hoogteOever1,1)
+                oeverpunt2 = ("insteek_sloot_dijkzijde_buiten",afstandOever2,hoogteOever2,1)
+
+                tabelCursor.insertRow(bodempunt1)
+                tabelCursor.insertRow(bodempunt2)
+                tabelCursor.insertRow(oeverpunt1)
+                tabelCursor.insertRow(oeverpunt2)
+                del tabelCursor
+
+
+
+                # route event layer
+                invoegtabelEvent = arcpy.MakeRouteEventLayer_lr("testRoute", "RID", "invoegtabel", "RID POINT afstand", "invoegtabel_event", "", "NO_ERROR_FIELD", "NO_ANGLE_FIELD", "NORMAL", "ANGLE", "LEFT", "POINT")
+
+                # definitieve layer
+                arcpy.CopyFeatures_management(invoegtabelEvent,"waterpunten_buiten_{}".format(output))
+
+
+            else:
+                print "Probleem in volgorde waterpunten, berekening overslaan"
+                return "STOP"
+
+        
+
+
+
+
+
+
+    if snijpuntenWaterBinnen > 0:
+        arcpy.MultipartToSinglepart_management("isectWaterBinnen","isectWaterBinnen_")
+        # waterpunten lokaliseren
+        arcpy.LocateFeaturesAlongRoutes_lr("isectWaterBinnen_", "testRoute", "rid", "0,1 Meters", "waterBinnenRouteTable", "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS", "M_DIRECTON")
+        arcpy.JoinField_management("isectWaterBinnen_","OBJECTID","waterBinnenRouteTable","OBJECTID","MEAS")
+        arcpy.AlterField_management("isectWaterBinnen_", 'MEAS', 'afstand')
+
+        # z-waarde aan waterpunten koppelen (indien aanwezig)
+        arcpy.CheckOutExtension("Spatial")
+        ExtractValuesToPoints("isectWaterBinnen_", hoogtedata, "isectWaterBinnenZ_","INTERPOLATE", "VALUE_ONLY")
+        arcpy.AlterField_management("isectWaterBinnenZ_", 'RASTERVALU', 'z_ahn')
+        
+
+        # koppel aan contourwaardes en geef z-waarde contour-waarde indien niet aanwezig (raster nodata)
+        arcpy.SpatialJoin_analysis("isectWaterBinnenZ_", "testIsectFocalPoint_", "isectWaterBinnenZ", "JOIN_ONE_TO_ONE", "KEEP_ALL","","CLOSEST", "", "")
+
+        waterpuntCursor = arcpy.da.UpdateCursor("isectWaterBinnenZ",["z_ahn","Contour"])
+        for wRow in waterpuntCursor:
+            if wRow[0] == None:
+                wRow[0] = wRow[1]
+                waterpuntCursor.updateRow(wRow)
+        del waterpuntCursor
+
+
+        # schoonmaken 
+        fields = [f.name for f in arcpy.ListFields("isectWaterBinnenZ")]
+        keepFields = ["OBJECTID","Shape","afstand","z_ahn","BGTPlusType"]
+        for field in fields:
+            if field in keepFields:
+                pass
+            else:
+                arcpy.DeleteField_management("isectWaterBinnenZ",field)
+
+        arcpy.AddField_management("isectWaterBinnenZ","locatie","TEXT", field_length=200)
+
+        # verwijder overlappende punten, selectie op hoogte en meas!
+
+
+        # meas van waterlijnpunten:
+        arcpy.CopyFeatures_management("isectWaterBinnenZ", "oeverpuntenBinnen_")
+        waterpuntCursor = arcpy.da.UpdateCursor("oeverpuntenBinnen_",["z_ahn","afstand","BGTPlusType","locatie"])
+        for wRow in waterpuntCursor:
+            
+            if "oever" in wRow[2]:
+                pass
+            else: 
+                waterpuntCursor.deleteRow()
+        del waterpuntCursor
+
+
+
+
+        arcpy.CopyFeatures_management("isectWaterBinnenZ", "waterlijnpuntenBinnen")
+        waterpuntCursor = arcpy.da.UpdateCursor("waterlijnpuntenBinnen",["z_ahn","afstand","BGTPlusType","locatie"])
+        for wRow in waterpuntCursor:
+            
+            
+            if "water" in wRow[2]:
+                pass
+            else: 
+                waterpuntCursor.deleteRow()
+            
+            
+        del waterpuntCursor
+        
+
+
+
+        # overlap verwijderen 
+        arcpy.MakeFeatureLayer_management("oeverpuntenBinnen_", "temp_oeverpuntenBinnen") 
+        arcpy.SelectLayerByLocation_management("temp_oeverpuntenBinnen", "INTERSECT", "waterlijnpuntenBinnen", "", "NEW_SELECTION", "INVERT")
+        arcpy.CopyFeatures_management("temp_oeverpuntenBinnen","oeverpuntenBinnen")
+
+
+        waterpuntCursor = arcpy.da.UpdateCursor("oeverpuntenBinnen",["z_ahn","afstand","BGTPlusType","locatie"])
+        for wRow in waterpuntCursor:
+            wRow[3] = "oever"
+            waterpuntCursor.updateRow(wRow)
+
+        del waterpuntCursor
+
+        waterpuntCursor = arcpy.da.UpdateCursor("waterlijnpuntenBinnen",["z_ahn","afstand","BGTPlusType","locatie"])
+        for wRow in waterpuntCursor:
+            wRow[3] = "waterlijn"
+            waterpuntCursor.updateRow(wRow)
+        del waterpuntCursor
+
+        # samenvoegen punten
+        arcpy.Merge_management(["waterlijnpuntenBinnen","oeverpuntenBinnen"],"waterpuntenTotaalBinnen")
+
+
+
+    
+        # check voor max vier punten op profieldeel, meer kan/hoeft niet, sort op afstand ASC (binnen naar buiten)
+        waterpuntCursor = arcpy.da.UpdateCursor("waterpuntenTotaalBinnen",["z_ahn","afstand","BGTPlusType","locatie"],sql_clause=(None, 'ORDER BY afstand DESC'))
+        wPointsBinnen = 0
+
+        for wRow in waterpuntCursor:
+            wPointsBinnen += 1
+            if wPointsBinnen <= 4:
+                pass
+            else:
+                waterpuntCursor.deleteRow()
+
+        del waterpuntCursor
+
+   
+
+        # check waterlijnpunten
+
+        aantalPunten = int(arcpy.GetCount_management("waterpuntenTotaalBinnen")[0])
+        # indien 2: twee soorten 
+        if aantalPunten == 2:
+            print "2 waterpunten gevonden binnenzijde, uitgaan van brede waterloop"
+
+            soortlist= [z[0] for z in arcpy.da.SearchCursor ("waterpuntenTotaalBinnen", ["locatie","afstand"],sql_clause=(None, 'ORDER BY afstand DESC'))]
+
+            soort1 = soortlist[0]
+            soort2 = soortlist[1]
+
+            if soort1 == "oever" and soort2 == "waterlijn":
+                print "Volgorde klopt, bereken talud en punten"
+
+                # bereken bodempunt
+                # bereken talud
+                hoogtelist= [z[0] for z in arcpy.da.SearchCursor ("waterpuntenTotaalBinnen", ["z_ahn","afstand"],sql_clause=(None, 'ORDER BY afstand DESC'))]
+                afstandlist = [z[1] for z in arcpy.da.SearchCursor ("waterpuntenTotaalBinnen", ["z_ahn","afstand"],sql_clause=(None, 'ORDER BY afstand DESC'))]
+                
+                
+                # oeverpunt
+                hoogteOever = hoogtelist[0]
+                afstandOever = afstandlist[0]
+                
+                #bodempunt
+                offsetBodem = (diepteBreed/standaardTalud)
+                hoogteBodem = (round(hoogtelist[1],2))-diepteBreed
+                afstandBodem = afstandlist[1]-offsetBodem
+                
+
+
+                # tabel aanmaken voor localisatie
+                arcpy.CreateTable_management(workspaceProfielen, "invoegtabel", "", "")
+                arcpy.AddField_management("invoegtabel","locatie","TEXT", field_length=200)
+                arcpy.AddField_management("invoegtabel","afstand","DOUBLE",field_is_nullable="NULLABLE")
+                arcpy.AddField_management("invoegtabel","z_ahn","DOUBLE",field_is_nullable="NULLABLE")
+                arcpy.AddField_management("invoegtabel","RID","DOUBLE", field_is_nullable="NULLABLE")
+
+                tabelCursor = arcpy.da.InsertCursor("invoegtabel",["locatie","afstand","z_ahn","RID"])
+                bodempunt = ("slootbodem_dijkzijde_binnen",afstandBodem,hoogteBodem,1)
+                oeverpunt = ("insteek_sloot_dijkzijde_binnen",afstandOever,hoogteOever,1)
+                tabelCursor.insertRow(bodempunt)
+                tabelCursor.insertRow(oeverpunt)
+                del tabelCursor
+
+
+
+                # route event layer
+                invoegtabelEvent = arcpy.MakeRouteEventLayer_lr("testRoute", "RID", "invoegtabel", "RID POINT afstand", "invoegtabel_event", "", "NO_ERROR_FIELD", "NO_ANGLE_FIELD", "NORMAL", "ANGLE", "LEFT", "POINT")
+
+                # definitieve layer
+                arcpy.CopyFeatures_management(invoegtabelEvent,"waterpunten_binnen_{}".format(output))
+                
+        
+
+
+            else:
+                print "Probleem in volgorde waterpunten, berekening overslaan"
+                return "STOP"
+
+            
+
+        if aantalPunten == 3:
+            print "3 waterpunten gevonden binnenzijde, controle waterloopbreedte op waterlijn"
+            # check voor een oeverpunt en twee waterlijnpunten, eerste punt moet oever zijn!
+
+            soortlist= [z[0] for z in arcpy.da.SearchCursor ("waterpuntenTotaalBinnen", ["locatie","z_ahn","afstand"],sql_clause=(None, 'ORDER BY afstand DESC'))]
+            hoogtelist = [z[1] for z in arcpy.da.SearchCursor ("waterpuntenTotaalBinnen", ["locatie","z_ahn","afstand"],sql_clause=(None, 'ORDER BY afstand DESC'))]
+            afstandlist = [z[2] for z in arcpy.da.SearchCursor ("waterpuntenTotaalBinnen", ["locatie","z_ahn","afstand"],sql_clause=(None, 'ORDER BY afstand DESC'))]
+
+            soort1 = soortlist[0]
+            soort2 = soortlist[1]
+            soort3 = soortlist[2]
+
+            print soort1, soort2, soort3
+            if soort1 == "oever" and soort2 == "waterlijn" and soort3 == "waterlijn":
+
+                # doorgaan
+                # bereken breedte
+                afstandWaterlijnDijk = hoogtelist[1]
+                afstandWaterlijnBuiten = hoogtelist[2]
+                breedteWaterloop = abs(afstandWaterlijnDijk-afstandWaterlijnBuiten)
+
+                if breedteWaterloop <= breedteSmal:
+                    diepte = diepteSmal
+                else:
+                    diepte = diepteBreed
+
+
+                # oeverpunt
+                hoogteOever = hoogtelist[0]
+                afstandOever = afstandlist[0]
+                
+                
+                offsetBodem = (diepte/standaardTalud)
+                
+                #bodempunt 1 dijkzijde
+                hoogteBodem1 = (round(hoogtelist[1],2))-diepte
+                afstandBodem1 = afstandlist[1]-offsetBodem
+
+                # bodempunt 2 buitenzijde
+                hoogteBodem2 = (round(hoogtelist[2],2))-diepte
+                afstandBodem2 = afstandlist[2]+offsetBodem
+                
+
+
+                # tabel aanmaken voor localisatie
+                arcpy.CreateTable_management(workspaceProfielen, "invoegtabel", "", "")
+                arcpy.AddField_management("invoegtabel","locatie","TEXT", field_length=200)
+                arcpy.AddField_management("invoegtabel","afstand","DOUBLE",field_is_nullable="NULLABLE")
+                arcpy.AddField_management("invoegtabel","z_ahn","DOUBLE",field_is_nullable="NULLABLE")
+                arcpy.AddField_management("invoegtabel","RID","DOUBLE", field_is_nullable="NULLABLE")
+
+                tabelCursor = arcpy.da.InsertCursor("invoegtabel",["locatie","afstand","z_ahn","RID"])
+
+                bodempunt1 = ("slootbodem_dijkzijde_binnen",afstandBodem1,hoogteBodem1,1)
+                bodempunt2 = ("slootbodem_dijkzijde_binnen",afstandBodem2,hoogteBodem2,1)
+                oeverpunt = ("insteek_sloot_dijkzijde_binnen",afstandOever,hoogteOever,1)
+
+                tabelCursor.insertRow(bodempunt1)
+                tabelCursor.insertRow(bodempunt2)
+                tabelCursor.insertRow(oeverpunt)
+                del tabelCursor
+
+
+
+                # route event layer
+                invoegtabelEvent = arcpy.MakeRouteEventLayer_lr("testRoute", "RID", "invoegtabel", "RID POINT afstand", "invoegtabel_event", "", "NO_ERROR_FIELD", "NO_ANGLE_FIELD", "NORMAL", "ANGLE", "LEFT", "POINT")
+
+                # definitieve layer
+                arcpy.CopyFeatures_management(invoegtabelEvent,"waterpunten_binnen_{}".format(output))
+               
+            
+            
+            else:
+                print "Probleem in volgorde waterpunten, berekening overslaan"
+                return "STOP"
+                
+
+
+
+        if aantalPunten == 4:
+            print "4 waterpunten gevonden binnenzijde, controle waterloopbreedte op waterlijn"
+            # check voor twee oeverpunten en twee waterlijnpunten
+            soortlist= [z[0] for z in arcpy.da.SearchCursor ("waterpuntenTotaalBinnen", ["locatie","z_ahn","afstand"],sql_clause=(None, 'ORDER BY afstand DESC'))]
+            hoogtelist = [z[1] for z in arcpy.da.SearchCursor ("waterpuntenTotaalBinnen", ["locatie","z_ahn","afstand"],sql_clause=(None, 'ORDER BY afstand DESC'))]
+            afstandlist = [z[2] for z in arcpy.da.SearchCursor ("waterpuntenTotaalBinnen", ["locatie","z_ahn","afstand"],sql_clause=(None, 'ORDER BY afstand DESC'))]
+            
+            soort1 = soortlist[0]
+            soort2 = soortlist[1]
+            soort3 = soortlist[2]
+            soort4 = soortlist[3]
+
+            if soort1 == "oever" and soort2 =="waterlijn" and soort3 =="waterlijn" and soort4 =="oever":
+                # doorgaan
+                # bereken breedte
+                afstandWaterlijnDijk = hoogtelist[1]
+                afstandWaterlijnBuiten = hoogtelist[2]
+                breedteWaterloop = abs(afstandWaterlijnDijk-afstandWaterlijnBuiten)
+
+                if breedteWaterloop <= breedteSmal:
+                    diepte = diepteSmal
+                else:
+                    diepte = diepteBreed
+
+
+                # oeverpunt dijkzijde
+                hoogteOever1 = hoogtelist[0]
+                afstandOever1 = afstandlist[0]
+
+                # oeverpunt buitenzijde
+                hoogteOever2 = hoogtelist[3]
+                afstandOever2 = afstandlist[3]
+                
+                
+                offsetBodem = (diepte/standaardTalud)
+                
+                #bodempunt 1 dijkzijde
+                hoogteBodem1 = (round(hoogtelist[1],2))-diepte
+                afstandBodem1 = afstandlist[1]-offsetBodem
+
+                # bodempunt 2 buitenzijde
+                hoogteBodem2 = (round(hoogtelist[1],2))-diepte
+                afstandBodem2 = afstandlist[2]+offsetBodem
+                
+
+
+                # tabel aanmaken voor localisatie
+                arcpy.CreateTable_management(workspaceProfielen, "invoegtabel", "", "")
+                arcpy.AddField_management("invoegtabel","locatie","TEXT", field_length=200)
+                arcpy.AddField_management("invoegtabel","afstand","DOUBLE",field_is_nullable="NULLABLE")
+                arcpy.AddField_management("invoegtabel","z_ahn","DOUBLE",field_is_nullable="NULLABLE")
+                arcpy.AddField_management("invoegtabel","RID","DOUBLE", field_is_nullable="NULLABLE")
+
+                tabelCursor = arcpy.da.InsertCursor("invoegtabel",["locatie","afstand","z_ahn","RID"])
+
+                bodempunt1 = ("slootbodem_dijkzijde_binnen",afstandBodem1,hoogteBodem1,1)
+                bodempunt2 = ("slootbodem_dijkzijde_binnen",afstandBodem2,hoogteBodem2,1)
+                oeverpunt1 = ("insteek_sloot_dijkzijde_binnen",afstandOever1,hoogteOever1,1)
+                oeverpunt2 = ("insteek_sloot_dijkzijde_binnen",afstandOever2,hoogteOever2,1)
+
+                tabelCursor.insertRow(bodempunt1)
+                tabelCursor.insertRow(bodempunt2)
+                tabelCursor.insertRow(oeverpunt1)
+                tabelCursor.insertRow(oeverpunt2)
+                del tabelCursor
+
+
+
+                # route event layer
+                invoegtabelEvent = arcpy.MakeRouteEventLayer_lr("testRoute", "RID", "invoegtabel", "RID POINT afstand", "invoegtabel_event", "", "NO_ERROR_FIELD", "NO_ANGLE_FIELD", "NORMAL", "ANGLE", "LEFT", "POINT")
+
+                # definitieve layer
+                arcpy.CopyFeatures_management(invoegtabelEvent,"waterpunten_binnen_{}".format(output))
+
+
+            else:
+                print "Probleem in volgorde waterpunten, berekening overslaan"
+                return "STOP"
+
+
+
+
+
+
+        
+
+
+
+
+
+        
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+        waterpuntCursor = arcpy.da.UpdateCursor("waterpuntenTotaal",["z_ahn","afstand","BGTPlusType","locatie"],sql_clause=(None, 'ORDER BY afstand ASC'))
+        wPointsBuiten = 0
+
+        for wRow in waterpuntCursor:
+            wPointsBuiten += 1
+            if wPointsBuiten <= 4:
+                pass
+            else:
+                waterpuntCursor.deleteRow()
+
+        del waterpuntCursor
+
+
+                
 
 
 
@@ -1878,7 +2508,7 @@ for row in profielIterator:
     if test == "DOORGAAN":
         taludDelen("tempProfiel")
         getKruin("tempProfiel")
-        getWaterPoints("tempProfiel")
+        getWaterPoints("tempProfiel",outName)
         # geomCheck = voorbewerkingTest("tempProfiel")
         # if geomCheck == "DOORGAAN":
 
