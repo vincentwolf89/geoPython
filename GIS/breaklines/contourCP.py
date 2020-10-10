@@ -1818,9 +1818,11 @@ def getWaterPoints(profiel,output):
 
                 # doorgaan
                 # bereken breedte
-                afstandWaterlijnDijk = hoogtelist[1]
-                afstandWaterlijnBuiten = hoogtelist[2]
+                afstandWaterlijnDijk = afstandlist[1]
+                afstandWaterlijnBuiten = afstandlist[2]
                 breedteWaterloop = abs(afstandWaterlijnDijk-afstandWaterlijnBuiten)
+
+               
 
                 if breedteWaterloop <= breedteSmal:
                     diepte = diepteSmal
@@ -1895,9 +1897,11 @@ def getWaterPoints(profiel,output):
             if soort1 == "oever" and soort2 =="waterlijn" and soort3 =="waterlijn" and soort4 =="oever":
                 # doorgaan
                 # bereken breedte
-                afstandWaterlijnDijk = hoogtelist[1]
-                afstandWaterlijnBuiten = hoogtelist[2]
+                afstandWaterlijnDijk = afstandlist[1]
+                afstandWaterlijnBuiten = afstandlist[2]
                 breedteWaterloop = abs(afstandWaterlijnDijk-afstandWaterlijnBuiten)
+
+                print "breedte waterloop is {}".format(breedteWaterloop)
 
                 if breedteWaterloop <= breedteSmal:
                     diepte = diepteSmal
@@ -2154,8 +2158,8 @@ def getWaterPoints(profiel,output):
 
                 # doorgaan
                 # bereken breedte
-                afstandWaterlijnDijk = hoogtelist[1]
-                afstandWaterlijnBuiten = hoogtelist[2]
+                afstandWaterlijnDijk = afstandlist[1]
+                afstandWaterlijnBuiten = afstandlist[2]
                 breedteWaterloop = abs(afstandWaterlijnDijk-afstandWaterlijnBuiten)
 
                 if breedteWaterloop <= breedteSmal:
@@ -2163,6 +2167,7 @@ def getWaterPoints(profiel,output):
                 else:
                     diepte = diepteBreed
 
+                
 
                 # oeverpunt
                 hoogteOever = hoogtelist[0]
@@ -2231,8 +2236,8 @@ def getWaterPoints(profiel,output):
             if soort1 == "oever" and soort2 =="waterlijn" and soort3 =="waterlijn" and soort4 =="oever":
                 # doorgaan
                 # bereken breedte
-                afstandWaterlijnDijk = hoogtelist[1]
-                afstandWaterlijnBuiten = hoogtelist[2]
+                afstandWaterlijnDijk = afstandlist[1]
+                afstandWaterlijnBuiten = afstandlist[2]
                 breedteWaterloop = abs(afstandWaterlijnDijk-afstandWaterlijnBuiten)
 
                 if breedteWaterloop <= breedteSmal:
