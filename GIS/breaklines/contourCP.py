@@ -51,28 +51,28 @@ bgtWaterdelenTotaal = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_waterde
 bgtWegdelen = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_wegdeel"
 bgtWegdelenInritten = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_wegdeel_inritten"
 
-profielen = 'profiel49'
+profielen = 'grechtkade_mini'
 outputFigures = r"C:\Users\Vincent\Desktop\cPointsFiguresGrechtkade"
 
 
 # # invoer safe
-# workspaceProfielen = r"D:\Projecten\HDSR\2020\gisData\testbatchSafe.gdb"
-# arcpy.env.workspace = r"D:\Projecten\HDSR\2020\gisData\testbatchSafe.gdb"
+# workspaceProfielen = r"D:\Projecten\WSRL\safe\hoekenPriovakken.gdb"
+# arcpy.env.workspace = r"D:\Projecten\WSRL\safe\hoekenPriovakken.gdb"
 
 # minLengteTaludBasis = 3 # meter
 
 # hoogtedata = r"D:\Projecten\WSRL\safe\waterlopenSafe300m.gdb\waterlopen300mTotaalFocal3m"
 # trajectLijn = r"D:\GoogleDrive\WSRL\safe_basis.gdb\buitenkruinlijn_safe_wsrl"
 
-# bgtPanden = r"D:\GoogleDrive\WSRL\safe_basis.gdb\panden_bag"
+# bgtPanden = r"D:\GoogleDrive\WSRL\safe_basis.gdb\panden_bag_dummy"
 # bgtWaterdelen = r"D:\GoogleDrive\WSRL\safe_basis.gdb\bgt_waterdeel_500m"
 # bgtWaterdelenOndersteunend = r"D:\GoogleDrive\WSRL\safe_basis.gdb\bgt_ondersteunend_waterdeel_500m"
 # bgtWaterdelenTotaal = r"D:\GoogleDrive\WSRL\safe_basis.gdb\bgt_waterdelen_safe_totaal"
 # bgtWegdelen = r"D:\GoogleDrive\WSRL\safe_basis.gdb\bgt_wegdelen_500m"
 # bgtWegdelenInritten = r"D:\GoogleDrive\WSRL\safe_basis.gdb\bgt_wegdelen_inritten_500m"
 
-# profielen = 'profielenSafeTest2'
-# outputFigures = r"C:\Users\Vincent\Desktop\cPointsFiguresSafe"
+# profielen = 'testProfielen'
+# outputFigures = r"C:\Users\Vincent\Desktop\cPointFiguresSafe"
 
 
 
@@ -371,6 +371,17 @@ def getKruin(profiel):
 
     del bukCursor
 
+def testKruin(profiel):
+    arcpy.Merge_management(["binnenkruin","buitenkruin"],"kruinPunten")
+
+    # check of kruinpunten in waterdeel liggen, indien zo berekening afbreken
+    arcpy.Intersect_analysis(["kruinPunten",bgtWaterdelenTotaal], "kruinPuntenWater", "ALL", "", "POINT") 
+    snijpuntenKruinWater = int(arcpy.GetCount_management("kruinPuntenWater").getOutput(0))
+    if snijpuntenKruinWater is not 0:
+        return "STOP"
+    else:
+        return "DOORGAAN"
+    
 
 def voorbewerkingTest(profiel):
 
@@ -1599,13 +1610,30 @@ def getBitBut(profiel):
             arcpy.Delete_management(dataset)
 
 
+
+
+
 def getWaterPoints(profiel,output):
 
+    print "begin watercheck"
+    waterdelenLandRivier = []
     # droge sloten en greppels worden (nog) niet meegenomen
 
 
     # bepaal binnenzijde en buitenzijde profieldeel
     arcpy.Merge_management(["binnenkruin","buitenkruin"],"kruinPunten")
+
+    # # check of kruinpunten in waterdeel liggen, indien zo berekening afbreken
+    # arcpy.Intersect_analysis(["kruinPunten",bgtWaterdelenTotaal], "kruinPuntenWater", "ALL", "", "POINT") 
+    # snijpuntenKruinWater = int(arcpy.GetCount_management("kruinPuntenWater").getOutput(0))
+    # if snijpuntenKruinWater is not 0:
+    #     return "STOP""
+
+
+
+
+
+
     arcpy.SplitLineAtPoint_management(profiel, "kruinPunten", "profielSplitWater", 1)
 
     arcpy.MakeFeatureLayer_management("profielSplitWater", "temp_profielSplitWater") 
@@ -1632,6 +1660,7 @@ def getWaterPoints(profiel,output):
 
 
     if snijpuntenWaterBuiten > 0:
+        print "snijpunten gevonden met waterlijn buitenzijde"
     
         arcpy.MultipartToSinglepart_management("isectWaterBuiten","isectWaterBuiten_")
         # waterpunten lokaliseren
@@ -1772,14 +1801,16 @@ def getWaterPoints(profiel,output):
 
                 # tabel aanmaken voor localisatie
                 arcpy.CreateTable_management(workspaceProfielen, "invoegtabel", "", "")
-                arcpy.AddField_management("invoegtabel","locatie","TEXT", field_length=200)
+                arcpy.AddField_management("invoegtabel","cPoint","TEXT", field_length=200)
+                arcpy.AddField_management("invoegtabel","profielNaam","TEXT", field_length=200)
                 arcpy.AddField_management("invoegtabel","afstand","DOUBLE",field_is_nullable="NULLABLE")
                 arcpy.AddField_management("invoegtabel","z_ahn","DOUBLE",field_is_nullable="NULLABLE")
                 arcpy.AddField_management("invoegtabel","RID","DOUBLE", field_is_nullable="NULLABLE")
 
-                tabelCursor = arcpy.da.InsertCursor("invoegtabel",["locatie","afstand","z_ahn","RID"])
-                bodempunt = ("slootbodem_dijkzijde_buiten",afstandBodem,hoogteBodem,1)
-                oeverpunt = ("insteek_sloot_dijkzijde_buiten",afstandOever,hoogteOever,1)
+                tabelCursor = arcpy.da.InsertCursor("invoegtabel",["cPoint","afstand","z_ahn","RID","profielNaam"])
+                bodempunt = ("slootbodem_dijkzijde_buiten",afstandBodem,hoogteBodem,1,output)
+                oeverpunt = ("insteek_sloot_dijkzijde_buiten",afstandOever,hoogteOever,1,output)
+
                 tabelCursor.insertRow(bodempunt)
                 tabelCursor.insertRow(oeverpunt)
                 del tabelCursor
@@ -1791,6 +1822,8 @@ def getWaterPoints(profiel,output):
 
                 # definitieve layer
                 arcpy.CopyFeatures_management(invoegtabelEvent,"waterpunten_buiten_{}".format(output))
+
+                waterdelenLandRivier.append("waterpunten_buiten_{}".format(output))
                 
         
 
@@ -1849,16 +1882,17 @@ def getWaterPoints(profiel,output):
 
                 # tabel aanmaken voor localisatie
                 arcpy.CreateTable_management(workspaceProfielen, "invoegtabel", "", "")
-                arcpy.AddField_management("invoegtabel","locatie","TEXT", field_length=200)
+                arcpy.AddField_management("invoegtabel","cPoint","TEXT", field_length=200)
+                arcpy.AddField_management("invoegtabel","profielNaam","TEXT", field_length=200)
                 arcpy.AddField_management("invoegtabel","afstand","DOUBLE",field_is_nullable="NULLABLE")
                 arcpy.AddField_management("invoegtabel","z_ahn","DOUBLE",field_is_nullable="NULLABLE")
                 arcpy.AddField_management("invoegtabel","RID","DOUBLE", field_is_nullable="NULLABLE")
 
-                tabelCursor = arcpy.da.InsertCursor("invoegtabel",["locatie","afstand","z_ahn","RID"])
+                tabelCursor = arcpy.da.InsertCursor("invoegtabel",["cPoint","afstand","z_ahn","RID","profielNaam"])
 
-                bodempunt1 = ("slootbodem_dijkzijde_buiten",afstandBodem1,hoogteBodem1,1)
-                bodempunt2 = ("slootbodem_polderzijde_buiten",afstandBodem2,hoogteBodem2,1)
-                oeverpunt = ("insteek_sloot_dijkzijde_buiten",afstandOever,hoogteOever,1)
+                bodempunt1 = ("slootbodem_dijkzijde_buiten",afstandBodem1,hoogteBodem1,1,output)
+                bodempunt2 = ("slootbodem_polderzijde_buiten",afstandBodem2,hoogteBodem2,1,output)
+                oeverpunt = ("insteek_sloot_dijkzijde_buiten",afstandOever,hoogteOever,1,output)
 
                 tabelCursor.insertRow(bodempunt1)
                 tabelCursor.insertRow(bodempunt2)
@@ -1873,6 +1907,7 @@ def getWaterPoints(profiel,output):
                 # definitieve layer
                 arcpy.CopyFeatures_management(invoegtabelEvent,"waterpunten_buiten_{}".format(output))
                
+                waterdelenLandRivier.append("waterpunten_buiten_{}".format(output))
             
             
             else:
@@ -1932,17 +1967,18 @@ def getWaterPoints(profiel,output):
 
                 # tabel aanmaken voor localisatie
                 arcpy.CreateTable_management(workspaceProfielen, "invoegtabel", "", "")
-                arcpy.AddField_management("invoegtabel","locatie","TEXT", field_length=200)
+                arcpy.AddField_management("invoegtabel","cPoint","TEXT", field_length=200)
+                arcpy.AddField_management("invoegtabel","profielNaam","TEXT", field_length=200)
                 arcpy.AddField_management("invoegtabel","afstand","DOUBLE",field_is_nullable="NULLABLE")
                 arcpy.AddField_management("invoegtabel","z_ahn","DOUBLE",field_is_nullable="NULLABLE")
                 arcpy.AddField_management("invoegtabel","RID","DOUBLE", field_is_nullable="NULLABLE")
 
-                tabelCursor = arcpy.da.InsertCursor("invoegtabel",["locatie","afstand","z_ahn","RID"])
+                tabelCursor = arcpy.da.InsertCursor("invoegtabel",["cPoint","afstand","z_ahn","RID","profielNaam"])
 
-                bodempunt1 = ("slootbodem_dijkzijde_buiten",afstandBodem1,hoogteBodem1,1)
-                bodempunt2 = ("slootbodem_polderzijde_buiten",afstandBodem2,hoogteBodem2,1)
-                oeverpunt1 = ("insteek_sloot_dijkzijde_buiten",afstandOever1,hoogteOever1,1)
-                oeverpunt2 = ("insteek_sloot_polderzijde_buiten",afstandOever2,hoogteOever2,1)
+                bodempunt1 = ("slootbodem_dijkzijde_buiten",afstandBodem1,hoogteBodem1,1,output)
+                bodempunt2 = ("slootbodem_polderzijde_buiten",afstandBodem2,hoogteBodem2,1,output)
+                oeverpunt1 = ("insteek_sloot_dijkzijde_buiten",afstandOever1,hoogteOever1,1,output)
+                oeverpunt2 = ("insteek_sloot_polderzijde_buiten",afstandOever2,hoogteOever2,1,output)
 
                 tabelCursor.insertRow(bodempunt1)
                 tabelCursor.insertRow(bodempunt2)
@@ -1958,6 +1994,7 @@ def getWaterPoints(profiel,output):
                 # definitieve layer
                 arcpy.CopyFeatures_management(invoegtabelEvent,"waterpunten_buiten_{}".format(output))
 
+                waterdelenLandRivier.append("waterpunten_buiten_{}".format(output))
 
             else:
                 print "Probleem in volgorde waterpunten, berekening overslaan"
@@ -1971,6 +2008,8 @@ def getWaterPoints(profiel,output):
 
 
     if snijpuntenWaterBinnen > 0:
+        print "snijpunten gevonden met waterlijn binnenzijde"
+
         arcpy.MultipartToSinglepart_management("isectWaterBinnen","isectWaterBinnen_")
         # waterpunten lokaliseren
         arcpy.LocateFeaturesAlongRoutes_lr("isectWaterBinnen_", "testRoute", "rid", "0,1 Meters", "waterBinnenRouteTable", "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS", "M_DIRECTON")
@@ -2112,14 +2151,16 @@ def getWaterPoints(profiel,output):
 
                 # tabel aanmaken voor localisatie
                 arcpy.CreateTable_management(workspaceProfielen, "invoegtabel", "", "")
-                arcpy.AddField_management("invoegtabel","locatie","TEXT", field_length=200)
+                arcpy.AddField_management("invoegtabel","cPoint","TEXT", field_length=200)
+                arcpy.AddField_management("invoegtabel","profielNaam","TEXT", field_length=200)
                 arcpy.AddField_management("invoegtabel","afstand","DOUBLE",field_is_nullable="NULLABLE")
                 arcpy.AddField_management("invoegtabel","z_ahn","DOUBLE",field_is_nullable="NULLABLE")
                 arcpy.AddField_management("invoegtabel","RID","DOUBLE", field_is_nullable="NULLABLE")
 
-                tabelCursor = arcpy.da.InsertCursor("invoegtabel",["locatie","afstand","z_ahn","RID"])
-                bodempunt = ("slootbodem_dijkzijde_binnen",afstandBodem,hoogteBodem,1)
-                oeverpunt = ("insteek_sloot_dijkzijde_binnen",afstandOever,hoogteOever,1)
+                tabelCursor = arcpy.da.InsertCursor("invoegtabel",["cPoint","afstand","z_ahn","RID","profielNaam"])
+
+                bodempunt = ("slootbodem_dijkzijde_binnen",afstandBodem,hoogteBodem,1,output)
+                oeverpunt = ("insteek_sloot_dijkzijde_binnen",afstandOever,hoogteOever,1,output)
                 tabelCursor.insertRow(bodempunt)
                 tabelCursor.insertRow(oeverpunt)
                 del tabelCursor
@@ -2132,7 +2173,7 @@ def getWaterPoints(profiel,output):
                 # definitieve layer
                 arcpy.CopyFeatures_management(invoegtabelEvent,"waterpunten_binnen_{}".format(output))
                 
-        
+                waterdelenLandRivier.append("waterpunten_binnen_{}".format(output))
 
 
             else:
@@ -2188,16 +2229,17 @@ def getWaterPoints(profiel,output):
 
                 # tabel aanmaken voor localisatie
                 arcpy.CreateTable_management(workspaceProfielen, "invoegtabel", "", "")
-                arcpy.AddField_management("invoegtabel","locatie","TEXT", field_length=200)
+                arcpy.AddField_management("invoegtabel","cPoint","TEXT", field_length=200)
+                arcpy.AddField_management("invoegtabel","profielNaam","TEXT", field_length=200)
                 arcpy.AddField_management("invoegtabel","afstand","DOUBLE",field_is_nullable="NULLABLE")
                 arcpy.AddField_management("invoegtabel","z_ahn","DOUBLE",field_is_nullable="NULLABLE")
                 arcpy.AddField_management("invoegtabel","RID","DOUBLE", field_is_nullable="NULLABLE")
 
-                tabelCursor = arcpy.da.InsertCursor("invoegtabel",["locatie","afstand","z_ahn","RID"])
+                tabelCursor = arcpy.da.InsertCursor("invoegtabel",["cPoint","afstand","z_ahn","RID","profielNaam"])
 
-                bodempunt1 = ("slootbodem_dijkzijde_binnen",afstandBodem1,hoogteBodem1,1)
-                bodempunt2 = ("slootbodem_polderzijde_binnen",afstandBodem2,hoogteBodem2,1)
-                oeverpunt = ("insteek_sloot_dijkzijde_binnen",afstandOever,hoogteOever,1)
+                bodempunt1 = ("slootbodem_dijkzijde_binnen",afstandBodem1,hoogteBodem1,1,output)
+                bodempunt2 = ("slootbodem_polderzijde_binnen",afstandBodem2,hoogteBodem2,1,output)
+                oeverpunt = ("insteek_sloot_dijkzijde_binnen",afstandOever,hoogteOever,1,output)
 
                 tabelCursor.insertRow(bodempunt1)
                 tabelCursor.insertRow(bodempunt2)
@@ -2212,7 +2254,7 @@ def getWaterPoints(profiel,output):
                 # definitieve layer
                 arcpy.CopyFeatures_management(invoegtabelEvent,"waterpunten_binnen_{}".format(output))
                
-            
+                waterdelenLandRivier.append("waterpunten_binnen_{}".format(output))
             
             else:
                 print "Probleem in volgorde waterpunten, berekening overslaan"
@@ -2269,17 +2311,18 @@ def getWaterPoints(profiel,output):
 
                 # tabel aanmaken voor localisatie
                 arcpy.CreateTable_management(workspaceProfielen, "invoegtabel", "", "")
-                arcpy.AddField_management("invoegtabel","locatie","TEXT", field_length=200)
+                arcpy.AddField_management("invoegtabel","cPoint","TEXT", field_length=200)
+                arcpy.AddField_management("invoegtabel","profielNaam","TEXT", field_length=200)
                 arcpy.AddField_management("invoegtabel","afstand","DOUBLE",field_is_nullable="NULLABLE")
                 arcpy.AddField_management("invoegtabel","z_ahn","DOUBLE",field_is_nullable="NULLABLE")
                 arcpy.AddField_management("invoegtabel","RID","DOUBLE", field_is_nullable="NULLABLE")
 
-                tabelCursor = arcpy.da.InsertCursor("invoegtabel",["locatie","afstand","z_ahn","RID"])
+                tabelCursor = arcpy.da.InsertCursor("invoegtabel",["cPoint","afstand","z_ahn","RID","profielNaam"])
 
-                bodempunt1 = ("slootbodem_dijkzijde_binnen",afstandBodem1,hoogteBodem1,1)
-                bodempunt2 = ("slootbodem_polderzijde_binnen",afstandBodem2,hoogteBodem2,1)
-                oeverpunt1 = ("insteek_sloot_dijkzijde_binnen",afstandOever1,hoogteOever1,1)
-                oeverpunt2 = ("insteek_sloot_polderzijde_binnen",afstandOever2,hoogteOever2,1)
+                bodempunt1 = ("slootbodem_dijkzijde_binnen",afstandBodem1,hoogteBodem1,1,output)
+                bodempunt2 = ("slootbodem_polderzijde_binnen",afstandBodem2,hoogteBodem2,1,output)
+                oeverpunt1 = ("insteek_sloot_dijkzijde_binnen",afstandOever1,hoogteOever1,1,output)
+                oeverpunt2 = ("insteek_sloot_polderzijde_binnen",afstandOever2,hoogteOever2,1,output)
 
                 tabelCursor.insertRow(bodempunt1)
                 tabelCursor.insertRow(bodempunt2)
@@ -2295,6 +2338,8 @@ def getWaterPoints(profiel,output):
                 # definitieve layer
                 arcpy.CopyFeatures_management(invoegtabelEvent,"waterpunten_binnen_{}".format(output))
 
+                waterdelenLandRivier.append("waterpunten_binnen_{}".format(output))
+
 
             else:
                 print "Probleem in volgorde waterpunten, berekening overslaan"
@@ -2303,8 +2348,14 @@ def getWaterPoints(profiel,output):
 
 
 
-
-
+    if waterdelenLandRivier:
+        waterdelen = "mergeWaterdelen"
+        arcpy.Merge_management(waterdelenLandRivier, waterdelen)
+        print "doorgaan met waterdelen"
+        return "DOORGAAN", True, waterdelen
+    if len(waterdelenLandRivier) is 0:
+        print "doorgaan zonder waterdelen"
+        return "DOORGAAN", False
         
 
 
@@ -2327,18 +2378,6 @@ def getWaterPoints(profiel,output):
 
 
         
-        waterpuntCursor = arcpy.da.UpdateCursor("waterpuntenTotaal",["z_ahn","afstand","BGTPlusType","locatie"],sql_clause=(None, 'ORDER BY afstand ASC'))
-        wPointsBuiten = 0
-
-        for wRow in waterpuntCursor:
-            wPointsBuiten += 1
-            if wPointsBuiten <= 4:
-                pass
-            else:
-                waterpuntCursor.deleteRow()
-
-        del waterpuntCursor
-
 
                 
 
@@ -2354,15 +2393,7 @@ def getWaterPoints(profiel,output):
 
 
 
-
-
-
-    
-    # controleer of binnenzijde/buitenzijde snijdt met waterloop
-    # 
-
-
-def writeOutput(profiel,cPoints):
+def writeOutput(profiel,cPoints,waterdelen):
     # profiel voorzien van z-waardes op afstand van .. m
     arcpy.GeneratePointsAlongLines_management("testRoute", "puntenRoute", "DISTANCE", Distance= pointDistance)
   
@@ -2400,6 +2431,13 @@ def writeOutput(profiel,cPoints):
     del cPointCursor
 
 
+    # samenvoegen waterdelen, indien nodig
+    if waterdelen is not None:
+        arcpy.CopyFeatures_management(cPoints,"tempCpoints")
+        arcpy.Merge_management(["tempCpoints", waterdelen], cPoints)
+
+
+
     # verwijder onnodige velden
     veldenCpoint= [f.name for f in arcpy.ListFields(cPoints)]
     veldenCpointEnd = ["OID@","OBJECTID","Shape","cPoint","profielNaam","z_ahn","afstand"]
@@ -2410,6 +2448,7 @@ def writeOutput(profiel,cPoints):
             arcpy.DeleteField_management(cPoints,veld)
 
 
+    
 
     # plotten van profiel en cPoints
     profiel = "puntenRouteZ"
@@ -2427,7 +2466,7 @@ def writeOutput(profiel,cPoints):
     fig = plt.figure(figsize=(60, 10))
     ax1 = fig.add_subplot(111, label ="1")
 
-    # cPoints
+    # cPoints land
     buitenteen = sortCpoint.loc[sortCpoint['cPoint'] == 'buitenteen']
     binnenteen = sortCpoint.loc[sortCpoint['cPoint'] == 'binnenteen']
     binnenkruin = sortCpoint.loc[sortCpoint['cPoint'] == 'binnenkruin']
@@ -2438,11 +2477,28 @@ def writeOutput(profiel,cPoints):
     kruinbBinnen = sortCpoint.loc[sortCpoint['cPoint'] == 'onderkantBermBinnen']
     kruinbBuiten = sortCpoint.loc[sortCpoint['cPoint'] == 'onderkantBermBuiten']
 
+    # cPoints water
+    insteekPolderBuiten = sortCpoint.loc[sortCpoint['cPoint'] == 'insteek_sloot_polderzijde_buiten']
+    insteekDijkBuiten = sortCpoint.loc[sortCpoint['cPoint'] == 'insteek_sloot_dijkzijde_buiten']
+    slootbodemPolderBuiten = sortCpoint.loc[sortCpoint['cPoint'] == 'slootbodem_polderzijde_buiten']
+    slootbodemDijkBuiten = sortCpoint.loc[sortCpoint['cPoint'] == 'slootbodem_dijkzijde_buiten']
+
+    insteekPolderBinnen = sortCpoint.loc[sortCpoint['cPoint'] == 'insteek_sloot_polderzijde_binnen']
+    insteekDijkBinnen = sortCpoint.loc[sortCpoint['cPoint'] == 'insteek_sloot_dijkzijde_binnen']
+    slootbodemPolderBinnen = sortCpoint.loc[sortCpoint['cPoint'] == 'slootbodem_polderzijde_binnen']
+    slootbodemDijkBinnen = sortCpoint.loc[sortCpoint['cPoint'] == 'slootbodem_dijkzijde_binnen']
+
+
+
+
+
     ax1.plot(sortProfiel['afstand'],sortProfiel['z_ahn'],label="AHN3-profiel")
+    # ax1.plot(sortCpoint['afstand'],sortCpoint['z_ahn'],label = "cPoints")
 
 
     if not buitenteen.empty:
         ax1.plot(buitenteen['afstand'],buitenteen['z_ahn'],'bo',markersize=10,color='yellow',label="Buitenteen")
+        
     if not binnenteen.empty:
         ax1.plot(binnenteen['afstand'],binnenteen['z_ahn'],'bo',markersize=10,color='orange',label="Binnenteen")
     if not binnenkruin.empty:
@@ -2454,11 +2510,39 @@ def writeOutput(profiel,cPoints):
     if not insteekbbBuiten.empty:
         ax1.plot(insteekbbBuiten['afstand'],insteekbbBuiten['z_ahn'],'bo',markersize=10,color='violet',label="Insteek buitenberm")
     if not kruinbBinnen.empty:
-        ax1.plot(kruinbBinnen['afstand'],kruinbBinnen['z_ahn'],'bo',markersize=10,color='hotpink',label="Kruin binnenberm")
+        ax1.plot(kruinbBinnen['afstand'],kruinbBinnen['z_ahn'],'bo',markersize=12,color='hotpink',label="Kruin binnenberm")
     if not kruinbBuiten.empty:
-        ax1.plot(kruinbBuiten['afstand'],kruinbBuiten['z_ahn'],'bo',markersize=10,color='mediumblue',label="Kruin buitenberm")
+        ax1.plot(kruinbBuiten['afstand'],kruinbBuiten['z_ahn'],'bo',markersize=12,color='mediumblue',label="Kruin buitenberm")
 
-    ax1.legend(frameon=False, loc='upper left',prop={'size': 30})
+
+    if not insteekPolderBuiten.empty:
+        ax1.plot(insteekPolderBuiten['afstand'],insteekPolderBuiten['z_ahn'],'<',markersize=12,color='blue',label="Insteek polder buitenzijde")
+        # ax1.annotate("Insteek polder buitenzijde",(insteekPolderBuiten['afstand'],insteekPolderBuiten['z_ahn']),rotation=90)
+    if not insteekDijkBuiten.empty:
+        ax1.plot(insteekDijkBuiten['afstand'],insteekDijkBuiten['z_ahn'],'>',markersize=12,color='blue',label="Insteek dijk buitenzijde")
+        # ax1.annotate("Insteek dijk buitenzijde",(insteekDijkBuiten['afstand'],insteekDijkBuiten['z_ahn']),rotation=90)
+    if not slootbodemPolderBuiten.empty:
+        ax1.plot(slootbodemPolderBuiten['afstand'],slootbodemPolderBuiten['z_ahn'],'^',markersize=12,color='blue',label="Slootbodem polder buitenzijde")
+        # ax1.annotate("Slootbodem polder buitenzijde",(slootbodemPolderBuiten['afstand'],slootbodemPolderBuiten['z_ahn']),rotation=90)
+    if not slootbodemDijkBuiten.empty:
+        ax1.plot(slootbodemDijkBuiten['afstand'],slootbodemDijkBuiten['z_ahn'],'v',markersize=12,color='blue',label="Slootbodem dijk buitenzijde")
+        # ax1.annotate("Slootbodem dijk buitenzijde",(slootbodemDijkBuiten['afstand'],slootbodemDijkBuiten['z_ahn']),rotation=90)
+
+    if not insteekPolderBinnen.empty:
+        ax1.plot(insteekPolderBinnen['afstand'],insteekPolderBinnen['z_ahn'],'>',markersize=12,color='red',label="Insteek polder binnenzijde")
+        # ax1.annotate("Insteek polder binnenzijde",(insteekPolderBinnen['afstand'],insteekPolderBinnen['z_ahn']),rotation=90)
+    if not insteekDijkBinnen.empty:
+        ax1.plot(insteekDijkBinnen['afstand'],insteekDijkBinnen['z_ahn'],'<',markersize=12,color='red',label="Insteek dijk binnenzijde")
+        # ax1.annotate("Insteek dijk binnenzijde",(insteekDijkBinnen['afstand'],insteekDijkBinnen['z_ahn']),rotation=90)
+    if not slootbodemPolderBinnen.empty:
+        ax1.plot(slootbodemPolderBinnen['afstand'],slootbodemPolderBinnen['z_ahn'],'^',markersize=12,color='red',label="Slootbodem polder binnenzijde")
+        # ax1.annotate("Slootbodem polder binnenzijde",(slootbodemPolderBinnen['afstand'],slootbodemPolderBinnen['z_ahn']),rotation=90)
+    if not slootbodemDijkBinnen.empty:
+        ax1.plot(slootbodemDijkBinnen['afstand'],slootbodemDijkBinnen['z_ahn'],'v',markersize=12,color='red',label="Slootbodem dijk binnenzijde")
+        # ax1.annotate("Slootbodem dijk binnenzijde",(slootbodemDijkBinnen['afstand'],slootbodemDijkBinnen['z_ahn']),rotation=90)
+
+    
+    ax1.legend(frameon=False, loc='upper left',prop={'size': 20})
 
 
 
@@ -2513,19 +2597,40 @@ for row in profielIterator:
     if test == "DOORGAAN":
         taludDelen("tempProfiel")
         getKruin("tempProfiel")
-        getWaterPoints("tempProfiel",outName)
-        # geomCheck = voorbewerkingTest("tempProfiel")
-        # if geomCheck == "DOORGAAN":
+        
+        
+        kruinTest = testKruin("tempProfiel")
+        if kruinTest == "DOORGAAN":
 
-        #     getBitBut("tempProfiel")
-            
-        #     # voeg naam toe aan rijen in profiel
-        #     profielCursor = arcpy.da.UpdateCursor(outPath,"profielNaam")
-        #     for pRow in profielCursor:
-        #         pRow[0] = outName
-        #         profielCursor.updateRow(pRow)
+            waterCheck = getWaterPoints("tempProfiel",outName)
+            if waterCheck[0]  == "DOORGAAN":
+                print "Watercheck geslaagd"
+                if waterCheck[1] is True:
+                    waterdelen = waterCheck[2]
+                else:
+                    waterdelen = None
 
-        #     writeOutput("tempProfiel",outPath)
+                geomCheck = voorbewerkingTest("tempProfiel")
+                if geomCheck == "DOORGAAN":
+                    print "Geomcheck geslaagd"
+
+                    getBitBut("tempProfiel")
+                    
+                    # voeg naam toe aan rijen in profiel
+                    profielCursor = arcpy.da.UpdateCursor(outPath,"profielNaam")
+                    for pRow in profielCursor:
+                        pRow[0] = outName
+                        profielCursor.updateRow(pRow)
+
+                    
+     
+                        
+
+
+                    writeOutput("tempProfiel",outPath,waterdelen)
+
+        else:
+            print "De kruin ligt deels in het water bij {}".format(outPath)
 
 
 

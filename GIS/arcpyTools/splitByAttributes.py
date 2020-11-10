@@ -2,8 +2,9 @@ import arcpy
 import os
 arcpy.env.overwriteOutput = True
 
-arcpy.env.workspace = r"D:\Projecten\WSRL\safe\lengteprofielen_safe\test.gdb"
-features = "boring_lagen"
+arcpy.env.workspace = r"D:\Projecten\WSRL\safe\ruimtebeslag.gdb"
+features = "dvIndelingSept2020"
+field = 'koppeling_RB'
 
 
 def splitByAttributes(features, field):
@@ -30,4 +31,6 @@ def splitByAttributes(features, field):
         outputName = (outputName.replace('.', '_'))
 
         arcpy.CopyFeatures_management(selected,outputName)
+
+splitByAttributes(features,field)
 
