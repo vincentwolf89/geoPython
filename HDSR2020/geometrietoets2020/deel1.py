@@ -75,6 +75,8 @@ with arcpy.da.SearchCursor(trajectenHDSR,['SHAPE@',code_hdsr,toetsniveaus]) as c
         arcpy.SelectLayerByLocation_management("temp_profiellayer", "WITHIN", opBovenTn, "", "NEW_SELECTION", "NOT_INVERT")
         arcpy.CopyFeatures_management("temp_profiellayer", "profielDelenOpBovenTn")
 
+        # check per profielnummer of een gedeelte op of boven toetsniveau aanwezig is. Profiel voorzien van opmerking (voldoende/onvoldoende)
+
 
         
 
