@@ -1,8 +1,13 @@
 import arcpy
 
+
+sys.path.append('HDSR2020')
+
+from basisRWK2020 import generate_profiles
+
+
+
 arcpy.env.overwriteOutput = True
-
-
 arcpy.env.workspace = r"D:\Projecten\HDSR\2020\gisData\geomToets.gdb"
 
 
@@ -20,11 +25,12 @@ with arcpy.da.SearchCursor(trajectenHDSR,['SHAPE@',code_hdsr,toetsniveaus]) as c
         code = code_hdsr
         toetsniveau = float(row[2])
         id = row[1]
+        
+        # uitvoer opbouw
         trajectlijn = 'deeltraject_'+str(row[1])
         buffertrajectlijn = 'buffer_deeltraject_'+str(row[1])
         opBovenTn = 'opBovenTn_deeltraject_'+str(row[1])
-        
-        # profielen = 'profielen_'+str(row[1])
+        profielen = 'profielen_'+str(row[1])
         
         
         # selecteer betreffend traject
@@ -43,9 +49,16 @@ with arcpy.da.SearchCursor(trajectenHDSR,['SHAPE@',code_hdsr,toetsniveaus]) as c
         outraster = raster >= toetsniveau
         outraster.save("tempRasterCalc")
 
-        # raster vertalen naar polygon en alleen deel boven toetsniveau overhouden
+        # raster vertalen naar polygon en alleen deel boven toetsniveau overhouden (gridcode = 1)
         arcpy.RasterToPolygon_conversion("tempRasterCalc", "tempRasterPoly", "SIMPLIFY", "Value")
         arcpy.Select_analysis("tempRasterPoly", opBovenTn, "gridcode = 1")
+
+        # profielen maken op trajectlijn
+        generate_profiles(profiel_interval=10,profiel_lengte_land=15,profiel_lengte_rivier=15,trajectlijn=trajectlijn,code=code,toetspeil=toetsniveau,profielen=profielen)
+
+        
+
+
 
         print trajectlijn
  
