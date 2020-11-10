@@ -15,6 +15,7 @@ trajectenHDSR = "testTrajecten"
 code_hdsr = "Naam"
 toetsniveaus = "th2024"
 rasterWaterstaatswerk = "WWBAG2mPlusWaterlopenAHN3"
+waterstaatswerkHDSR = "waterstaatswerkHDSR"
 
 # selecteer keringlijn
 with arcpy.da.SearchCursor(trajectenHDSR,['SHAPE@',code_hdsr,toetsniveaus]) as cursor:
@@ -56,11 +57,31 @@ with arcpy.da.SearchCursor(trajectenHDSR,['SHAPE@',code_hdsr,toetsniveaus]) as c
         # profielen maken op trajectlijn
         generate_profiles(profiel_interval=10,profiel_lengte_land=15,profiel_lengte_rivier=15,trajectlijn=trajectlijn,code=code,toetspeil=toetsniveau,profielen=profielen)
 
+        # knip profielen op waterstaatswerk
+ 
+        arcpy.Intersect_analysis([profielen,waterstaatswerkHDSR], "temp_splitPoints", "ALL", "", "POINT")
+        arcpy.SplitLineAtPoint_management(profielen, "temp_splitPoints", "temp_profielen", "1 Meters")
+        arcpy.MakeFeatureLayer_management("temp_profielen", "temp_profiellayer") 
+   
+        arcpy.SelectLayerByLocation_management("temp_profiellayer", "WITHIN", waterstaatswerkHDSR, "", "NEW_SELECTION", "NOT_INVERT")
+        arcpy.CopyFeatures_management("temp_profiellayer", "profielDelenWS")
+
+        # knip profielen op vlak "opBovenTn"
+
+        arcpy.Intersect_analysis([profielen,opBovenTn], "temp_splitPoints", "ALL", "", "POINT")
+        arcpy.SplitLineAtPoint_management(profielen, "temp_splitPoints", "temp_profielen", "1 Meters")
+        arcpy.MakeFeatureLayer_management("temp_profielen", "temp_profiellayer") 
+   
+        arcpy.SelectLayerByLocation_management("temp_profiellayer", "WITHIN", opBovenTn, "", "NEW_SELECTION", "NOT_INVERT")
+        arcpy.CopyFeatures_management("temp_profiellayer", "profielDelenOpBovenTn")
+
+
         
 
 
 
         print trajectlijn
+        break
  
 
 
