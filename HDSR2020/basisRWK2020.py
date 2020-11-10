@@ -134,7 +134,7 @@ def generate_profiles(profiel_interval,profiel_lengte_land,profiel_lengte_rivier
     arcpy.CopyFeatures_management('profielen_temp', profielen)
     # arcpy.FlipLine_edit(profielen) # alleen nodig indien profielen verkeerde richting hebben
 
-    print 'Profielen gemaakt op trajectlijn'
+    # print 'Profielen gemaakt op trajectlijn'
 
 # functie voor het bepalen van afstanden van meetpunten op profielen t.o.v. trajectlijn
 def set_measurements_trajectory(profielen, trajectlijn, code, stapgrootte_punten,
