@@ -893,5 +893,33 @@ def splitByAttributes(features, field):
 
         arcpy.CopyFeatures_management(selected,outputName)
 
+def splitProfielen(profielen,trajectlijn,code):
+    # split profielen
+    rivierlijn = "river"
+    landlijn = "land"
+    clusterTolerance = 0
+    invoer = [profielen, trajectlijn]
+    uitvoer = 'snijpunten_centerline'
+    arcpy.Intersect_analysis(invoer, uitvoer, "", clusterTolerance, "point")
+    arcpy.SplitLineAtPoint_management(profielen, uitvoer, 'profielsplits', 1)
 
+    velden = ['profielnummer', 'van', 'tot', code]
+
+    fieldmappings = arcpy.FieldMappings()
+    fieldmappings.addTable('profielsplits')
+    fieldmappings.addTable(rivierlijn)
+    fieldmappings.addTable(landlijn)
+    keepers = velden
+
+    # koppel splits aan rivier-/landdelen
+    for field in fieldmappings.fields:
+        if field.name not in keepers:
+            fieldmappings.removeFieldMap(fieldmappings.findFieldMapIndex(field.name))
+
+    arcpy.SpatialJoin_analysis('profielsplits', rivierlijn, 'profieldeel_rivier', "JOIN_ONE_TO_ONE", "KEEP_COMMON",
+                            fieldmappings,
+                            match_option="INTERSECT")
+    arcpy.SpatialJoin_analysis('profielsplits', landlijn, 'profieldeel_land', "JOIN_ONE_TO_ONE", "KEEP_COMMON",
+                            fieldmappings,
+                            match_option="INTERSECT")
 

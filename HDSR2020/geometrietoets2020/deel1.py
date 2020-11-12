@@ -1,8 +1,9 @@
 import arcpy
 from itertools import groupby
+import pandas as pd
 
 sys.path.append('HDSR2020')
-from basisRWK2020 import generate_profiles
+from basisRWK2020 import generate_profiles, copy_trajectory_lr, splitProfielen
 
 
 
@@ -10,16 +11,21 @@ arcpy.env.overwriteOutput = True
 arcpy.env.workspace = r"D:\Projecten\HDSR\2020\gisData\geomToets.gdb"
 
 
-trajectenHDSR = "testTrajecten"
+trajectenHDSR = "testTraject"
 code_hdsr = "Naam"
 toetsniveaus = "th2024"
 rasterWaterstaatswerk = "WWBAG2mPlusWaterlopenAHN3"
 waterstaatswerkHDSR = "waterstaatswerkHDSR"
+waterlopenBGT = "bgt_waterdeel"
+
+
+
 minimaleKruinBreedte = 1.5
+maximaalTaludBuitenzijde = 0.5
 
 
 def controleerKruinBreedte(profielen, waterstaatswerk,opBovenTn,profielenUitvoer,kruinDelenUitvoer):
-    # knip profielen op waterstaatswerk
+        # knip profielen op waterstaatswerk
         arcpy.Intersect_analysis([profielen,waterstaatswerk], "tempSplitPoints", "ALL", "", "POINT")
         arcpy.SplitLineAtPoint_management(profielen, "tempSplitPoints", "tempProfielen", "1 Meters")
         arcpy.MakeFeatureLayer_management("tempProfielen", "tempProfiellayer") 
@@ -72,45 +78,152 @@ def controleerKruinBreedte(profielen, waterstaatswerk,opBovenTn,profielenUitvoer
         profielCursor = arcpy.da.UpdateCursor("profielen",["profielnummer","krBreedte","ctrlEis"])
 
         for pRow in profielCursor:
-            profielnummer = int(pRow[0])
-            oordeel = profielenTraject[profielnummer][0]
-            profieldelen = profielenTraject[profielnummer][1]
+            try:
+                profielnummer = int(pRow[0])
+                oordeel = profielenTraject[profielnummer][0]
+                profieldelen = profielenTraject[profielnummer][1]
 
-            if oordeel == "voldoende" and profieldelen ==1:
-                pRow[1] = "voldoende"
-                pRow[2] = "1 kruindeel"
+                if oordeel == "voldoende" and profieldelen ==1:
+                    pRow[1] = "voldoende"
+                    pRow[2] = "1 kruindeel"
 
-   
+    
 
-            if oordeel == "voldoende" and profieldelen > 1:
-                pRow[1] = "voldoende"
-                pRow[2] = "meerdere voldoende kruindelen, controleer resultaat"
+                if oordeel == "voldoende" and profieldelen > 1:
+                    pRow[1] = "voldoende"
+                    pRow[2] = "meerdere voldoende kruindelen, controleer resultaat"
+
+                
+                if oordeel =="onvoldoende" and profieldelen > 1:
+                    pRow[1] = "onvoldoende"
+                    pRow[2] = "meerdere onvoldoende kruindelen, controleer resultaat"
+
+                
+                
+                if oordeel =="onvoldoende" and profieldelen == 1 :
+                    pRow[1] = "onvoldoende"
+                    pRow[2] = "1 kruindeel"
 
             
-            if oordeel =="onvoldoende" and profieldelen > 1:
-                pRow[1] = "onvoldoende"
-                pRow[2] = "meerdere onvoldoende kruindelen, controleer resultaat"
+                profielCursor.updateRow(pRow)
 
-               
-            
-            if oordeel =="onvoldoende" and profieldelen == 1 :
-                pRow[1] = "onvoldoende"
-                pRow[2] = "1 kruindeel"
-
-         
-            
-            if oordeel =="onvoldoende" and profieldelen < 1 :
+            except KeyError:
                 pRow[1] = "onvoldoende"
                 pRow[2] = "geen kruindeel"
+                profielCursor.updateRow(pRow)
+                print "Geen kruindelen aanwezig voor profielnummer {}".format(profielnummer)
 
-            
-            profielCursor.updateRow(pRow)
+
 
         # kopieer profielen als vaste laag 
         arcpy.Copy_management("profielen",profielenUitvoer)
 
         # kopieer profieldeel op-boven tn als vaste laag (?) 
         arcpy.Copy_management("profielDelenOpBovenTn", kruinDelenUitvoer)
+
+
+def controleerBuitenTalud(profielenUitvoer,waterlopenvlak,trajectlijn,code):
+    
+    # snijpunten profielen met watervlak 
+    arcpy.Intersect_analysis([profielenUitvoer,waterlopenvlak], "tempIsectWaterloop", "ALL", "", "POINT")
+    arcpy.MultipartToSinglepart_management("tempIsectWaterloop","tempIsectWaterloopPoint")
+
+
+    # maak route van profiel
+    veldenProfielen = [f.name for f in arcpy.ListFields(profielenUitvoer)]
+    veldenRoute = ["van","tot"]
+    for veld in veldenRoute:
+        if veld in veldenProfielen:
+            pass
+        else: 
+            arcpy.AddField_management(profielenUitvoer,veld,"DOUBLE", 2, field_is_nullable="NULLABLE")
+
+    profielCursor = arcpy.da.UpdateCursor(profielenUitvoer, ["van","tot","SHAPE@LENGTH"])
+    for row in profielCursor:
+        lengte = row[2]
+        row[0] = 0
+        row[1] = lengte
+        profielCursor.updateRow(row)
+
+    
+    del profielCursor
+    arcpy.CreateRoutes_lr(profielenUitvoer, "profielnummer", 'profielRoutes',"TWO_FIELDS", "van", "tot", "UPPER_LEFT", "1", "0", "IGNORE", "INDEX")
+
+    # localiseer isect over route
+    arcpy.LocateFeaturesAlongRoutes_lr("tempIsectWaterloopPoint", "profielRoutes", "profielnummer", "0,1 Meters", "testOutTable", "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS", "M_DIRECTON")
+    arcpy.JoinField_management("tempIsectWaterloopPoint","OBJECTID","testOutTable","OBJECTID","MEAS")
+
+    # controleer of punt buitentalud/binnentalud is
+    copy_trajectory_lr(trajectlijn=trajectlijn,code=code_hdsr)
+    splitProfielen(profielen=profielenUitvoer,trajectlijn=trajectlijn,code=code_hdsr)
+
+    arcpy.MakeFeatureLayer_management("tempIsectWaterloopPoint", "temp_tempIsectWaterloopPoint") 
+    arcpy.SelectLayerByLocation_management("temp_tempIsectWaterloopPoint", "WITHIN", "profieldeel_rivier", "", "NEW_SELECTION", "NOT_INVERT")
+    arcpy.CopyFeatures_management("temp_tempIsectWaterloopPoint", "isectWaterloopBuiten")
+
+    # zekerheidscheck: controleer of er 1 snijpunt per profiel is: degene met de laagste MEAS
+    # ter voorkoming van mogelijk snijpunt met waterlijn overzijde... 
+    
+    iSectBoezemCursor = arcpy.da.SearchCursor("isectWaterloopBuiten",["profielnummer","MEAS"],sql_clause=(None, 'ORDER BY profielnummer ASC'))
+    removeList = []
+    
+    # eerst kijken of er meerdere snijpunten per profiel zijn:
+    for profielnummer, group in groupby(iSectBoezemCursor, lambda x: x[0]):
+        
+        profielnummer = int(profielnummer)
+
+        aantalIsectsProfiel = 0
+        dfProfiel = pd.DataFrame(columns=["profielnummer", "meas"])
+        index = 0
+        
+        for iRow in group:
+            newRow = pd.Series({"profielnummer": iRow[0], "meas": iRow[1]})
+            dfProfiel.loc[index] = newRow
+            index += 1
+            aantalIsectsProfiel += 1
+
+   
+
+        if aantalIsectsProfiel > 1:
+            removeList.append(profielnummer)
+
+    del iSectBoezemCursor    
+    
+
+    # daarna alleen dichtstbijzijnde snijpunt aan buitenzijde overhouden:
+    isectRemoveCursor = arcpy.da.UpdateCursor("isectWaterloopBuiten",["profielnummer","MEAS"],sql_clause=(None, 'ORDER BY profielnummer ASC'))
+
+    for profielnummer, group in groupby(isectRemoveCursor, lambda x: x[0]):
+        profielnummer = int(profielnummer)
+        
+        count = 0
+
+        
+        firstMEAS = round(group.next()[1],2)
+        for iRow in group:
+            MEAS = round(iRow[1],2)
+            if MEAS == firstMEAS:
+                pass
+            else:
+                isectRemoveCursor.deleteRow()
+
+
+    del isectRemoveCursor
+
+
+
+
+        
+        
+
+
+    
+
+
+
+
+    # bepaal maaiveldhoogte snijpunten
+
 
 
 # selecteer keringlijn
@@ -161,10 +274,13 @@ with arcpy.da.SearchCursor(trajectenHDSR,['SHAPE@',code_hdsr,toetsniveaus]) as c
         generate_profiles(profiel_interval=10,profiel_lengte_land=15,profiel_lengte_rivier=15,trajectlijn=trajectlijn,code=code,toetspeil=toetsniveau,profielen=profielen)
 
 
-        #
-        controleerKruinBreedte(profielen,waterstaatswerkHDSR,opBovenTn,profielenUitvoer,kruinDelenUitvoer)
         
 
+
+
+        # controleerKruinBreedte(profielen=profielen,waterstaatswerk = waterstaatswerkHDSR, opBovenTn = opBovenTn, profielenUitvoer =profielenUitvoer,kruinDelenUitvoer= kruinDelenUitvoer)
+        
+        controleerBuitenTalud(profielenUitvoer=profielenUitvoer,waterlopenvlak=waterlopenBGT,trajectlijn=trajectlijn,code=code_hdsr)
 
 
         print id

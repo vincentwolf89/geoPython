@@ -1,7 +1,7 @@
 import arcpy
 import os
 arcpy.env.overwriteOutput = True
-arcpy.env.workspace = r"C:\Users\Vincent\Desktop\temp\temp.gdb"
+arcpy.env.workspace = r"C:\Users\Vincent\Desktop\tempsafe\test.gdb"
 
 featureclasses = arcpy.ListFeatureClasses()
 outlocation = r"C:\Users\Vincent\Desktop\temp\shp"
