@@ -1,10 +1,10 @@
 import arcpy
 import os
 arcpy.env.overwriteOutput = True
-arcpy.env.workspace = r"D:\Projecten\WSRL\safe\temp.gdb"
+arcpy.env.workspace = r"C:\Users\Vincent\Desktop\temp\temp.gdb"
 
 featureclasses = arcpy.ListFeatureClasses()
-outlocation = r"C:\Users\Vincent\Desktop\temp"
+outlocation = r"C:\Users\Vincent\Desktop\temp\shp"
 # sr = arcpy.Describe(r"C:\Users\Vincent\Desktop\shp_viewer\test.shp").spatialReference
 sr = arcpy.SpatialReference(4326)
 

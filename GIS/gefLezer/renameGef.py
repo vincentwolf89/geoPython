@@ -10,7 +10,8 @@ def gefTxt(files):
             if not os.path.isfile(ingef): continue
             nieuwenaam = ingef.replace('.GEF', '.gef')
             output = os.rename(ingef, nieuwenaam)
+            print ("naam aangepast")
 
-files = r'C:\Users\Vincent\Desktop\totaal_gef\totaal_gef'
+files = r'C:\Users\Vincent\Desktop\dinodata\totaal_dino'
 
 gefTxt(files)

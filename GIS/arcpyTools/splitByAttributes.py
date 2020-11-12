@@ -2,9 +2,9 @@ import arcpy
 import os
 arcpy.env.overwriteOutput = True
 
-arcpy.env.workspace = r"D:\Projecten\WSRL\safe\ruimtebeslag.gdb"
-features = "dvIndelingSept2020"
-field = 'koppeling_RB'
+arcpy.env.workspace = r"D:\Projecten\HDSR\2020\gisData\geomToets.gdb"
+features = "profielDelenOpBovenTn"
+field = 'splitnummer'
 
 
 def splitByAttributes(features, field):

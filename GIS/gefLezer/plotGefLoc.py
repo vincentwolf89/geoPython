@@ -2,11 +2,11 @@ import os
 import arcpy
 import pandas as pd
 
-files = r'C:\Users\Vincent\Desktop\viewer_hdsr\go_inladen'
-arcpy.env.workspace = r'D:\Projecten\HDSR\2020\gisData\gefInlezen.gdb'
-gdb = r'D:\Projecten\HDSR\2020\gisData\gefInlezen.gdb'
+files = r'C:\Users\Vincent\Desktop\dinodata\sonderingen_bro'
+arcpy.env.workspace = r'C:\Users\Vincent\Desktop\go_extra_dino\go_extra_dino.gdb'
+gdb = r'C:\Users\Vincent\Desktop\go_extra_dino\go_extra_dino.gdb'
 arcpy.env.overwriteOutput = True
-puntenlaag = 'test'
+puntenlaag = 'safe_sonderingen_dino_bro'
 
 
 
