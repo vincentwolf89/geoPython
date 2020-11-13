@@ -1,4 +1,5 @@
 import arcpy
+from arcpy.sa import *
 from itertools import groupby
 import pandas as pd
 
@@ -15,6 +16,7 @@ trajectenHDSR = "testTraject"
 code_hdsr = "Naam"
 toetsniveaus = "th2024"
 rasterWaterstaatswerk = "WWBAG2mPlusWaterlopenAHN3"
+rasterTotaal = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\BAG2mPlusWaterlopenAHN3"
 waterstaatswerkHDSR = "waterstaatswerkHDSR"
 waterlopenBGT = "bgt_waterdeel"
 
@@ -44,26 +46,24 @@ def controleerKruinBreedte(profielen, waterstaatswerk,opBovenTn,profielenUitvoer
         # check per profielnummer of een gedeelte op of boven toetsniveau aanwezig is. Profiel voorzien van opmerking (voldoende/onvoldoende)
         profielenTraject = {}
 
-        profielDeelCursor = arcpy.da.UpdateCursor("profielDelenOpBovenTn",["profielnummer","SHAPE@LENGTH"])
+        profielDeelCursor = arcpy.da.UpdateCursor("profielDelenOpBovenTn",["profielnummer","SHAPE@LENGTH"],sql_clause=(None, 'ORDER BY profielnummer ASC'))
         
         for profielnummer, group in groupby(profielDeelCursor, lambda x: x[0]):
             
             profielDelenVoldoende = 0 # lege lijst voor aantal profieldelen per profiel dat voldoet aan breedte-eis
             profielDelenOnvoldoende = 0 # lege lijst voor aantal profieldelen per profiel dat niet voldoet aan breedte-eis
             
-            voldoendeBreedte = False
+           
             for row in group:
                 if row[1] >= minimaleKruinBreedte:
-                    voldoendeBreedte = True
                     profielDelenVoldoende += 1
                 if row[1] < minimaleKruinBreedte:
-                    voldoendeBreedte = False
                     profielDelenOnvoldoende += 1
             
-            if voldoendeBreedte is True:
+            if profielDelenVoldoende > 0:
                 profielenTraject[profielnummer] = "voldoende", profielDelenVoldoende
 
-            if voldoendeBreedte is False:
+            if profielDelenVoldoende == 0:
                 profielenTraject[profielnummer] = "onvoldoende", profielDelenOnvoldoende
                 
 
@@ -122,7 +122,7 @@ def controleerKruinBreedte(profielen, waterstaatswerk,opBovenTn,profielenUitvoer
         arcpy.Copy_management("profielDelenOpBovenTn", kruinDelenUitvoer)
 
 
-def controleerBuitenTalud(profielenUitvoer,waterlopenvlak,trajectlijn,code):
+def controleerBuitenTalud(profielenUitvoer,waterlopenvlak,trajectlijn,code,hoogtedata,kruindelen):
     
     # snijpunten profielen met watervlak 
     arcpy.Intersect_analysis([profielenUitvoer,waterlopenvlak], "tempIsectWaterloop", "ALL", "", "POINT")
@@ -173,13 +173,12 @@ def controleerBuitenTalud(profielenUitvoer,waterlopenvlak,trajectlijn,code):
         profielnummer = int(profielnummer)
 
         aantalIsectsProfiel = 0
-        dfProfiel = pd.DataFrame(columns=["profielnummer", "meas"])
-        index = 0
+   
+ 
         
         for iRow in group:
             newRow = pd.Series({"profielnummer": iRow[0], "meas": iRow[1]})
-            dfProfiel.loc[index] = newRow
-            index += 1
+ 
             aantalIsectsProfiel += 1
 
    
@@ -210,6 +209,44 @@ def controleerBuitenTalud(profielenUitvoer,waterlopenvlak,trajectlijn,code):
 
     del isectRemoveCursor
 
+    # boezemniveau bepalen: gemiddelde van hoogtewaarde van alle boezemsnijpunten per traject
+    arcpy.CheckOutExtension("Spatial")
+    ExtractValuesToPoints("isectWaterloopBuiten", hoogtedata, "isectWaterloopBuitenZ","INTERPOLATE", "VALUE_ONLY")
+    arcpy.AlterField_management("isectWaterloopBuitenZ", 'RASTERVALU', 'z_ahn')
+
+    arcpy.Statistics_analysis("isectWaterloopBuitenZ", "gemBoezemPeil", "z_ahn MEAN", "")
+    gemBoezemPeil = [z[0] for z in arcpy.da.SearchCursor ("gemBoezemPeil", ["MEAN_z_ahn"])][0]
+    print gemBoezemPeil
+
+
+    # pandas truckje om OBJECTID's met maxlengte te vinden (en te verwijderen)
+    array = arcpy.da.FeatureClassToNumPyArray(kruindelen, ('profielnummer','SHAPE@LENGTH','OBJECTID'))
+    df = pd.DataFrame(array)
+    sortDf = df.sort_values(by=['profielnummer'])
+    idx = sortDf.groupby(['profielnummer'])['SHAPE@LENGTH'].transform(max) == sortDf['SHAPE@LENGTH']
+    dfFinal = sortDf[idx]
+    maxList = dfFinal["OBJECTID"].tolist()
+
+ 
+
+    removeKruinDelenCursor = arcpy.da.UpdateCursor(kruindelen,["OBJECTID"])
+
+    for iRow in removeKruinDelenCursor:
+        if int(iRow[0]) in maxList:
+            pass
+        else:
+            removeKruinDelenCursor.deleteRow()
+
+    del removeKruinDelenCursor
+
+  
+    arcpy.FeatureVerticesToPoints_management(kruindelen, "kruinPunten", "END")
+
+    # maaiveldhoogte berekenen kruinPunten
+    # samenvoegen kruinpunten en isectWaterlopenBuiten
+    # hoek berekenen tussen punten 
+    # hoek terugkoppelen aan profiellijn
+
 
 
 
@@ -219,10 +256,6 @@ def controleerBuitenTalud(profielenUitvoer,waterlopenvlak,trajectlijn,code):
 
     
 
-
-
-
-    # bepaal maaiveldhoogte snijpunten
 
 
 
@@ -277,10 +310,10 @@ with arcpy.da.SearchCursor(trajectenHDSR,['SHAPE@',code_hdsr,toetsniveaus]) as c
         
 
 
-
-        # controleerKruinBreedte(profielen=profielen,waterstaatswerk = waterstaatswerkHDSR, opBovenTn = opBovenTn, profielenUitvoer =profielenUitvoer,kruinDelenUitvoer= kruinDelenUitvoer)
+        # functies runnen
+        controleerKruinBreedte(profielen=profielen,waterstaatswerk = waterstaatswerkHDSR, opBovenTn = opBovenTn, profielenUitvoer =profielenUitvoer,kruinDelenUitvoer= kruinDelenUitvoer)
         
-        controleerBuitenTalud(profielenUitvoer=profielenUitvoer,waterlopenvlak=waterlopenBGT,trajectlijn=trajectlijn,code=code_hdsr)
+        controleerBuitenTalud(profielenUitvoer=profielenUitvoer,waterlopenvlak=waterlopenBGT,trajectlijn=trajectlijn,code=code_hdsr,hoogtedata=rasterTotaal,kruindelen=kruinDelenUitvoer)
 
 
         print id
