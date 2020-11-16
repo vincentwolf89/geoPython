@@ -2570,6 +2570,10 @@ for row in profielIterator:
     arcpy.Select_analysis(trajectenHDSR, trajectLijn, where)
     ##
 
+    ## genereer nieuwe profielen 
+    # lengte land:
+    # lengte rivier: 
+
 
 
 

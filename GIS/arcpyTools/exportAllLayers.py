@@ -3,6 +3,7 @@ import os
 arcpy.env.overwriteOutput = True
 arcpy.env.workspace = r"C:\Users\Vincent\Desktop\temphdsr\nieuweshapes.gdb"
 
+
 featureclasses = arcpy.ListFeatureClasses()
 outlocation = r"C:\Users\Vincent\Desktop\temphdsr\shp"
 # sr = arcpy.Describe(r"C:\Users\Vincent\Desktop\shp_viewer\test.shp").spatialReference

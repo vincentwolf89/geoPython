@@ -893,7 +893,7 @@ def splitByAttributes(features, field):
 
         arcpy.CopyFeatures_management(selected,outputName)
 
-def splitProfielen(profielen,trajectlijn,code):
+def split_profielen(profielen,trajectlijn,code):
     # split profielen
     rivierlijn = "river"
     landlijn = "land"
