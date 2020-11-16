@@ -34,15 +34,16 @@ breedteSmal = 3
 
 
 # invoer hdsr
-workspaceProfielen = r"D:\Projecten\HDSR\2020\gisData\testbatchGrechtkade.gdb"
-arcpy.env.workspace = r"D:\Projecten\HDSR\2020\gisData\testbatchGrechtkade.gdb"
+workspaceProfielen = r"D:\Projecten\HDSR\2020\gisData\cPointsTest.gdb"
+arcpy.env.workspace = r"D:\Projecten\HDSR\2020\gisData\cPointsTest.gdb"
+
 
 
 
 minLengteTaludBasis = 1 # meter
 
 hoogtedata = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\BAG2mPlusWaterlopenAHN3"
-trajectLijn = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\RWK_areaal_2024"
+trajectenHDSR = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\RWK_areaal_2024"
 
 bgtPanden = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_pand"
 bgtWaterdelen = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_waterdeel"
@@ -51,8 +52,9 @@ bgtWaterdelenTotaal = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_waterde
 bgtWegdelen = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_wegdeel"
 bgtWegdelenInritten = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_wegdeel_inritten"
 
-profielen = 'grechtkade_mini'
-outputFigures = r"C:\Users\Vincent\Desktop\cPointsFiguresGrechtkade"
+profielen = 'profielenTestGrecht'
+code_hdsr = 'Naam'
+outputFigures = r"C:\Users\Vincent\Desktop\cPointsTest"
 
 
 # # invoer safe
@@ -81,7 +83,7 @@ outputFigures = r"C:\Users\Vincent\Desktop\cPointsFiguresGrechtkade"
 
 
 
-profielVelden = ['SHAPE@','profielnummer']
+profielVelden = ['SHAPE@','profielnummer',code_hdsr]
 spatialRef = arcpy.Describe(profielen).spatialReference
 
 
@@ -301,7 +303,7 @@ def taludDelen(profiel):
 
 
 
-def getKruin(profiel): 
+def getKruin(profiel, trajectLijn): 
     ## aanpassing kruinbepalen:
     # intersect trajectlijn met profiel
     arcpy.Intersect_analysis([profiel,trajectLijn], "kruinPunt", "ALL", "", "POINT")
@@ -383,7 +385,7 @@ def testKruin(profiel):
         return "DOORGAAN"
     
 
-def voorbewerkingTest(profiel):
+def voorbewerkingTest(profiel,trajectLijn):
 
     # lokaliseer profieldelen op binnenkant-buitenkant
     bitCursor = arcpy.da.SearchCursor("binnenkruin","MEAS")
@@ -2560,6 +2562,15 @@ def writeOutput(profiel,cPoints,waterdelen):
 profielIterator = arcpy.da.SearchCursor(profielen, profielVelden)
 for row in profielIterator:
 
+    
+    ## selecteer betreffend traject
+    id = row[2]
+    trajectLijn = 'temp_trajectlijn'
+    where = '"' + code_hdsr + '" = ' + "'" + str(id) + "'"
+    arcpy.Select_analysis(trajectenHDSR, trajectLijn, where)
+    ##
+
+
 
 
     geom = row[0]
@@ -2596,7 +2607,7 @@ for row in profielIterator:
     test = profielControle("tempProfiel")
     if test == "DOORGAAN":
         taludDelen("tempProfiel")
-        getKruin("tempProfiel")
+        getKruin("tempProfiel",trajectLijn)
         
         
         kruinTest = testKruin("tempProfiel")
@@ -2610,7 +2621,7 @@ for row in profielIterator:
                 else:
                     waterdelen = None
 
-                geomCheck = voorbewerkingTest("tempProfiel")
+                geomCheck = voorbewerkingTest("tempProfiel",trajectLijn)
                 if geomCheck == "DOORGAAN":
                     print "Geomcheck geslaagd"
 

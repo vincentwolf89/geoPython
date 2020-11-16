@@ -12,6 +12,6 @@ def gefTxt(files):
             output = os.rename(ingef, nieuwenaam)
             print ("naam aangepast")
 
-files = r'C:\Users\Vincent\Desktop\dinodata\totaal_dino'
+files = r'C:\Users\Vincent\Desktop\nieuw_grondonderzoek\cpt'
 
 gefTxt(files)

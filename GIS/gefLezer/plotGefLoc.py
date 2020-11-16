@@ -2,11 +2,11 @@ import os
 import arcpy
 import pandas as pd
 
-files = r'C:\Users\Vincent\Desktop\dinodata\sonderingen_bro'
-arcpy.env.workspace = r'C:\Users\Vincent\Desktop\go_extra_dino\go_extra_dino.gdb'
-gdb = r'C:\Users\Vincent\Desktop\go_extra_dino\go_extra_dino.gdb'
+files = r'C:\Users\Vincent\Desktop\nieuw_grondonderzoek\cpt'
+arcpy.env.workspace = r'C:\Users\Vincent\Desktop\temphdsr\nieuweshapes.gdb'
+gdb = r'C:\Users\Vincent\Desktop\temphdsr\nieuweshapes.gdb'
 arcpy.env.overwriteOutput = True
-puntenlaag = 'safe_sonderingen_dino_bro'
+puntenlaag = 'sonderingen_mos'
 
 
 

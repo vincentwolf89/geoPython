@@ -12,7 +12,7 @@ arcpy.env.overwriteOutput = True
 arcpy.env.workspace = r"D:\Projecten\HDSR\2020\gisData\geomToets.gdb"
 
 
-trajectenHDSR = "testTraject"
+trajectenHDSR = "testTraject2"
 code_hdsr = "Naam"
 toetsniveaus = "th2024"
 rasterWaterstaatswerk = "WWBAG2mPlusWaterlopenAHN3"
@@ -215,8 +215,11 @@ def controleerBuitenTalud(profielenUitvoer,waterlopenvlak,trajectlijn,code,hoogt
     arcpy.AlterField_management("isectWaterloopBuitenZ", 'RASTERVALU', 'z_ahn')
 
     arcpy.Statistics_analysis("isectWaterloopBuitenZ", "gemBoezemPeil", "z_ahn MEAN", "")
-    gemBoezemPeil = [z[0] for z in arcpy.da.SearchCursor ("gemBoezemPeil", ["MEAN_z_ahn"])][0]
-    print gemBoezemPeil
+    try:
+        gemBoezemPeil = [z[0] for z in arcpy.da.SearchCursor ("gemBoezemPeil", ["MEAN_z_ahn"])][0]
+        print gemBoezemPeil
+    except IndexError:
+        print "Geen boezem aanwezig, wat doen we hier?"
 
 
     # pandas truckje om OBJECTID's met maxlengte te vinden (en te verwijderen)
