@@ -23,8 +23,12 @@ toetsniveaus = "th2024"
 waterlopenBGTBoezem = "bgt_waterdeel_boezem"
 rasterWaterstaatswerk = "WWBAG2mPlusWaterlopenAHN3"
 
-def maak_profielen(trajectlijn,code,toetsniveau,profielen,bgt_waterdeel_boezem):
-    # lange profielen maken 
+def maak_profielen(trajectlijn,code,toetsniveau,profielen,refprofielen, bgt_waterdeel_boezem):
+    # referentieprofielen maken
+    generate_profiles(profiel_interval=25,profiel_lengte_land=140,profiel_lengte_rivier=1000,trajectlijn=trajectlijn,code=code,
+    toetspeil=toetsniveau,profielen="tempRefProfielen")
+    
+    # normale profielen maken 
     generate_profiles(profiel_interval=25,profiel_lengte_land=40,profiel_lengte_rivier=1000,trajectlijn=trajectlijn,code=code,
     toetspeil=toetsniveau,profielen=profielen)
 
@@ -40,6 +44,7 @@ def maak_profielen(trajectlijn,code,toetsniveau,profielen,bgt_waterdeel_boezem):
     arcpy.SelectLayerByLocation_management("tempProfiellayer", "INTERSECT", trajectlijn, "", "NEW_SELECTION", "NOT_INVERT")
     arcpy.CopyFeatures_management("tempProfiellayer", "tempProfielen")
 
+    # routes maken normale profielen
     profielCursor = arcpy.da.UpdateCursor("tempProfielen", ["van","tot","SHAPE@LENGTH"])
     for row in profielCursor:
         lengte = row[2]
@@ -51,10 +56,22 @@ def maak_profielen(trajectlijn,code,toetsniveau,profielen,bgt_waterdeel_boezem):
     del profielCursor
     arcpy.CreateRoutes_lr("tempProfielen", "profielnummer", "profielen","TWO_FIELDS", "van", "tot", "UPPER_LEFT", "1", "0", "IGNORE", "INDEX")
 
+    # routes maken refprofielen
+    profielCursor = arcpy.da.UpdateCursor("tempRefProfielen", ["van","tot","SHAPE@LENGTH"])
+    for row in profielCursor:
+        lengte = row[2]
+        row[0] = 0
+        row[1] = lengte
+        profielCursor.updateRow(row)
+
+    
+    del profielCursor
+    arcpy.CreateRoutes_lr("tempRefProfielen", "profielnummer", "refprofielen","TWO_FIELDS", "van", "tot", "UPPER_LEFT", "1", "0", "IGNORE", "INDEX")
 
 
 
-def bepaal_kruinvlak_toetsniveau(trajectlijn,rasterWaterstaatswerk,toetsniveau,profielen):
+
+def bepaal_kruinvlak_toetsniveau(trajectlijn,rasterWaterstaatswerk,toetsniveau,profielen,refprofielen):
     # maak buffer van traject om raster te knippen
     arcpy.Buffer_analysis(trajectlijn, "tempBufferTrajectlijn", "10 Meters", "FULL", "ROUND", "NONE", "", "PLANAR")
 
@@ -148,7 +165,7 @@ def bepaal_kruinvlak_toetsniveau(trajectlijn,rasterWaterstaatswerk,toetsniveau,p
 
         del tempCursor
         # eindpunten overhouden door afstandberekening
-        arcpy.LocateFeaturesAlongRoutes_lr("kruinGroepPunten", profielen, "profielnummer", "0,1 Meters", "kruinTable", "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS", "M_DIRECTON")
+        arcpy.LocateFeaturesAlongRoutes_lr("kruinGroepPunten", refprofielen, "profielnummer", "0,1 Meters", "kruinTable", "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS", "M_DIRECTON")
         arcpy.JoinField_management("kruinGroepPunten","OBJECTID","kruinTable","OBJECTID","MEAS")
 
 
@@ -176,12 +193,116 @@ def bepaal_kruinvlak_toetsniveau(trajectlijn,rasterWaterstaatswerk,toetsniveau,p
 
             kruindelenCursor.insertRow([profielnummer,kruinDeel])
             print profielnummer 
+            
 
         except ValueError:
             pass
 
 
 
+def maak_referentieprofielen(profielen,refprofielen,rasterWaterstaatswerk,toetsniveau, minKruinBreedte):
+    # maak kruinpunten 
+    arcpy.FeatureVerticesToPoints_management("kruindelenTraject", "kruindelenTrajectEindpunten", "BOTH_ENDS")
+
+    # lokaliseer kruinpunten op profielroute
+    arcpy.LocateFeaturesAlongRoutes_lr("kruindelenTrajectEindpunten", refprofielen, "profielnummer", "0,1 Meters", "kruindelenTable", "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS", "M_DIRECTON")
+    arcpy.JoinField_management("kruindelenTrajectEindpunten","OBJECTID","kruindelenTable","OBJECTID","MEAS")
+
+    # onderscheid maken binnen/buitenkant
+    arcpy.AddField_management("kruindelenTrajectEindpunten","locatie","TEXT", field_length=50)
+    arcpy.AddField_management("kruindelenTrajectEindpunten","z_ref","DOUBLE", 2, field_is_nullable="NULLABLE")
+
+    
+    kruinDict = {}
+
+    kruinPuntenCursor = arcpy.da.SearchCursor("kruindelenTrajectEindpunten",["profielnummer","MEAS","locatie"],sql_clause=(None, 'ORDER BY profielnummer ASC'))
+
+    for profielnummer, group in groupby(kruinPuntenCursor, lambda x: x[0]):
+        profielnummer = int(profielnummer)
+        firstMEAS = round(group.next()[1],2)
+        secondMEAS = round(group.next()[1],2)
+
+        measList = [firstMEAS,secondMEAS]
+        minMeas = min(measList)
+        maxMeas = max(measList)
+
+        kruinDict[profielnummer] = minMeas, maxMeas
+    
+    del kruinPuntenCursor
+
+    kruinPuntenCursor = arcpy.da.UpdateCursor("kruindelenTrajectEindpunten",["profielnummer","MEAS","locatie","z_ref"],sql_clause=(None, 'ORDER BY profielnummer ASC'))
+    
+    for kRow in kruinPuntenCursor:
+        if int(kRow[0]) in kruinDict:
+            if round(kRow[1],2) == kruinDict[int(kRow[0])][0]:
+            
+                kRow[2] = "kruin binnenzijde"
+            if round(kRow[1],2) == kruinDict[int(kRow[0])][1]:
+                kRow[2] = "kruin buitenzijde"
+
+        kRow[3] = toetsniveau
+        kruinPuntenCursor.updateRow(kRow)
+
+    del kruinPuntenCursor
+
+    
+    
+    
+    # invoegen eindpunten refprofiel:
+    # ophalen measwaarde kruinpunt buiten: binnen = - 106,5 (105+1,5m profielbreedte), buiten = +30
+
+    for profielnr, waardes in kruinDict.iteritems():
+        measKruinBuiten = waardes[1]
+        measKruinBinnen = measKruinBuiten-minKruinBreedte
+        measRefPuntBuiten = measKruinBuiten+30
+        measRefPuntBinnen = measKruinBinnen-105
+
+
+    # vanaf hier lokaliseren van refpunten en vervolgens juiste hoogtewaardes koppelen. Dan is het refprofiel klaar.
+    
+
+
+
+
+
+
+
+
+
+
+    # nieuwe profielen voor ref: 
+    # arcpy.FeatureVerticesToPoints_management(profielen, "refProfielPunten", "BOTH_ENDS")
+
+
+
+    
+    
+    
+    # punten referentieprofielen maken
+    # sr = arcpy.SpatialReference(28992)
+    # arcpy.CreateFeatureclass_management(workspace, "referentieProfielPunten", "POINT",spatial_reference= sr)
+    # arcpy.AddField_management("referentieProfielPunten","profielnummer","DOUBLE", 2, field_is_nullable="NULLABLE")
+    # arcpy.AddField_management("referentieProfielPunten","locatie","TEXT", field_length=50)
+    # arcpy.AddField_management("referentieProfielPunten","z_ref","profielnummer","DOUBLE", 2, field_is_nullable="NULLABLE")
+    # arcpy.AddField_management("referentieProfielPunten","afstand","profielnummer","DOUBLE", 2, field_is_nullable="NULLABLE")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+
+    # begin vanaf buitenkant: 
 
 
 
@@ -202,6 +323,7 @@ with arcpy.da.SearchCursor(trajectenHDSR,['SHAPE@',code_hdsr,toetsniveaus]) as c
         id = row[1]
         
         profielen = "profielen"
+        refprofielen = "refprofielen"
         trajectlijn = "tempTrajectlijn"
 
         # selecteer betreffend traject en kopieer naar tijdelijke laag
@@ -209,11 +331,11 @@ with arcpy.da.SearchCursor(trajectenHDSR,['SHAPE@',code_hdsr,toetsniveaus]) as c
         arcpy.Select_analysis(trajectenHDSR, trajectlijn, where)
 
 
-        # stap 1: profielen op juiste maat maken
-        maak_profielen(trajectlijn=trajectlijn,code=code,toetsniveau=toetsniveau,profielen=profielen,bgt_waterdeel_boezem=waterlopenBGTBoezem)
+        ## stap 1: profielen op juiste maat maken
+        # maak_profielen(trajectlijn=trajectlijn,code=code,toetsniveau=toetsniveau,profielen=profielen, refprofielen=refprofielen, bgt_waterdeel_boezem=waterlopenBGTBoezem)
 
+        ## stap 2: bepaal gedeelte dat op-boven toetsniveau ligt
+        # bepaal_kruinvlak_toetsniveau(trajectlijn=trajectlijn,rasterWaterstaatswerk=rasterWaterstaatswerk,toetsniveau=toetsniveau,profielen=profielen,refprofielen=refprofielen)
 
-
-        # stap 2: bepaal gedeelte dat op-boven toetsniveau ligt
-        bepaal_kruinvlak_toetsniveau(trajectlijn=trajectlijn,rasterWaterstaatswerk=rasterWaterstaatswerk,toetsniveau=toetsniveau,profielen=profielen)
-
+        ## stap 3: bepaal referentieprofiel (begin aan buitenzijde)
+        maak_referentieprofielen(profielen=profielen,refprofielen=refprofielen, rasterWaterstaatswerk=rasterWaterstaatswerk,toetsniveau=toetsniveau,minKruinBreedte=minKruinBreedte)
