@@ -251,11 +251,41 @@ def maak_referentieprofielen(profielen,refprofielen,rasterWaterstaatswerk,toetsn
     # invoegen eindpunten refprofiel:
     # ophalen measwaarde kruinpunt buiten: binnen = - 106,5 (105+1,5m profielbreedte), buiten = +30
 
+
+
+    arcpy.CreateTable_management(workspace, "refProfielTabel", "", "")
+   
+   
+    arcpy.AddField_management("refProfielTabel","profielnummer", "DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.AddField_management("refProfielTabel","locatie","TEXT", field_length=50)
+    arcpy.AddField_management("refProfielTabel","afstand","DOUBLE", 2, field_is_nullable="NULLABLE")
+
+    refPuntenCursor = arcpy.da.InsertCursor("refProfielTabel", ["profielnummer","locatie","afstand"])
+  
+
     for profielnr, waardes in kruinDict.iteritems():
         measKruinBuiten = waardes[1]
         measKruinBinnen = measKruinBuiten-minKruinBreedte
         measRefPuntBuiten = measKruinBuiten+30
         measRefPuntBinnen = measKruinBinnen-105
+
+       
+        refPuntenCursor.insertRow([profielnr,"eindpunt binnenzijde",measRefPuntBinnen])
+        refPuntenCursor.insertRow([profielnr,"eindpunt buitenzijde",measRefPuntBuiten])
+        refPuntenCursor.insertRow([profielnr,"kruinpunt binnenzijde",measKruinBinnen])
+        refPuntenCursor.insertRow([profielnr,"kruinpunt buitenzijde",measKruinBuiten])
+
+
+
+    del refPuntenCursor
+    # losse route per profiel maken
+
+    arcpy.MakeRouteEventLayer_lr(refprofielen, "profielnummer", "refProfielTabel", "profielnummer POINT afstand", "tempRefProfielen", "", "NO_ERROR_FIELD", "NO_ANGLE_FIELD", "NORMAL", "ANGLE", "LEFT", "POINT")
+    arcpy.CopyFeatures_management("tempRefProfielen", "refProfielenPunten")
+  
+
+
+
 
 
     # vanaf hier lokaliseren van refpunten en vervolgens juiste hoogtewaardes koppelen. Dan is het refprofiel klaar.
