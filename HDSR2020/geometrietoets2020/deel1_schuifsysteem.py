@@ -17,7 +17,7 @@ workspace = r"D:\Projecten\HDSR\2020\gisData\geomToets.gdb"
 
 
 
-trajectenHDSR = "testTraject2"
+trajectenHDSR = "testTraject3"
 afstandKruinSegment = 0.5 
 minKruinBreedte = 1.5
 code_hdsr = "Naam"
@@ -51,11 +51,11 @@ def maak_profielen(trajectlijn,code,toetsniveau,profielen,refprofielen, bgt_wate
 
     # routes maken normale profielen
     profielCursor = arcpy.da.UpdateCursor("tempProfielen", ["van","tot","SHAPE@LENGTH"])
-    for row in profielCursor:
-        lengte = row[2]
-        row[0] = 0
-        row[1] = lengte
-        profielCursor.updateRow(row)
+    for tRow in profielCursor:
+        lengte = tRow[2]
+        tRow[0] = 0
+        tRow[1] = lengte
+        profielCursor.updateRow(tRow)
 
     
     del profielCursor
@@ -63,11 +63,11 @@ def maak_profielen(trajectlijn,code,toetsniveau,profielen,refprofielen, bgt_wate
 
     # routes maken refprofielen
     profielCursor = arcpy.da.UpdateCursor("tempRefProfielen", ["van","tot","SHAPE@LENGTH"])
-    for row in profielCursor:
-        lengte = row[2]
-        row[0] = 0
-        row[1] = lengte
-        profielCursor.updateRow(row)
+    for tRow in profielCursor:
+        lengte = tRow[2]
+        tRow[0] = 0
+        tRow[1] = lengte
+        profielCursor.updateRow(tRow)
 
     
     del profielCursor
@@ -199,13 +199,16 @@ def bepaal_kruinvlak_toetsniveau(trajectlijn,rasterWaterstaatswerk,toetsniveau,p
             maxBreedte = [z[0] for z in arcpy.da.SearchCursor ("kruinGroepLijn", ["SHAPE@LENGTH"])][0]
 
             kruindelenCursor.insertRow([profielnummer, maxBreedte, kruinDeel])
-            print profielnummer 
+            
             
 
         except ValueError:
             pass
 
-
+    
+    del kruinCursor
+    print "Kruinvlak bepaald"
+ 
 
 
 
@@ -227,8 +230,8 @@ def maak_referentieprofielen(profielen,refprofielen,rasterWaterstaatswerk,toetsn
 
     kruinPuntenCursor = arcpy.da.SearchCursor("kruindelenTrajectEindpunten",["profielnummer","MEAS","locatie"],sql_clause=(None, 'ORDER BY profielnummer ASC'))
 
-    for profielnummer, group in groupby(kruinPuntenCursor, lambda x: x[0]):
-        profielnummer = int(profielnummer)
+    for profielnr, group in groupby(kruinPuntenCursor, lambda x: x[0]):
+        profielnr = int(profielnr)
         firstMEAS = round(group.next()[1],2)
         secondMEAS = round(group.next()[1],2)
 
@@ -236,9 +239,10 @@ def maak_referentieprofielen(profielen,refprofielen,rasterWaterstaatswerk,toetsn
         minMeas = min(measList)
         maxMeas = max(measList)
 
-        kruinDict[profielnummer] = minMeas, maxMeas
+        kruinDict[profielnr] = minMeas, maxMeas
     
     del kruinPuntenCursor
+
 
     kruinPuntenCursor = arcpy.da.UpdateCursor("kruindelenTrajectEindpunten",["profielnummer","MEAS","locatie","z_ref","profielnummer_str"],sql_clause=(None, 'ORDER BY profielnummer ASC'))
     
@@ -255,6 +259,8 @@ def maak_referentieprofielen(profielen,refprofielen,rasterWaterstaatswerk,toetsn
         kruinPuntenCursor.updateRow(kRow)
 
     del kruinPuntenCursor
+
+  
 
     
     
@@ -300,13 +306,15 @@ def maak_referentieprofielen(profielen,refprofielen,rasterWaterstaatswerk,toetsn
 
 
     del refPuntenCursor
-    # losse route per profiel maken
 
-    arcpy.MakeRouteEventLayer_lr(refprofielen, "profielnummer", "refProfielTabel", "profielnummer POINT afstand", "tempRefProfielen", "", "NO_ERROR_FIELD", "NO_ANGLE_FIELD", "NORMAL", "ANGLE", "LEFT", "POINT")
-    arcpy.CopyFeatures_management("tempRefProfielen", refprofielenpunten)
+    
+    # # losse route per profiel maken
 
+    arcpy.MakeRouteEventLayer_lr(refprofielen, "profielnummer", "refProfielTabel", "profielnummer POINT afstand", "temproutelayer", "", "NO_ERROR_FIELD", "NO_ANGLE_FIELD", "NORMAL", "ANGLE", "LEFT", "POINT")
+    arcpy.CopyFeatures_management("temproutelayer", refprofielenpunten)
+    arcpy.Delete_management("temproutelayer")
 
-    # koppelen hoogtewaardes
+    # # koppelen hoogtewaardes
     arcpy.AddField_management("refProfielenPunten","z_ref", "DOUBLE", 2, field_is_nullable="NULLABLE")
 
     refPuntenCursor = arcpy.da.UpdateCursor("refProfielenPunten",["locatie","z_ref"])
@@ -322,7 +330,7 @@ def maak_referentieprofielen(profielen,refprofielen,rasterWaterstaatswerk,toetsn
     del refPuntenCursor
 
 
-
+    print "Referentieprofielen gemaakt"
 
 def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG):
 
@@ -626,7 +634,7 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG):
         
 
 
-            baseMerge2.to_excel(r"C:\Users\Vincent\Desktop\output.xlsx")  
+       
 
             
 
@@ -700,15 +708,15 @@ with arcpy.da.SearchCursor(trajectenHDSR,['SHAPE@',code_hdsr,toetsniveaus]) as c
         arcpy.Select_analysis(trajectenHDSR, trajectlijn, where)
 
 
-        ## stap 1: profielen op juiste maat maken
-        # maak_profielen(trajectlijn=trajectlijn,code=code,toetsniveau=toetsniveau,profielen=profielen, refprofielen=refprofielen, bgt_waterdeel_boezem=waterlopenBGTBoezem)
+      
+        maak_profielen(trajectlijn=trajectlijn,code=code,toetsniveau=toetsniveau,profielen=profielen, refprofielen=refprofielen, bgt_waterdeel_boezem=waterlopenBGTBoezem)
 
-        ## stap 2: bepaal gedeelte dat op-boven toetsniveau ligt
-        # bepaal_kruinvlak_toetsniveau(trajectlijn=trajectlijn,rasterWaterstaatswerk=rasterWaterstaatswerk,toetsniveau=toetsniveau,profielen=profielen,refprofielen=refprofielen)
+      
+        
 
-        ## stap 3: bepaal referentieprofiel (begin aan buitenzijde)
-        # maak_referentieprofielen(profielen=profielen,refprofielen=refprofielen, rasterWaterstaatswerk=rasterWaterstaatswerk,toetsniveau=toetsniveau,minKruinBreedte=minKruinBreedte,refprofielenpunten= refprofielenpunten)
-        
-        
-        ## stap 4:
+        bepaal_kruinvlak_toetsniveau(trajectlijn=trajectlijn,rasterWaterstaatswerk=rasterWaterstaatswerk,toetsniveau=toetsniveau,profielen=profielen,refprofielen=refprofielen)
+
+        maak_referentieprofielen(profielen=profielen,refprofielen=refprofielen, rasterWaterstaatswerk=rasterWaterstaatswerk,toetsniveau=toetsniveau,minKruinBreedte=minKruinBreedte,refprofielenpunten= refprofielenpunten)
+    
+
         fitten_refprofiel(profielen=profielen,refprofielen=refprofielen, refprofielenpunten=refprofielenpunten,rasterAHNBAG=rasterAHN3BAG2m)
