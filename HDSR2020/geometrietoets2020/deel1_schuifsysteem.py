@@ -2,6 +2,7 @@ import arcpy
 from arcpy.sa import *
 from itertools import groupby
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt 
 
 sys.path.append('HDSR2020')
@@ -75,6 +76,7 @@ def maak_profielen(trajectlijn,code,toetsniveau,profielen,refprofielen, bgt_wate
 
 
 
+
 def bepaal_kruinvlak_toetsniveau(trajectlijn,rasterWaterstaatswerk,toetsniveau,profielen,refprofielen):
     # maak buffer van traject om raster te knippen
     arcpy.Buffer_analysis(trajectlijn, "tempBufferTrajectlijn", "10 Meters", "FULL", "ROUND", "NONE", "", "PLANAR")
@@ -107,7 +109,8 @@ def bepaal_kruinvlak_toetsniveau(trajectlijn,rasterWaterstaatswerk,toetsniveau,p
     sr = arcpy.SpatialReference(28992)
     arcpy.CreateFeatureclass_management(workspace, "kruindelenTraject", "POLYLINE",spatial_reference= sr)
     arcpy.AddField_management("kruindelenTraject","profielnummer","DOUBLE", 2, field_is_nullable="NULLABLE")
-    kruindelenCursor = arcpy.da.InsertCursor("kruindelenTraject", ["profielnummer","SHAPE@"])
+    arcpy.AddField_management("kruindelenTraject","maxBreedte","DOUBLE", 2, field_is_nullable="NULLABLE")
+    kruindelenCursor = arcpy.da.InsertCursor("kruindelenTraject", ["profielnummer","maxBreedte","SHAPE@"])
 
 
     kruinCursor = arcpy.da.UpdateCursor("profielDelenOpBovenTn",["profielnummer","SHAPE@"],sql_clause=(None, 'ORDER BY profielnummer ASC'))
@@ -193,14 +196,16 @@ def bepaal_kruinvlak_toetsniveau(trajectlijn,rasterWaterstaatswerk,toetsniveau,p
 
             # lijn toevoegen aan kruindelen met insertcursor
             kruinDeel = [z[0] for z in arcpy.da.SearchCursor ("kruinGroepLijn", ["SHAPE@"])][0]
+            maxBreedte = [z[0] for z in arcpy.da.SearchCursor ("kruinGroepLijn", ["SHAPE@LENGTH"])][0]
 
-
-            kruindelenCursor.insertRow([profielnummer,kruinDeel])
+            kruindelenCursor.insertRow([profielnummer, maxBreedte, kruinDeel])
             print profielnummer 
             
 
         except ValueError:
             pass
+
+
 
 
 
@@ -306,11 +311,7 @@ def maak_referentieprofielen(profielen,refprofielen,rasterWaterstaatswerk,toetsn
 
 
 
-
-
-
-
-def testplot(profielen, refprofielen, refprofielenpunten,rasterAHNBAG):
+def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG):
 
 
     # stringveld aanmaken voor profielen en refprofielen voor individuele selectie
@@ -345,12 +346,32 @@ def testplot(profielen, refprofielen, refprofielenpunten,rasterAHNBAG):
     
     del profielCursor
 
+
+    # ref_afstand toevoegen voor koppeling df
+    fields = [f.name for f in arcpy.ListFields(refprofielenpunten)]
+
+    if "afstand_ref" in fields:
+        pass
+    else:
+        arcpy.AddField_management(refprofielenpunten,"afstand_ref","DOUBLE", 2, field_is_nullable="NULLABLE")
+
+
+    tempCursor = arcpy.da.UpdateCursor(refprofielenpunten, ["afstand","afstand_ref"])
+    for tRow in tempCursor:
+            tRow[0] = round(tRow[0] * 2) / 2
+            tRow[1] = round(tRow[0] * 2) / 2
+            tempCursor.updateRow(tRow)
+    del tempCursor
+
     
 
     # per profielnummer refprofielplotten en gewone profiel plotten
 
     with arcpy.da.SearchCursor(profielen,["SHAPE@","profielnummer_str"]) as profielCursor:
         for pRow in profielCursor:
+
+            # ## tijdelijk!!##
+            # if pRow[1] == "profiel_2":
 
             profielnummer = pRow[1]
             tempprofiel = "tempprofiel"
@@ -363,6 +384,8 @@ def testplot(profielen, refprofielen, refprofielenpunten,rasterAHNBAG):
 
             # selecteer referentiepunten van betreffend profiel en kopieer naar tijdelijke laag
             arcpy.Select_analysis(refprofielenpunten, temprefpunten, where)
+            
+            arcpy.JoinField_management(temprefpunten,"profielnummer","kruindelenTraject","profielnummer","maxBreedte")
 
             # selecteer betreffend referentieprofiel voor localisatie profielpunten
             arcpy.Select_analysis(refprofielen, temprefprofiel, where)
@@ -416,33 +439,133 @@ def testplot(profielen, refprofielen, refprofielenpunten,rasterAHNBAG):
             arcpy.JoinField_management("puntenRoute","OBJECTID","profileRouteTable","OBJECTID","MEAS")
             arcpy.AlterField_management("puntenRoute", 'MEAS', 'afstand')
 
+
+
             # z-waarde aan profielpunten koppelen (indien aanwezig)
             arcpy.CheckOutExtension("Spatial")
             ExtractValuesToPoints("puntenRoute", rasterAHNBAG, "puntenRouteZ","INTERPOLATE", "VALUE_ONLY")
             arcpy.AlterField_management("puntenRouteZ", 'RASTERVALU', 'z_ahn')
 
+            # afstanden afronden op 1 decimaal voor koppeling in pandas df! 
+            # # temprefpunten
+            # arcpy.AddField_management(temprefpunten,"afstand_ref","DOUBLE", 2, field_is_nullable="NULLABLE")
+            # tempCursor = arcpy.da.UpdateCursor(temprefpunten, ["afstand","afstand_ref"])
+            # for tRow in tempCursor:
+            #     tRow[1] = round(row[0] * 2) / 2
+            #     tempCursor.updateRow(tRow)
+            # del tempCursor
+
+            # puntenroutez
+            tempCursor = arcpy.da.UpdateCursor("puntenRouteZ", ["afstand"])
+            for tRow in tempCursor:
+                tRow[0] = round(tRow[0] * 2) / 2
+                tempCursor.updateRow(tRow)
+            del tempCursor
+
 
 
             # plotten 
-            arrayRefProfile = arcpy.da.FeatureClassToNumPyArray("temprefpunten", ('profielnummer','afstand','z_ref'))
+            arrayRefProfile = arcpy.da.FeatureClassToNumPyArray("temprefpunten", ('profielnummer','afstand','afstand_ref','z_ref'))
             refDf = pd.DataFrame(arrayRefProfile)
-            sortrefDf = refDf.sort_values(by=['profielnummer','afstand'],ascending=[True, True])
+            sortrefDf = refDf.sort_values(by=['profielnummer','afstand_ref'],ascending=[True, True])
 
             arrayProfile = arcpy.da.FeatureClassToNumPyArray("puntenRouteZ", ('afstand','z_ahn'))
             profileDf = pd.DataFrame(arrayProfile)
             sortProfileDf = profileDf.sort_values(by=['afstand'],ascending=[True])
 
 
+            # mergedDf = sortProfileDf.merge(sortrefDf, on=['afstand'],how='outer')
+            # mergedDfSorted= mergedDf.sort_values(by=['afstand'],ascending=[True])
+
+            minPlotX = sortProfileDf['afstand'].min()
+            maxPlotX = sortProfileDf['afstand'].max()
+            minPlotY = sortProfileDf['z_ahn'].min()-1
+            maxPlotY = sortProfileDf['z_ahn'].max()+1
+
+
+
+            minList = [sortProfileDf['afstand'].min(),sortrefDf['afstand'].min()]
+            maxList = [sortProfileDf['afstand'].max(),sortrefDf['afstand_ref'].max()]
+            minAfstand = min(minList)
+            maxAfstand = max(maxList)
+
+
+            baseList = np.arange(minAfstand, maxAfstand, 0.5).tolist()
+            baseSeries = pd.Series(baseList) 
+
+
+
+
+            # heropbouw 
+            frame = {'afstand': baseSeries} 
+            baseDf = pd.DataFrame(frame) 
+
+            baseMerge1 = baseDf.merge(sortProfileDf, on=['afstand'],how='outer')
+            baseMerge2 = baseMerge1.merge(sortrefDf, on=['afstand'],how='outer')
+            
+            
+
+            firstAfstand = baseMerge2['afstand_ref'].first_valid_index()
+            lastAfstand = baseMerge2['afstand_ref'].last_valid_index()
+            baseMerge2.loc[firstAfstand:lastAfstand, 'afstand_ref'] = baseMerge2.loc[firstAfstand:lastAfstand, 'afstand_ref'].interpolate()
+            baseMerge2.loc[firstAfstand:lastAfstand, 'z_ref'] = baseMerge2.loc[firstAfstand:lastAfstand, 'z_ref'].interpolate()
+            baseMerge2['difference'] = baseMerge2.z_ahn - baseMerge2.z_ref
+            
+
             plt.style.use('seaborn-whitegrid') #seaborn-ticks
             fig = plt.figure(figsize=(80, 10))
-        
-        
             ax1 = fig.add_subplot(111, label ="1")
-
-            ax1.plot(sortrefDf['afstand'],sortrefDf['z_ref'],label="Referentie-profiel",linewidth=3)
-            ax1.plot(sortProfileDf['afstand'],sortProfileDf['z_ahn'],label="AHN3-profiel")
+            ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'])
 
 
+            
+        
+            iteraties = 1
+            maxBreedte= [z[0] for z in arcpy.da.SearchCursor ("temprefpunten", ["maxBreedte"])][0]
+            resterend = round(maxBreedte* 2) / 2
+            test = (baseMerge2['difference'] < 0).values.any()
+
+            print test, resterend
+
+            while test == True and resterend > 0:
+
+                print "Iteratie {}".format(iteraties)
+
+                baseMerge2['afstand_ref'] = baseMerge2['afstand_ref'].shift(+1)
+                baseMerge2['z_ref'] = baseMerge2['z_ref'].shift(+1)
+                baseMerge2['difference'] = baseMerge2.z_ahn - baseMerge2.z_ref
+                
+                test = (baseMerge2['difference'] < 0).values.any()
+
+                iteraties += 1
+                resterend -= 0.5
+
+                print resterend
+
+        
+            
+        
+
+
+            baseMerge2.to_excel(r"C:\Users\Vincent\Desktop\output.xlsx")  
+
+            
+
+
+            
+        
+            
+            # plt.style.use('seaborn-whitegrid') #seaborn-ticks
+            # fig = plt.figure(figsize=(80, 10))
+            # ax1 = fig.add_subplot(111, label ="1")
+
+            ax1.plot(baseMerge2['afstand'],baseMerge2['z_ahn'])
+            ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'],'--')
+            
+
+            
+            plt.xlim(minPlotX, maxPlotX)
+            plt.ylim(minPlotY, maxPlotY)
 
             # plt.show()
 
@@ -450,6 +573,8 @@ def testplot(profielen, refprofielen, refprofielenpunten,rasterAHNBAG):
             plt.close()
 
             print profielnummer
+
+            break
 
 
 
@@ -522,4 +647,4 @@ with arcpy.da.SearchCursor(trajectenHDSR,['SHAPE@',code_hdsr,toetsniveaus]) as c
         ## stap 3: bepaal referentieprofiel (begin aan buitenzijde)
         # maak_referentieprofielen(profielen=profielen,refprofielen=refprofielen, rasterWaterstaatswerk=rasterWaterstaatswerk,toetsniveau=toetsniveau,minKruinBreedte=minKruinBreedte,refprofielenpunten= refprofielenpunten)
 
-        testplot(profielen=profielen,refprofielen=refprofielen, refprofielenpunten=refprofielenpunten,rasterAHNBAG=rasterAHN3BAG2m)
+        fitten_refprofiel(profielen=profielen,refprofielen=refprofielen, refprofielenpunten=refprofielenpunten,rasterAHNBAG=rasterAHN3BAG2m)
