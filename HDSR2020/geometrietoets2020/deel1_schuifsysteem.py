@@ -37,7 +37,7 @@ def maak_profielen(trajectlijn,code,toetsniveau,profielen,refprofielen, bgt_wate
     generate_profiles(profiel_interval=25,profiel_lengte_land=40,profiel_lengte_rivier=1000,trajectlijn=trajectlijn,code=code,
     toetspeil=toetsniveau,profielen=profielen)
 
-    # profielen knippen buitenzijde: BAG
+    # profielen knippen buitenzijde: BGT-waterdeel
     copy_trajectory_lr(trajectlijn=trajectlijn,code=code)
     split_profielen(profielen=profielen,trajectlijn=trajectlijn,code=code)
 
@@ -326,6 +326,50 @@ def maak_referentieprofielen(profielen,refprofielen,rasterWaterstaatswerk,toetsn
 
 def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG):
 
+    # maken van bandbreedtepunten (totaal)
+
+    # eindpunten van profielen
+    arcpy.FeatureVerticesToPoints_management(profielen, "grensRivierzijde", "END")
+
+
+
+
+    whereKruin = '"' + 'locatie' + '" = ' + "'" + "kruin binnenzijde" + "'"
+    arcpy.Select_analysis("kruindelenTrajecEindpunten", "grensLandzijde", whereKruin)
+
+
+    
+    arcpy.Merge_management(["grensLandzijde","grensRivierzijde"],"grensPunten")
+
+    # ref_afstand toevoegen voor koppeling df
+    fields = [f.name for f in arcpy.ListFields("grensPunten")]
+
+    for field in fields:
+        if "MEAS" in field:
+            arcpy.DeleteField_management("grensPunten",field)
+        if "afstand" in field:
+            arcpy.DeleteField_management("grensPunten",field)
+        if "profielnummer_str" in field:
+            arcpy.DeleteField_management("grensPunten",field)
+
+        
+
+    arcpy.AddField_management("grensPunten","profielnummer_str","TEXT", field_length=50)
+
+    grensCursor = arcpy.da.UpdateCursor("grensPunten",["profielnummer","profielnummer_str"])
+
+    for gRow in grensCursor:
+        gRow[1] = "profiel_"+str(int(gRow[0]))
+
+        grensCursor.updateRow(gRow)
+
+
+    del grensCursor
+
+
+
+
+
 
     # stringveld aanmaken voor profielen en refprofielen voor individuele selectie
     arcpy.AddField_management(profielen,"profielnummer_str","TEXT", field_length=50)
@@ -405,7 +449,8 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG):
             arcpy.Select_analysis(refprofielen, temprefprofiel, where)
 
             # selecteer betreffende kruinpunten(bandbreedte) voor localisatie
-            arcpy.Select_analysis("kruindelenTrajectEindpunten", tempbandbreedte, where)
+            arcpy.Select_analysis("grensPunten", tempbandbreedte, where)
+            # arcpy.Select_analysis("kruindelenTrajectEindpunten", tempbandbreedte, where)"grensPunten"
 
             
 
@@ -477,7 +522,7 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG):
             # bandbreedte lokaliseren
             arcpy.LocateFeaturesAlongRoutes_lr(tempbandbreedte, "tempRefRoute", "profielnummer_str", "0,1 Meters", "bandbreedteTable", "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS", "M_DIRECTON")
             arcpy.JoinField_management(tempbandbreedte,"OBJECTID","bandbreedteTable","OBJECTID","MEAS")
-            arcpy.AlterField_management(tempbandbreedte, 'MEAS_1', 'afstand')
+            arcpy.AlterField_management(tempbandbreedte, 'MEAS', 'afstand')
 
 
             # plotten 
@@ -494,10 +539,10 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG):
             bandbreedteDf = pd.DataFrame(arrayBandbreedte)
             sortBandbreedteDf = bandbreedteDf.sort_values(by=['afstand'], ascending =[True])
 
-            minPlotX = sortProfileDf['afstand'].min()
-            maxPlotX = sortProfileDf['afstand'].max()
-            minPlotY = sortProfileDf['z_ahn'].min()-1
-            maxPlotY = sortProfileDf['z_ahn'].max()+1
+            minPlotX = sortProfileDf['afstand'].min()-10
+            maxPlotX = sortProfileDf['afstand'].max()+10
+            minPlotY = sortProfileDf['z_ahn'].min()
+            maxPlotY = sortProfileDf['z_ahn'].max()
 
 
 
@@ -547,7 +592,14 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG):
             
         
             iteraties = 1
-            maxBreedte= [z[0] for z in arcpy.da.SearchCursor ("temprefpunten", ["maxBreedte"])][0]
+            # maxBreedte= [z[0] for z in arcpy.da.SearchCursor ("temprefpunten", ["maxBreedte"])][0]
+
+
+            maxBreedte = abs(sortBandbreedteDf['afstand'].max() - sortBandbreedteDf['afstand'].min())
+           
+
+          
+
             resterend = round(maxBreedte* 2) / 2 - minKruinBreedte
             
             test = (baseMerge2['difference'] < 0).values.any()
@@ -602,8 +654,7 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG):
             print profielnummer
 
             
-
-           
+    
 
 
 
