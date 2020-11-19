@@ -220,6 +220,7 @@ def maak_referentieprofielen(profielen,refprofielen,rasterWaterstaatswerk,toetsn
     # onderscheid maken binnen/buitenkant
     arcpy.AddField_management("kruindelenTrajectEindpunten","locatie","TEXT", field_length=50)
     arcpy.AddField_management("kruindelenTrajectEindpunten","z_ref","DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.AddField_management("kruindelenTrajectEindpunten","profielnummer_str","TEXT", field_length=50)
 
     
     kruinDict = {}
@@ -239,7 +240,7 @@ def maak_referentieprofielen(profielen,refprofielen,rasterWaterstaatswerk,toetsn
     
     del kruinPuntenCursor
 
-    kruinPuntenCursor = arcpy.da.UpdateCursor("kruindelenTrajectEindpunten",["profielnummer","MEAS","locatie","z_ref"],sql_clause=(None, 'ORDER BY profielnummer ASC'))
+    kruinPuntenCursor = arcpy.da.UpdateCursor("kruindelenTrajectEindpunten",["profielnummer","MEAS","locatie","z_ref","profielnummer_str"],sql_clause=(None, 'ORDER BY profielnummer ASC'))
     
     for kRow in kruinPuntenCursor:
         if int(kRow[0]) in kruinDict:
@@ -250,6 +251,7 @@ def maak_referentieprofielen(profielen,refprofielen,rasterWaterstaatswerk,toetsn
                 kRow[2] = "kruin buitenzijde"
 
         kRow[3] = toetsniveau
+        kRow[4] = "profiel_"+str(int(kRow[0]))
         kruinPuntenCursor.updateRow(kRow)
 
     del kruinPuntenCursor
@@ -273,10 +275,21 @@ def maak_referentieprofielen(profielen,refprofielen,rasterWaterstaatswerk,toetsn
   
 
     for profielnr, waardes in kruinDict.iteritems():
-        measKruinBuiten = waardes[1]
-        measKruinBinnen = measKruinBuiten-minKruinBreedte
+        
+
+        # vanuit binnenzijde
+        measKruinBinnen = waardes[0]
+        measKruinBuiten = measKruinBinnen+minKruinBreedte
         measRefPuntBuiten = measKruinBuiten+30
         measRefPuntBinnen = measKruinBinnen-105
+
+
+
+        # # vanuit buitenzijde
+        # measKruinBuiten = waardes[1]
+        # measKruinBinnen = measKruinBuiten-minKruinBreedte
+        # measRefPuntBuiten = measKruinBuiten+30
+        # measRefPuntBinnen = measKruinBinnen-105
 
        
         refPuntenCursor.insertRow([profielnr,"eindpunt binnenzijde",measRefPuntBinnen])
@@ -377,6 +390,7 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG):
             tempprofiel = "tempprofiel"
             temprefpunten = "temprefpunten"
             temprefprofiel = "temprefprofiel"
+            tempbandbreedte = "tempbandbreedte"
             
             # selecteer betreffend profiel en kopieer naar tijdelijke laag
             where = '"' + 'profielnummer_str' + '" = ' + "'" + profielnummer + "'"
@@ -389,6 +403,10 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG):
 
             # selecteer betreffend referentieprofiel voor localisatie profielpunten
             arcpy.Select_analysis(refprofielen, temprefprofiel, where)
+
+            # selecteer betreffende kruinpunten(bandbreedte) voor localisatie
+            arcpy.Select_analysis("kruindelenTrajectEindpunten", tempbandbreedte, where)
+
             
 
 
@@ -446,14 +464,7 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG):
             ExtractValuesToPoints("puntenRoute", rasterAHNBAG, "puntenRouteZ","INTERPOLATE", "VALUE_ONLY")
             arcpy.AlterField_management("puntenRouteZ", 'RASTERVALU', 'z_ahn')
 
-            # afstanden afronden op 1 decimaal voor koppeling in pandas df! 
-            # # temprefpunten
-            # arcpy.AddField_management(temprefpunten,"afstand_ref","DOUBLE", 2, field_is_nullable="NULLABLE")
-            # tempCursor = arcpy.da.UpdateCursor(temprefpunten, ["afstand","afstand_ref"])
-            # for tRow in tempCursor:
-            #     tRow[1] = round(row[0] * 2) / 2
-            #     tempCursor.updateRow(tRow)
-            # del tempCursor
+
 
             # puntenroutez
             tempCursor = arcpy.da.UpdateCursor("puntenRouteZ", ["afstand"])
@@ -462,6 +473,11 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG):
                 tempCursor.updateRow(tRow)
             del tempCursor
 
+
+            # bandbreedte lokaliseren
+            arcpy.LocateFeaturesAlongRoutes_lr(tempbandbreedte, "tempRefRoute", "profielnummer_str", "0,1 Meters", "bandbreedteTable", "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS", "M_DIRECTON")
+            arcpy.JoinField_management(tempbandbreedte,"OBJECTID","bandbreedteTable","OBJECTID","MEAS")
+            arcpy.AlterField_management(tempbandbreedte, 'MEAS_1', 'afstand')
 
 
             # plotten 
@@ -474,8 +490,9 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG):
             sortProfileDf = profileDf.sort_values(by=['afstand'],ascending=[True])
 
 
-            # mergedDf = sortProfileDf.merge(sortrefDf, on=['afstand'],how='outer')
-            # mergedDfSorted= mergedDf.sort_values(by=['afstand'],ascending=[True])
+            arrayBandbreedte = arcpy.da.FeatureClassToNumPyArray(tempbandbreedte, ('afstand','z_ref'))
+            bandbreedteDf = pd.DataFrame(arrayBandbreedte)
+            sortBandbreedteDf = bandbreedteDf.sort_values(by=['afstand'], ascending =[True])
 
             minPlotX = sortProfileDf['afstand'].min()
             maxPlotX = sortProfileDf['afstand'].max()
@@ -518,11 +535,21 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG):
             ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'])
 
 
+
+
+            leftBorder = sortBandbreedteDf.iloc[0]['afstand']
+            rightBorder = sortBandbreedteDf.iloc[1]['afstand']
+
+            ax1.axvline(leftBorder, color='grey', linestyle='--')
+            ax1.axvline(rightBorder, color='grey', linestyle='--')
+
+
             
         
             iteraties = 1
             maxBreedte= [z[0] for z in arcpy.da.SearchCursor ("temprefpunten", ["maxBreedte"])][0]
-            resterend = round(maxBreedte* 2) / 2
+            resterend = round(maxBreedte* 2) / 2 - minKruinBreedte
+            
             test = (baseMerge2['difference'] < 0).values.any()
 
             print test, resterend
@@ -574,8 +601,9 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG):
 
             print profielnummer
 
-            break
+            
 
+           
 
 
 
@@ -586,24 +614,7 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG):
 
 
 
-    # arrayRefProfile = arcpy.da.FeatureClassToNumPyArray("refProfielenPunten", ('profielnummer','afstand','z_ref'))
-    # refDf = pd.DataFrame(arrayRefProfile)
-    # sortrefDf = refDf.sort_values(by=['profielnummer','afstand'],ascending=[True, True])
-
-    # groupedRef = sortrefDf.groupby(["profielnummer",])
-
-    # for name, group in groupedRef:
-        
-    #     plt.style.use('seaborn-whitegrid') #seaborn-ticks
-    #     fig = plt.figure(figsize=(60, 10))
-        
-        
-    #     ax1 = fig.add_subplot(111, label ="1")
-    #     ax1.plot(group['afstand'],group['z_ref'],label="Refprofiel")
-
-
-
-    #     plt.show()
+ 
 
 
 
@@ -646,5 +657,7 @@ with arcpy.da.SearchCursor(trajectenHDSR,['SHAPE@',code_hdsr,toetsniveaus]) as c
 
         ## stap 3: bepaal referentieprofiel (begin aan buitenzijde)
         # maak_referentieprofielen(profielen=profielen,refprofielen=refprofielen, rasterWaterstaatswerk=rasterWaterstaatswerk,toetsniveau=toetsniveau,minKruinBreedte=minKruinBreedte,refprofielenpunten= refprofielenpunten)
-
+        
+        
+        ## stap 4:
         fitten_refprofiel(profielen=profielen,refprofielen=refprofielen, refprofielenpunten=refprofielenpunten,rasterAHNBAG=rasterAHN3BAG2m)
