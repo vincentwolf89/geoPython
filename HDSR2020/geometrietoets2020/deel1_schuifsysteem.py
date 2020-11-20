@@ -1,4 +1,5 @@
 import arcpy
+import os
 from arcpy.sa import *
 from itertools import groupby
 import pandas as pd
@@ -15,6 +16,7 @@ arcpy.env.overwriteOutput = True
 arcpy.env.workspace = r"D:\Projecten\HDSR\2020\gisData\geomToets.gdb"
 workspace = r"D:\Projecten\HDSR\2020\gisData\geomToets.gdb"
 
+baseFigures = r"C:/Users/Vincent/Desktop/demoGeomtoets/"
 
 
 
@@ -30,6 +32,15 @@ rasterWaterstaatswerk = "WWBAG2mPlusWaterlopenAHN3"
 rasterAHN3BAG2m = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\BAG2mPlusWaterlopenAHN3"
 
 outputFigures = r"C:\Users\Vincent\Desktop\demoGeomtoets"
+
+
+def maak_plotmap(baseFigures,trajectnaam):
+
+    plotmap = baseFigures+trajectnaam
+    if not os.path.exists(plotmap):
+        os.makedirs(plotmap)
+
+    return plotmap
 
 def maak_profielen(trajectlijn,code,toetsniveau,profielen,refprofielen, bgt_waterdeel_boezem):
     # referentieprofielen maken
@@ -341,7 +352,7 @@ def maak_referentieprofielen(profielen,refprofielen,rasterWaterstaatswerk,toetsn
 
     print "Referentieprofielen gemaakt"
 
-def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG,kruinpunten):
+def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG,kruinpunten,plotmap):
 
     # maken van bandbreedtepunten (totaal)
 
@@ -610,8 +621,8 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG,k
             fig = plt.figure(figsize=(80, 10))
             ax1 = fig.add_subplot(111, label ="1")
             
-            ax1.plot(baseMerge2['afstand'],baseMerge2['z_ahn'],label="AHN3-profiel")
-            ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'],label="Initieel referentieprofiel")
+            ax1.plot(baseMerge2['afstand'],baseMerge2['z_ahn'],label="AHN3-profiel",color="dimgrey",linewidth=5)
+            ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'],label="Initieel referentieprofiel",color="orange",linewidth=3.5)
 
 
 
@@ -621,8 +632,8 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG,k
 
 
                 
-                ax1.axvline(leftBorder, color='grey', linestyle='--')
-                ax1.axvline(rightBorder, color='grey', linestyle='--')
+                ax1.axvline(leftBorder, color='coral', linestyle=':',linewidth=3,label="Iteratiegrens landzijde")
+                ax1.axvline(rightBorder, color='seagreen', linestyle=':',linewidth=3, label="Iteratiegrens boezemzijde")
 
             except IndexError:
                 pass
@@ -663,7 +674,7 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG,k
             
 
             # ax1.plot(baseMerge2['afstand'],baseMerge2['z_ahn'])
-            ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'],'--',label="Uiteindelijk referentieprofiel")
+            # ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'],'--',label="Uiteindelijk referentieprofiel")
 
 
             # terugkoppelen wel/niet gefit
@@ -686,6 +697,7 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG,k
 
             # kruinlocatie als punt weergeven indien gefit
             if test == False:
+                ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'],'--',label="Passend referentieprofiel", color="green",linewidth=3.5)
                 kruinHoogte = baseMerge2['z_ref'].max()
                 kruinDeel = baseMerge2.loc[baseMerge2['z_ref'] == kruinHoogte]
                 kruinLandzijde = kruinDeel['afstand'].min()
@@ -721,6 +733,8 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG,k
                 del geom
             
                 # einde kruinlocatie
+            if test == True:
+                ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'],'--',label="Niet-passend referentieprofiel", color="red",linewidth=3.5)
 
          
     
@@ -745,10 +759,11 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG,k
             
             plt.xlim(minPlotX, maxPlotX)
             plt.ylim(minPlotY, maxPlotY)
+            ax1.legend(frameon=False, loc='upper right',prop={'size': 20})
 
             # plt.show()
 
-            plt.savefig("{}/{}.png".format(outputFigures,profielnummer))
+            plt.savefig("{}/{}.png".format(plotmap,profielnummer))
             
       
             plt.close()
@@ -816,4 +831,6 @@ with arcpy.da.SearchCursor(trajectenHDSR,['SHAPE@',code_hdsr,toetsniveaus]) as c
         # maak_referentieprofielen(profielen=profielen,refprofielen=refprofielen, rasterWaterstaatswerk=rasterWaterstaatswerk,toetsniveau=toetsniveau,minKruinBreedte=minKruinBreedte,refprofielenpunten= refprofielenpunten)
     
 
-        fitten_refprofiel(profielen=profielen,refprofielen=refprofielen, refprofielenpunten=refprofielenpunten,rasterAHNBAG=rasterAHN3BAG2m,kruinpunten=kruinpunten)
+        plotmap = maak_plotmap(baseFigures=baseFigures,trajectnaam = id)
+
+        fitten_refprofiel(profielen=profielen,refprofielen=refprofielen, refprofielenpunten=refprofielenpunten,rasterAHNBAG=rasterAHN3BAG2m,kruinpunten=kruinpunten,plotmap=plotmap)
