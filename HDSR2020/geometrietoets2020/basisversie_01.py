@@ -23,8 +23,9 @@ baseFigures = r"C:/Users/Vincent/Desktop/demoGeomtoets/"
 
 
 trajectenHDSR = "testtraject4"
-afstandKruinSegment = 0.5 
+afstandKruinSegment = 0.5 # maximale afstand die tussen kruinsegmenten mag zijn om samen te voegen
 minKruinBreedte = 1.5
+ondergrensReferentie = 15 # aantal m onder toetsniveau
 code_hdsr = "Naam"
 toetsniveaus = "th2024"
 waterlopenBGTBoezem = "bgt_waterdeel_boezem"
@@ -41,29 +42,33 @@ def maak_plotmap(baseFigures,trajectnaam):
         os.makedirs(plotmap)
 
     return plotmap
+    print "Plotmap gemaakt voor {}".format(trajectnaam)
 
-def maak_profielen(trajectlijn,code,toetsniveau,profielen,refprofielen, bgt_waterdeel_boezem):
-    # referentieprofielen maken
+
+def maak_basisprofielen(trajectlijn,code,toetsniveau,profielen,refprofielen, bgt_waterdeel_boezem,trajectnaam):
+    ## 1 referentieprofielen maken
     generate_profiles(profiel_interval=25,profiel_lengte_land=140,profiel_lengte_rivier=1000,trajectlijn=trajectlijn,code=code,
     toetspeil=toetsniveau,profielen="tempRefProfielen")
     
-    # normale profielen maken 
+    ## 2 normale profielen maken 
     generate_profiles(profiel_interval=25,profiel_lengte_land=40,profiel_lengte_rivier=1000,trajectlijn=trajectlijn,code=code,
     toetspeil=toetsniveau,profielen=profielen)
 
-    # profielen knippen buitenzijde: BGT-waterdeel
+    ## 3 profielen knippen buitenzijde: BGT-waterdeel
     copy_trajectory_lr(trajectlijn=trajectlijn,code=code)
     split_profielen(profielen=profielen,trajectlijn=trajectlijn,code=code)
 
-    # snijpunten van rivierzijde profieldelen en boezemwaterlopen
+    # 3a snijpunten van rivierzijde profieldelen en boezemwaterlopen
     arcpy.Intersect_analysis(["profieldeel_rivier",bgt_waterdeel_boezem], "tempSplitBoezem", "ALL", "", "POINT")
     arcpy.SplitLineAtPoint_management(profielen, "tempSplitBoezem", "tempProfielenSplit", "1 Meters")
     arcpy.MakeFeatureLayer_management("tempProfielenSplit", "tempProfiellayer") 
-   
+    
+    # 3b selecteer deel uit splitsing dat snijdt met trajectlijn
     arcpy.SelectLayerByLocation_management("tempProfiellayer", "INTERSECT", trajectlijn, "", "NEW_SELECTION", "NOT_INVERT")
     arcpy.CopyFeatures_management("tempProfiellayer", "tempProfielen")
+    ##
 
-    # routes maken normale profielen
+    # 4 routes maken normale profielen (dit is tevens de defintieve profielenlaag waaraan oordelen worden gekoppeld)
     profielCursor = arcpy.da.UpdateCursor("tempProfielen", ["van","tot","SHAPE@LENGTH"])
     for tRow in profielCursor:
         lengte = tRow[2]
@@ -76,7 +81,7 @@ def maak_profielen(trajectlijn,code,toetsniveau,profielen,refprofielen, bgt_wate
     arcpy.CreateRoutes_lr("tempProfielen", "profielnummer", profielen,"TWO_FIELDS", "van", "tot", "UPPER_LEFT", "1", "0", "IGNORE", "INDEX")
     arcpy.AddField_management(profielen,"geometrieOordeel","TEXT", field_length=50)
 
-    # routes maken refprofielen
+    # 5 routes maken refprofielen
     profielCursor = arcpy.da.UpdateCursor("tempRefProfielen", ["van","tot","SHAPE@LENGTH"])
     for tRow in profielCursor:
         lengte = tRow[2]
@@ -88,31 +93,32 @@ def maak_profielen(trajectlijn,code,toetsniveau,profielen,refprofielen, bgt_wate
     del profielCursor
     arcpy.CreateRoutes_lr("tempRefProfielen", "profielnummer", "refprofielen","TWO_FIELDS", "van", "tot", "UPPER_LEFT", "1", "0", "IGNORE", "INDEX")
 
+    print "Profielen gemaakt voor {}".format(trajectnaam)
 
 
 
 
-def bepaal_kruinvlak_toetsniveau(trajectlijn,rasterWaterstaatswerk,toetsniveau,profielen,refprofielen):
-    # maak buffer van traject om raster te knippen
-    arcpy.Buffer_analysis(trajectlijn, "tempBufferTrajectlijn", "10 Meters", "FULL", "ROUND", "NONE", "", "PLANAR")
 
-    # knip buffer uit totaalraster
-    arcpy.Clip_management(rasterWaterstaatswerk,"", "tempRaster", "tempBufferTrajectlijn", "-3,402823e+038", "ClippingGeometry", "MAINTAIN_EXTENT")
+def bepaal_kruinvlak_toetsniveau(trajectlijn,hoogtedata,toetsniveau,profielen,refprofielen,trajectnaam):
+    ## 1 maak buffer van traject om raster te knippen
+    arcpy.Buffer_analysis(trajectlijn, "tempBufferTrajectlijn", "15 Meters", "FULL", "ROUND", "NONE", "", "PLANAR")
+
+    ## 2 knip buffer uit totaalraster
+    arcpy.Clip_management(hoogtedata,"", "tempRaster", "tempBufferTrajectlijn", "-3,402823e+038", "ClippingGeometry", "MAINTAIN_EXTENT")
     
 
-    # raster calculator, selecteer deel op en boven toetsniveau
+    ## 3 raster calculator, selecteer deel op en boven toetsniveau
     raster = arcpy.Raster("tempRaster")
     outraster = raster >= toetsniveau
     outraster.save("tempRasterCalc")
 
-    # arcpy.gp.FocalStatistics_sa("tempRasterCalc", "tempRasterCalcFocal", "Rectangle 3 3 CELL", "MEAN", "DATA")
 
-    # raster vertalen naar polygon en alleen deel boven toetsniveau overhouden (gridcode = 1)
+    ## 4 raster vertalen naar polygon en alleen deel boven toetsniveau overhouden (gridcode = 1)
     arcpy.RasterToPolygon_conversion("tempRasterCalc", "tempRasterPoly", "SIMPLIFY", "Value")
     arcpy.Select_analysis("tempRasterPoly", "temp_opBovenTn", "gridcode = 1")
 
 
-    # knip profielen op vlak "opBovenTn"
+    ## 5  knip profielen op vlak "opBovenTn"
     arcpy.Intersect_analysis([profielen,"temp_opBovenTn"], "tempSplitKruin", "ALL", "", "POINT")
     arcpy.SplitLineAtPoint_management(profielen, "tempSplitKruin", "splitTempProfielen", "1 Meters")
     arcpy.MakeFeatureLayer_management("splitTempProfielen", "tempProfiellayer") 
@@ -120,126 +126,136 @@ def bepaal_kruinvlak_toetsniveau(trajectlijn,rasterWaterstaatswerk,toetsniveau,p
     arcpy.SelectLayerByLocation_management("tempProfiellayer", "WITHIN", "temp_opBovenTn", "", "NEW_SELECTION", "NOT_INVERT")
     arcpy.CopyFeatures_management("tempProfiellayer", "profielDelenOpBovenTn")
 
-    # samenvoegen delen die 0,5 m van elkaar afliggen
-    sr = arcpy.SpatialReference(28992)
+    ## 6 check of profieldelen "opBovenTn" aanwezig zijn
+    aantalOpBovenTn = arcpy.GetCount_management("profielDelenOpBovenTn")[0]
+
+    if aantalOpBovenTn > 0:
     
-    if arcpy.Exists("kruindelenTraject"):
-        arcpy.Delete_management("kruindelenTraject")
 
-    arcpy.CreateFeatureclass_management(workspace, "kruindelenTraject", "POLYLINE",spatial_reference= sr)
-    arcpy.AddField_management("kruindelenTraject","profielnummer","DOUBLE", 2, field_is_nullable="NULLABLE")
-    arcpy.AddField_management("kruindelenTraject","maxBreedte","DOUBLE", 2, field_is_nullable="NULLABLE")
-    kruindelenCursor = arcpy.da.InsertCursor("kruindelenTraject", ["profielnummer","maxBreedte","SHAPE@"])
+        ## 7 samenvoegen delen die 0,5 m van elkaar afliggen
+        sr = arcpy.SpatialReference(28992)
+        if arcpy.Exists("kruindelenTraject"):
+            arcpy.Delete_management("kruindelenTraject")
+
+        arcpy.CreateFeatureclass_management(workspace, "kruindelenTraject", "POLYLINE",spatial_reference= sr)
+        arcpy.AddField_management("kruindelenTraject","profielnummer","DOUBLE", 2, field_is_nullable="NULLABLE")
+        arcpy.AddField_management("kruindelenTraject","maxBreedte","DOUBLE", 2, field_is_nullable="NULLABLE")
+        kruindelenCursor = arcpy.da.InsertCursor("kruindelenTraject", ["profielnummer","maxBreedte","SHAPE@"])
 
 
-    kruinCursor = arcpy.da.UpdateCursor("profielDelenOpBovenTn",["profielnummer","SHAPE@"],sql_clause=(None, 'ORDER BY profielnummer ASC'))
-    
-    for profielnummer, group in groupby(kruinCursor, lambda x: x[0]):
-
-        kruinDelenGroep = []
-        for kRow in group:
-            kruinDelenGroep.append(kRow[1])
+        kruinCursor = arcpy.da.UpdateCursor("profielDelenOpBovenTn",["profielnummer","SHAPE@"],sql_clause=(None, 'ORDER BY profielnummer ASC'))
         
-        # samenvoegen
-        arcpy.Merge_management(kruinDelenGroep,"kruinGroep")
+        for profielnummer, group in groupby(kruinCursor, lambda x: x[0]):
 
-        # near tabel maken
-        arcpy.Near_analysis("kruinGroep", "kruinGroep", "", "NO_LOCATION", "NO_ANGLE", "PLANAR")
+            kruinDelenGroep = []
+            for kRow in group:
+                kruinDelenGroep.append(kRow[1])
+            
+            #  samenvoegen
+            arcpy.Merge_management(kruinDelenGroep,"kruinGroep")
 
-        # nears met < 0,5 m verwijderen
-     
+            # near tabel maken
+            arcpy.Near_analysis("kruinGroep", "kruinGroep", "", "NO_LOCATION", "NO_ANGLE", "PLANAR")
 
-        profielCursorKruin = arcpy.da.UpdateCursor("kruinGroep",["NEAR_DIST","SHAPE@LENGTH"])
-
-        for pRow in profielCursorKruin:
-            if (pRow[0] > afstandKruinSegment) and (pRow[1] < minKruinBreedte):
-                profielCursorKruin.deleteRow()
-            else:
-                pass
-
-        del profielCursorKruin
-
-        # indien twee of meer delen aanwezig zijn die wel lang genoeg zijn maar te ver uit elkaar liggen: langste overhouden
-        
-        try:
-            minLengte = round(min([z[0] for z in arcpy.da.SearchCursor ("kruinGroep", ["SHAPE@LENGTH"])]),2)
-            maxLengte = round(max([z[0] for z in arcpy.da.SearchCursor ("kruinGroep", ["SHAPE@LENGTH"])]),2)
+            # nears met < 0,5 m verwijderen
 
             profielCursorKruin = arcpy.da.UpdateCursor("kruinGroep",["NEAR_DIST","SHAPE@LENGTH"])
 
             for pRow in profielCursorKruin:
-                if (pRow[0] > afstandKruinSegment) and (round(pRow[1],2) == maxLengte):
-                    pass
-                if (pRow[0] > afstandKruinSegment) and (round(pRow[1],2) < maxLengte):
+                if (pRow[0] > afstandKruinSegment) and (pRow[1] < minKruinBreedte):
                     profielCursorKruin.deleteRow()
+                else:
+                    pass
 
             del profielCursorKruin
-        
-        except ValueError:
-            pass
+
+            # indien twee of meer delen aanwezig zijn die wel lang genoeg zijn maar te ver uit elkaar liggen: langste overhouden
+            
+            try:
+                minLengte = round(min([z[0] for z in arcpy.da.SearchCursor ("kruinGroep", ["SHAPE@LENGTH"])]),2)
+                maxLengte = round(max([z[0] for z in arcpy.da.SearchCursor ("kruinGroep", ["SHAPE@LENGTH"])]),2)
+
+                profielCursorKruin = arcpy.da.UpdateCursor("kruinGroep",["NEAR_DIST","SHAPE@LENGTH"])
+
+                for pRow in profielCursorKruin:
+                    if (pRow[0] > afstandKruinSegment) and (round(pRow[1],2) == maxLengte):
+                        pass
+                    if (pRow[0] > afstandKruinSegment) and (round(pRow[1],2) < maxLengte):
+                        profielCursorKruin.deleteRow()
+
+                del profielCursorKruin
+            
+            except ValueError:
+                pass
 
 
-        
-        
-        # punten van lijnen maken
-        arcpy.FeatureVerticesToPoints_management("kruinGroep", "kruinGroepPunten", "BOTH_ENDS")
-        arcpy.AddField_management("kruinGroepPunten", "profielnummer", "DOUBLE", 2, field_is_nullable="NULLABLE")
-        tempCursor = arcpy.da.UpdateCursor("kruinGroepPunten","profielnummer")
-        for tRow in tempCursor:
-            tRow[0] = profielnummer
-            tempCursor.updateRow(tRow)
-
-        del tempCursor
-        # eindpunten overhouden door afstandberekening
-        arcpy.LocateFeaturesAlongRoutes_lr("kruinGroepPunten", refprofielen, "profielnummer", "0,1 Meters", "kruinTable", "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS", "M_DIRECTON")
-        arcpy.JoinField_management("kruinGroepPunten","OBJECTID","kruinTable","OBJECTID","MEAS")
-
-
-        try:
-            minMeas = round(min([z[0] for z in arcpy.da.SearchCursor ("kruinGroepPunten", ["MEAS"])]),2)
-            maxMeas = round(max([z[0] for z in arcpy.da.SearchCursor ("kruinGroepPunten", ["MEAS"])]),2)
-
-            eindMeas = [minMeas,maxMeas]
-
-            tempCursor = arcpy.da.UpdateCursor("kruinGroepPunten",["profielnummer","MEAS"])
+            
+            
+            # punten van lijnen maken
+            arcpy.FeatureVerticesToPoints_management("kruinGroep", "kruinGroepPunten", "BOTH_ENDS")
+            arcpy.AddField_management("kruinGroepPunten", "profielnummer", "DOUBLE", 2, field_is_nullable="NULLABLE")
+            tempCursor = arcpy.da.UpdateCursor("kruinGroepPunten","profielnummer")
             for tRow in tempCursor:
-                if round(tRow[1],2) in eindMeas:
-                    pass
-                else:
-                    tempCursor.deleteRow()
+                tRow[0] = profielnummer
+                tempCursor.updateRow(tRow)
 
             del tempCursor
+            # eindpunten overhouden door afstandberekening
+            arcpy.LocateFeaturesAlongRoutes_lr("kruinGroepPunten", refprofielen, "profielnummer", "0,1 Meters", "kruinTable", "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS", "M_DIRECTON")
+            arcpy.JoinField_management("kruinGroepPunten","OBJECTID","kruinTable","OBJECTID","MEAS")
 
-            # lijn maken van afstandpunten
-            arcpy.PointsToLine_management("kruinGroepPunten", "kruinGroepLijn", "", "", "NO_CLOSE")
 
-            # lijn toevoegen aan kruindelen met insertcursor
-            kruinDeel = [z[0] for z in arcpy.da.SearchCursor ("kruinGroepLijn", ["SHAPE@"])][0]
-            maxBreedte = [z[0] for z in arcpy.da.SearchCursor ("kruinGroepLijn", ["SHAPE@LENGTH"])][0]
+            try:
+                minMeas = round(min([z[0] for z in arcpy.da.SearchCursor ("kruinGroepPunten", ["MEAS"])]),2)
+                maxMeas = round(max([z[0] for z in arcpy.da.SearchCursor ("kruinGroepPunten", ["MEAS"])]),2)
 
-            kruindelenCursor.insertRow([profielnummer, maxBreedte, kruinDeel])
-            
-            
+                eindMeas = [minMeas,maxMeas]
 
-        except ValueError:
-            pass
+                tempCursor = arcpy.da.UpdateCursor("kruinGroepPunten",["profielnummer","MEAS"])
+                for tRow in tempCursor:
+                    if round(tRow[1],2) in eindMeas:
+                        pass
+                    else:
+                        tempCursor.deleteRow()
 
-    
-    del kruinCursor
-    print "Kruinvlak bepaald"
+                del tempCursor
+
+                # lijn maken van afstandpunten
+                arcpy.PointsToLine_management("kruinGroepPunten", "kruinGroepLijn", "", "", "NO_CLOSE")
+
+                # lijn toevoegen aan kruindelen met insertcursor
+                kruinDeel = [z[0] for z in arcpy.da.SearchCursor ("kruinGroepLijn", ["SHAPE@"])][0]
+                maxBreedte = [z[0] for z in arcpy.da.SearchCursor ("kruinGroepLijn", ["SHAPE@LENGTH"])][0]
+
+                kruindelenCursor.insertRow([profielnummer, maxBreedte, kruinDeel])
+                
+                
+
+            except ValueError:
+                pass
+
+        
+        del kruinCursor
+        print "Kruinvlak bepaald voor {} ".format(trajectnaam)
+        return "kruindelenTraject"
+    else:
+        print "Onvoldoende hoogte voor berekeningen {} ".format(trajectnaam)
+        return "stop"
+
+        
  
 
 
 
-def maak_referentieprofielen(profielen,refprofielen,rasterWaterstaatswerk,toetsniveau, minKruinBreedte,refprofielenpunten):
-    # maak kruinpunten 
-    arcpy.FeatureVerticesToPoints_management("kruindelenTraject", "kruindelenTrajectEindpunten", "BOTH_ENDS")
+def maak_referentieprofielen(profielen,refprofielen,rasterWaterstaatswerk,toetsniveau, minKruinBreedte,refprofielenpunten,kruindelentraject,ondergrensReferentie,trajectnaam):
+    ## 1 maak kruinpunten 
+    arcpy.FeatureVerticesToPoints_management(kruindelentraject, "kruindelenTrajectEindpunten", "BOTH_ENDS")
 
-    # lokaliseer kruinpunten op profielroute
+    ## 2  lokaliseer kruinpunten op profielroute
     arcpy.LocateFeaturesAlongRoutes_lr("kruindelenTrajectEindpunten", refprofielen, "profielnummer", "0,1 Meters", "kruindelenTable", "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS", "M_DIRECTON")
     arcpy.JoinField_management("kruindelenTrajectEindpunten","OBJECTID","kruindelenTable","OBJECTID","MEAS")
 
-    # onderscheid maken binnen/buitenkant
+    # 3 onderscheid maken binnen/buitenkant
     arcpy.AddField_management("kruindelenTrajectEindpunten","locatie","TEXT", field_length=50)
     arcpy.AddField_management("kruindelenTrajectEindpunten","z_ref","DOUBLE", 2, field_is_nullable="NULLABLE")
     arcpy.AddField_management("kruindelenTrajectEindpunten","profielnummer_str","TEXT", field_length=50)
@@ -284,8 +300,9 @@ def maak_referentieprofielen(profielen,refprofielen,rasterWaterstaatswerk,toetsn
     
     
     
-    # invoegen eindpunten refprofiel:
-    # ophalen measwaarde kruinpunt buiten: binnen = - 106,5 (105+1,5m profielbreedte), buiten = +30
+    ## 4 invoegen van eindpunten voor referentieprofiel, vanuit landzijde
+    # z_ref eindpunten = toetsniveau -15m, z_ref kruin= toetsniveau, kruinbreedte = minkruinbreedte.
+    # offset eindpunt binnen = 105 (15*1:7), offset buiten = 1.5+(15*1:2)
 
     if arcpy.Exists("refProfielTabel"):
         arcpy.Delete_management("refProfielTabel")
@@ -328,13 +345,13 @@ def maak_referentieprofielen(profielen,refprofielen,rasterWaterstaatswerk,toetsn
     del refPuntenCursor
 
     
-    # # losse route per profiel maken
+    ## 5 losse route per profiel maken
 
     arcpy.MakeRouteEventLayer_lr(refprofielen, "profielnummer", "refProfielTabel", "profielnummer POINT afstand", "temproutelayer", "", "NO_ERROR_FIELD", "NO_ANGLE_FIELD", "NORMAL", "ANGLE", "LEFT", "POINT")
     arcpy.CopyFeatures_management("temproutelayer", refprofielenpunten)
     arcpy.Delete_management("temproutelayer")
 
-    # # koppelen hoogtewaardes
+    ## 6 koppelen hoogtewaardes
     arcpy.AddField_management("refProfielenPunten","z_ref", "DOUBLE", 2, field_is_nullable="NULLABLE")
 
     refPuntenCursor = arcpy.da.UpdateCursor("refProfielenPunten",["locatie","z_ref"])
@@ -343,33 +360,28 @@ def maak_referentieprofielen(profielen,refprofielen,rasterWaterstaatswerk,toetsn
         if "kruinpunt" in rRow[0]:
             rRow[1] = toetsniveau
         if "eindpunt" in rRow[0]:
-            rRow[1] = -15
+            rRow[1] = toetsniveau-ondergrensReferentie
         
         refPuntenCursor.updateRow(rRow)
 
     del refPuntenCursor
 
 
-    print "Referentieprofielen gemaakt"
+    print "Referentieprofielen gemaakt voor {}".format(trajectnaam)
 
-def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG,kruinpunten,plotmap):
+def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kruinpunten,plotmap,trajectnaam):
 
-    # maken van bandbreedtepunten (totaal)
+    ## 1 maken van bandbreedtepunten (totaal)
 
     # eindpunten van profielen
     arcpy.FeatureVerticesToPoints_management(profielen, "grensRivierzijde", "END")
 
-
-
-
     whereKruin = '"' + 'locatie' + '" = ' + "'" + "kruin binnenzijde" + "'"
     arcpy.Select_analysis("kruindelenTrajectEindpunten", "grensLandzijde", whereKruin)
 
-
-    
     arcpy.Merge_management(["grensLandzijde","grensRivierzijde"],"grensPunten")
 
-    # ref_afstand toevoegen voor koppeling df
+    # velden bewerken voor koppeling df
     fields = [f.name for f in arcpy.ListFields("grensPunten")]
 
     for field in fields:
@@ -388,18 +400,12 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG,k
 
     for gRow in grensCursor:
         gRow[1] = "profiel_"+str(int(gRow[0]))
-
         grensCursor.updateRow(gRow)
-
 
     del grensCursor
 
 
-
-
-
-
-    # stringveld aanmaken voor profielen en refprofielen voor individuele selectie
+    ## 2 stringveld aanmaken voor profielen en refprofielen voor individuele selectie
     arcpy.AddField_management(profielen,"profielnummer_str","TEXT", field_length=50)
     arcpy.AddField_management(refprofielen,"profielnummer_str","TEXT", field_length=50)
     arcpy.AddField_management(refprofielenpunten,"profielnummer_str","TEXT", field_length=50)
@@ -432,7 +438,7 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG,k
     del profielCursor
 
 
-    # ref_afstand toevoegen voor koppeling df
+    ## 3 ref_afstand toevoegen voor koppeling df
     fields = [f.name for f in arcpy.ListFields(refprofielenpunten)]
 
     if "afstand_ref" in fields:
@@ -450,20 +456,18 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG,k
 
     
 
-    # maak kruinpunten (punten, insertcursor)
+    ## 4 maak kruinpunten voor terugkoppeling locatie kruin
     sr = arcpy.SpatialReference(28992)
     arcpy.CreateFeatureclass_management(workspace, kruinpunten, "POINT",spatial_reference= sr)
     arcpy.AddField_management(kruinpunten,"profielnummer","DOUBLE", 2, field_is_nullable="NULLABLE")
     arcpy.AddField_management(kruinpunten,"afstand","DOUBLE", 2, field_is_nullable="NULLABLE")
     kruinpuntenCursor = arcpy.da.InsertCursor(kruinpunten, ["profielnummer","afstand","SHAPE@"])
 
-    # per profielnummer refprofielplotten en gewone profiel plotten
+    ## 5 per profiel verder werken
 
     with arcpy.da.SearchCursor(profielen,["SHAPE@","profielnummer_str"]) as profielCursor:
         for pRow in profielCursor:
 
-            # ## tijdelijk!!##
-            # if pRow[1] == "profiel_2":
 
             profielnummer = pRow[1]
             tempprofiel = "tempprofiel"
@@ -475,26 +479,22 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG,k
             where = '"' + 'profielnummer_str' + '" = ' + "'" + profielnummer + "'"
             arcpy.Select_analysis(profielen, tempprofiel, where)
 
+
             # selecteer referentiepunten van betreffend profiel en kopieer naar tijdelijke laag
             arcpy.Select_analysis(refprofielenpunten, temprefpunten, where)
-            
-            arcpy.JoinField_management(temprefpunten,"profielnummer","kruindelenTraject","profielnummer","maxBreedte")
+            # arcpy.JoinField_management(temprefpunten,"profielnummer","kruindelenTraject","profielnummer","maxBreedte")
+
 
             # selecteer betreffend referentieprofiel voor localisatie profielpunten
             arcpy.Select_analysis(refprofielen, temprefprofiel, where)
 
+
             # selecteer betreffende kruinpunten(bandbreedte) voor localisatie
             arcpy.Select_analysis("grensPunten", tempbandbreedte, where)
 
-      
+    
 
-            
-
-
-
-
-
-            # creer routes voor punten profiel
+            # creer routes voor punten profiel, dit is het echte profiel en NIET het refprofiel...! 
             arcpy.AddField_management(tempprofiel,"van","DOUBLE", 2, field_is_nullable="NULLABLE")
             arcpy.AddField_management(tempprofiel,"tot","DOUBLE", 2, field_is_nullable="NULLABLE")
             
@@ -508,7 +508,7 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG,k
             del tempCursor
             arcpy.CreateRoutes_lr(tempprofiel, "profielnummer_str", 'tempRoute',"TWO_FIELDS", "van", "tot", "UPPER_LEFT", "1", "0", "IGNORE", "INDEX")
 
-            # creer routes voor refprofiel
+            # creer routes voor refprofiel, hierop wordt uiteindelijk alles gelokaliseerd 
             arcpy.AddField_management(temprefprofiel,"van","DOUBLE", 2, field_is_nullable="NULLABLE")
             arcpy.AddField_management(temprefprofiel,"tot","DOUBLE", 2, field_is_nullable="NULLABLE")
             
@@ -524,12 +524,6 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG,k
 
 
 
-
-
-
-
-
-
             # profiel voorzien van z-waardes op afstand van 0.5 m
             arcpy.GeneratePointsAlongLines_management("tempRoute", "puntenRoute", "DISTANCE", Distance= 0.5)
         
@@ -539,15 +533,13 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG,k
             arcpy.AlterField_management("puntenRoute", 'MEAS', 'afstand')
 
 
-
             # z-waarde aan profielpunten koppelen (indien aanwezig)
             arcpy.CheckOutExtension("Spatial")
-            ExtractValuesToPoints("puntenRoute", rasterAHNBAG, "puntenRouteZ","INTERPOLATE", "VALUE_ONLY")
+            ExtractValuesToPoints("puntenRoute", hoogtedata, "puntenRouteZ","INTERPOLATE", "VALUE_ONLY")
             arcpy.AlterField_management("puntenRouteZ", 'RASTERVALU', 'z_ahn')
 
 
-
-            # puntenroutez
+            # afstand afronden op .05 m om koppeling te garanderen in df
             tempCursor = arcpy.da.UpdateCursor("puntenRouteZ", ["afstand"])
             for tRow in tempCursor:
                 tRow[0] = round(tRow[0] * 2) / 2
@@ -568,27 +560,32 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG,k
             
 
 
-            # plotten 
-            arrayRefProfile = arcpy.da.FeatureClassToNumPyArray("temprefpunten", ('profielnummer','afstand','afstand_ref','z_ref'))
-            refDf = pd.DataFrame(arrayRefProfile)
-            sortrefDf = refDf.sort_values(by=['profielnummer','afstand_ref'],ascending=[True, True])
+            ## plotten 
 
+            
+            # gewone profiel
             arrayProfile = arcpy.da.FeatureClassToNumPyArray("puntenRouteZ", ('afstand','z_ahn'))
             profileDf = pd.DataFrame(arrayProfile)
             sortProfileDf = profileDf.sort_values(by=['afstand'],ascending=[True])
 
+            # referentieprofiel
+            arrayRefProfile = arcpy.da.FeatureClassToNumPyArray("temprefpunten", ('profielnummer','afstand','afstand_ref','z_ref'))
+            refDf = pd.DataFrame(arrayRefProfile)
+            sortrefDf = refDf.sort_values(by=['profielnummer','afstand_ref'],ascending=[True, True])
 
+            # bandbreedte
             arrayBandbreedte = arcpy.da.FeatureClassToNumPyArray(tempbandbreedte, ('afstand','z_ref'))
             bandbreedteDf = pd.DataFrame(arrayBandbreedte)
             sortBandbreedteDf = bandbreedteDf.sort_values(by=['afstand'], ascending =[True])
 
+            # plotbereik instellen
             minPlotX = sortProfileDf['afstand'].min()-10
             maxPlotX = sortProfileDf['afstand'].max()+10
             minPlotY = sortProfileDf['z_ahn'].min()
             maxPlotY = sortProfileDf['z_ahn'].max()
 
 
-
+            # minimale en maximale afstanden bepalen voor opbouw basisdataframe
             minList = [sortProfileDf['afstand'].min(),sortrefDf['afstand'].min()]
             maxList = [sortProfileDf['afstand'].max(),sortrefDf['afstand_ref'].max()]
             minAfstand = min(minList)
@@ -599,24 +596,22 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG,k
             baseSeries = pd.Series(baseList) 
 
 
-
-
-            # heropbouw 
+            # opbouw dataframe
             frame = {'afstand': baseSeries} 
             baseDf = pd.DataFrame(frame) 
 
+            # koppelen dataframes profielen en refprofielen
             baseMerge1 = baseDf.merge(sortProfileDf, on=['afstand'],how='outer')
             baseMerge2 = baseMerge1.merge(sortrefDf, on=['afstand'],how='outer')
             
-            
-
+            # verschil bepalen tussen gewone profiel en referentieprofiel
             firstAfstand = baseMerge2['afstand_ref'].first_valid_index()
             lastAfstand = baseMerge2['afstand_ref'].last_valid_index()
             baseMerge2.loc[firstAfstand:lastAfstand, 'afstand_ref'] = baseMerge2.loc[firstAfstand:lastAfstand, 'afstand_ref'].interpolate()
             baseMerge2.loc[firstAfstand:lastAfstand, 'z_ref'] = baseMerge2.loc[firstAfstand:lastAfstand, 'z_ref'].interpolate()
             baseMerge2['difference'] = baseMerge2.z_ahn - baseMerge2.z_ref
             
-
+            # plot opbouwen
             plt.style.use('seaborn-whitegrid') #seaborn-ticks
             fig = plt.figure(figsize=(80, 10))
             ax1 = fig.add_subplot(111, label ="1")
@@ -625,37 +620,24 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG,k
             ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'],label="Initieel referentieprofiel",color="orange",linewidth=3.5)
 
 
-
+            # bandbreedte plotten
             try:
                 leftBorder = sortBandbreedteDf.iloc[0]['afstand']
                 rightBorder = sortBandbreedteDf.iloc[1]['afstand']
 
-
-                
                 ax1.axvline(leftBorder, color='coral', linestyle=':',linewidth=3,label="Iteratiegrens landzijde")
                 ax1.axvline(rightBorder, color='seagreen', linestyle=':',linewidth=3, label="Iteratiegrens boezemzijde")
 
             except IndexError:
                 pass
 
-
-
-
             
-        
+            # itereren tot referentieprofiel past, indien mogelijk en nodig
             iteraties = 1
             maxBreedte = abs(sortBandbreedteDf['afstand'].max() - sortBandbreedteDf['afstand'].min())
-           
-          
-
             resterend = round(maxBreedte* 2) / 2 - minKruinBreedte
-            
-
             test = (baseMerge2['difference'] < 0).values.any()
-
                  
-    
-
             while test == True and resterend > 0:
 
                 print "Iteratie {}".format(iteraties)
@@ -668,19 +650,12 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG,k
 
                 iteraties += 1
                 resterend -= 0.5
-
                 print resterend
 
-            
-
-            # ax1.plot(baseMerge2['afstand'],baseMerge2['z_ahn'])
-            # ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'],'--',label="Uiteindelijk referentieprofiel")
 
 
-            # terugkoppelen wel/niet gefit
-
+            # terugkoppelen of fit wel/niet gelukt is 
             oordeelCursor = arcpy.da.UpdateCursor(profielen,["profielnummer_str","geometrieOordeel"])
-
             for oRow in oordeelCursor:
                 if oRow[0] == profielnummer:
 
@@ -689,7 +664,6 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG,k
                     
                     if test == False:
                         oRow[1] = "Voldoende"
-                 
                 
                     oordeelCursor.updateRow(oRow)
 
@@ -697,6 +671,7 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG,k
 
             # kruinlocatie als punt weergeven indien gefit
             if test == False:
+                # plot groen profiel, profiel past
                 ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'],'--',label="Passend referentieprofiel", color="green",linewidth=3.5)
                 kruinHoogte = baseMerge2['z_ref'].max()
                 kruinDeel = baseMerge2.loc[baseMerge2['z_ref'] == kruinHoogte]
@@ -706,13 +681,11 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG,k
 
 
 
-
                 arcpy.CreateTable_management(workspace, "kruinpuntTable", "", "")
                 arcpy.AddField_management("kruinpuntTable","profielnummer_str", "TEXT", field_length=50)
                 arcpy.AddField_management("kruinpuntTable","afstand","DOUBLE", 2, field_is_nullable="NULLABLE")
 
                 kruinTabelCursor = arcpy.da.InsertCursor("kruinpuntTable", ["profielnummer_str","afstand"])
-                
             
                 kruinTabelCursor.insertRow([profielnummer,kruinMidden])
 
@@ -733,32 +706,19 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG,k
                 del geom
             
                 # einde kruinlocatie
+           
+            
             if test == True:
+                # plot rood profiel, profiel past niet
                 ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'],'--',label="Niet-passend referentieprofiel", color="red",linewidth=3.5)
 
-         
-    
-
-
-
-        
-
-
-       
-
             
 
-
-            
-        
-
-
-       
-            
-
-            
+            # verdere plotinstellingen
             plt.xlim(minPlotX, maxPlotX)
             plt.ylim(minPlotY, maxPlotY)
+            
+            # legenda aanzetten
             ax1.legend(frameon=False, loc='upper right',prop={'size': 20})
 
             # plt.show()
@@ -770,31 +730,10 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,rasterAHNBAG,k
 
             print profielnummer
      
-
-
-            
+    
     del kruinpuntenCursor
 
-
-
-          
-
-
-
-
-
-
- 
-
-
-
-
-    
-
-
-
-
-
+    print "Indien mogelijk referentieprofielen gefit voor {}".format(trajectnaam)
 
 
 
@@ -821,16 +760,19 @@ with arcpy.da.SearchCursor(trajectenHDSR,['SHAPE@',code_hdsr,toetsniveaus]) as c
 
 
       
-        # maak_profielen(trajectlijn=trajectlijn,code=code,toetsniveau=toetsniveau,profielen=profielen, refprofielen=refprofielen, bgt_waterdeel_boezem=waterlopenBGTBoezem)
+        maak_basisprofielen(trajectlijn=trajectlijn,code=code,toetsniveau=toetsniveau,profielen=profielen, refprofielen=refprofielen, bgt_waterdeel_boezem=waterlopenBGTBoezem,trajectnaam=id)
 
       
         
+        hoogtetest = bepaal_kruinvlak_toetsniveau(trajectlijn=trajectlijn,hoogtedata=rasterAHN3BAG2m,toetsniveau=toetsniveau,profielen=profielen,refprofielen=refprofielen,trajectnaam=id)
 
-        # bepaal_kruinvlak_toetsniveau(trajectlijn=trajectlijn,rasterWaterstaatswerk=rasterWaterstaatswerk,toetsniveau=toetsniveau,profielen=profielen,refprofielen=refprofielen)
+        if hoogtetest == "stop":
+            break
 
-        # maak_referentieprofielen(profielen=profielen,refprofielen=refprofielen, rasterWaterstaatswerk=rasterWaterstaatswerk,toetsniveau=toetsniveau,minKruinBreedte=minKruinBreedte,refprofielenpunten= refprofielenpunten)
-    
+        else: 
 
-        plotmap = maak_plotmap(baseFigures=baseFigures,trajectnaam = id)
+            maak_referentieprofielen(profielen=profielen,refprofielen=refprofielen, rasterWaterstaatswerk=rasterWaterstaatswerk,toetsniveau=toetsniveau,minKruinBreedte=minKruinBreedte,refprofielenpunten= refprofielenpunten,kruindelentraject=hoogtetest,ondergrensReferentie=ondergrensReferentie,trajectnaam=id)
 
-        fitten_refprofiel(profielen=profielen,refprofielen=refprofielen, refprofielenpunten=refprofielenpunten,rasterAHNBAG=rasterAHN3BAG2m,kruinpunten=kruinpunten,plotmap=plotmap)
+            plotmap = maak_plotmap(baseFigures=baseFigures,trajectnaam = id)
+
+            fitten_refprofiel(profielen=profielen,refprofielen=refprofielen, refprofielenpunten=refprofielenpunten,hoogtedata=rasterAHN3BAG2m,kruinpunten=kruinpunten,plotmap=plotmap,trajectnaam = id)

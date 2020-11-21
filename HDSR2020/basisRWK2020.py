@@ -78,7 +78,7 @@ def copy_trajectory_lr(trajectlijn,code):
         for shp, w in cursor:
             RightLine = CopyParallelR(shp, w)
             cursor.updateRow((RightLine, w))
-    print "Water- en landdelen gemaakt"
+    # print "Water- en landdelen gemaakt"
 
 # functie voor het bepalen van profielen op de trajectlijn
 def generate_profiles(profiel_interval,profiel_lengte_land,profiel_lengte_rivier,trajectlijn,code,toetspeil,profielen):
