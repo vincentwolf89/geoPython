@@ -22,7 +22,7 @@ baseFigures = r"C:/Users/Vincent/Desktop/demoGeomtoets/"
 
 
 
-trajectenHDSR = "testtraject4"
+trajectenHDSR = "testtraject5"
 afstandKruinSegment = 0.5 # maximale afstand die tussen kruinsegmenten mag zijn om samen te voegen
 minKruinBreedte = 1.5
 ondergrensReferentie = 15 # aantal m onder toetsniveau
@@ -468,13 +468,17 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
     with arcpy.da.SearchCursor(profielen,["SHAPE@","profielnummer_str"]) as profielCursor:
         for pRow in profielCursor:
 
+         
+
 
             profielnummer = pRow[1]
             tempprofiel = "tempprofiel"
             temprefpunten = "temprefpunten"
             temprefprofiel = "temprefprofiel"
             tempbandbreedte = "tempbandbreedte"
-            
+
+           
+                
             # selecteer betreffend profiel en kopieer naar tijdelijke laag
             where = '"' + 'profielnummer_str' + '" = ' + "'" + profielnummer + "'"
             arcpy.Select_analysis(profielen, tempprofiel, where)
@@ -630,15 +634,26 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
 
             except IndexError:
                 pass
+            
 
+            # check of referentiepunten aanwezig zijn
+            aantalRefpunten = int(arcpy.GetCount_management(temprefpunten)[0])
+            if aantalRefpunten > 0:
+                ingepastRefprofiel = True
+            if aantalRefpunten == 0:
+                ingepastRefprofiel = False
+
+            
             
             # itereren tot referentieprofiel past, indien mogelijk en nodig
             iteraties = 1
             maxBreedte = abs(sortBandbreedteDf['afstand'].max() - sortBandbreedteDf['afstand'].min())
             resterend = round(maxBreedte* 2) / 2 - minKruinBreedte
             test = (baseMerge2['difference'] < 0).values.any()
-                 
-            while test == True and resterend > 0:
+
+            
+                
+            while (test == True and ingepastRefprofiel == True) and resterend > 0:
 
                 print "Iteratie {}".format(iteraties)
 
@@ -662,15 +677,18 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
                     if test == True:
                         oRow[1] = "Onvoldoende"
                     
-                    if test == False:
+                    if test == False and ingepastRefprofiel == True:
                         oRow[1] = "Voldoende"
+
+                    if test == False and ingepastRefprofiel == False:
+                        oRow[1] = "Onvoldoende"
                 
                     oordeelCursor.updateRow(oRow)
 
             del oordeelCursor
 
             # kruinlocatie als punt weergeven indien gefit
-            if test == False:
+            if test == False and ingepastRefprofiel == True:
                 # plot groen profiel, profiel past
                 ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'],'--',label="Passend referentieprofiel", color="green",linewidth=3.5)
                 kruinHoogte = baseMerge2['z_ref'].max()
@@ -706,11 +724,14 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
                 del geom
             
                 # einde kruinlocatie
-           
+        
             
-            if test == True:
+            if test == True and ingepastRefprofiel == True:
                 # plot rood profiel, profiel past niet
                 ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'],'--',label="Niet-passend referentieprofiel", color="red",linewidth=3.5)
+
+            if test == False and ingepastRefprofiel == False:
+                pass
 
             
 
@@ -725,13 +746,13 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
 
             plt.savefig("{}/{}.png".format(plotmap,profielnummer))
             
-      
+    
             plt.close()
 
             print profielnummer
-     
-    
-    del kruinpuntenCursor
+        
+        
+        del kruinpuntenCursor
 
     print "Indien mogelijk referentieprofielen gefit voor {}".format(trajectnaam)
 
@@ -760,19 +781,19 @@ with arcpy.da.SearchCursor(trajectenHDSR,['SHAPE@',code_hdsr,toetsniveaus]) as c
 
 
       
-        maak_basisprofielen(trajectlijn=trajectlijn,code=code,toetsniveau=toetsniveau,profielen=profielen, refprofielen=refprofielen, bgt_waterdeel_boezem=waterlopenBGTBoezem,trajectnaam=id)
+        # maak_basisprofielen(trajectlijn=trajectlijn,code=code,toetsniveau=toetsniveau,profielen=profielen, refprofielen=refprofielen, bgt_waterdeel_boezem=waterlopenBGTBoezem,trajectnaam=id)
 
       
         
-        hoogtetest = bepaal_kruinvlak_toetsniveau(trajectlijn=trajectlijn,hoogtedata=rasterAHN3BAG2m,toetsniveau=toetsniveau,profielen=profielen,refprofielen=refprofielen,trajectnaam=id)
+        # hoogtetest = bepaal_kruinvlak_toetsniveau(trajectlijn=trajectlijn,hoogtedata=rasterAHN3BAG2m,toetsniveau=toetsniveau,profielen=profielen,refprofielen=refprofielen,trajectnaam=id)
 
-        if hoogtetest == "stop":
-            break
+        # if hoogtetest == "stop":
+        #     break
 
-        else: 
+        # else: 
 
-            maak_referentieprofielen(profielen=profielen,refprofielen=refprofielen, rasterWaterstaatswerk=rasterWaterstaatswerk,toetsniveau=toetsniveau,minKruinBreedte=minKruinBreedte,refprofielenpunten= refprofielenpunten,kruindelentraject=hoogtetest,ondergrensReferentie=ondergrensReferentie,trajectnaam=id)
+        #     maak_referentieprofielen(profielen=profielen,refprofielen=refprofielen, rasterWaterstaatswerk=rasterWaterstaatswerk,toetsniveau=toetsniveau,minKruinBreedte=minKruinBreedte,refprofielenpunten= refprofielenpunten,kruindelentraject=hoogtetest,ondergrensReferentie=ondergrensReferentie,trajectnaam=id)
 
-            plotmap = maak_plotmap(baseFigures=baseFigures,trajectnaam = id)
+        plotmap = maak_plotmap(baseFigures=baseFigures,trajectnaam = id)
 
-            fitten_refprofiel(profielen=profielen,refprofielen=refprofielen, refprofielenpunten=refprofielenpunten,hoogtedata=rasterAHN3BAG2m,kruinpunten=kruinpunten,plotmap=plotmap,trajectnaam = id)
+        fitten_refprofiel(profielen=profielen,refprofielen=refprofielen, refprofielenpunten=refprofielenpunten,hoogtedata=rasterAHN3BAG2m,kruinpunten=kruinpunten,plotmap=plotmap,trajectnaam = id)
