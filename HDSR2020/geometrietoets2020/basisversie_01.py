@@ -781,19 +781,19 @@ with arcpy.da.SearchCursor(trajectenHDSR,['SHAPE@',code_hdsr,toetsniveaus]) as c
 
 
       
-        # maak_basisprofielen(trajectlijn=trajectlijn,code=code,toetsniveau=toetsniveau,profielen=profielen, refprofielen=refprofielen, bgt_waterdeel_boezem=waterlopenBGTBoezem,trajectnaam=id)
+        maak_basisprofielen(trajectlijn=trajectlijn,code=code,toetsniveau=toetsniveau,profielen=profielen, refprofielen=refprofielen, bgt_waterdeel_boezem=waterlopenBGTBoezem,trajectnaam=id)
 
       
         
-        # hoogtetest = bepaal_kruinvlak_toetsniveau(trajectlijn=trajectlijn,hoogtedata=rasterAHN3BAG2m,toetsniveau=toetsniveau,profielen=profielen,refprofielen=refprofielen,trajectnaam=id)
+        hoogtetest = bepaal_kruinvlak_toetsniveau(trajectlijn=trajectlijn,hoogtedata=rasterAHN3BAG2m,toetsniveau=toetsniveau,profielen=profielen,refprofielen=refprofielen,trajectnaam=id)
 
-        # if hoogtetest == "stop":
-        #     break
+        if hoogtetest == "stop":
+            break
 
-        # else: 
+        else: 
 
-        #     maak_referentieprofielen(profielen=profielen,refprofielen=refprofielen, rasterWaterstaatswerk=rasterWaterstaatswerk,toetsniveau=toetsniveau,minKruinBreedte=minKruinBreedte,refprofielenpunten= refprofielenpunten,kruindelentraject=hoogtetest,ondergrensReferentie=ondergrensReferentie,trajectnaam=id)
+            maak_referentieprofielen(profielen=profielen,refprofielen=refprofielen, rasterWaterstaatswerk=rasterWaterstaatswerk,toetsniveau=toetsniveau,minKruinBreedte=minKruinBreedte,refprofielenpunten= refprofielenpunten,kruindelentraject=hoogtetest,ondergrensReferentie=ondergrensReferentie,trajectnaam=id)
 
-        plotmap = maak_plotmap(baseFigures=baseFigures,trajectnaam = id)
+            plotmap = maak_plotmap(baseFigures=baseFigures,trajectnaam = id)
 
-        fitten_refprofiel(profielen=profielen,refprofielen=refprofielen, refprofielenpunten=refprofielenpunten,hoogtedata=rasterAHN3BAG2m,kruinpunten=kruinpunten,plotmap=plotmap,trajectnaam = id)
+            fitten_refprofiel(profielen=profielen,refprofielen=refprofielen, refprofielenpunten=refprofielenpunten,hoogtedata=rasterAHN3BAG2m,kruinpunten=kruinpunten,plotmap=plotmap,trajectnaam = id)
