@@ -22,7 +22,7 @@ baseFigures = r"C:/Users/Vincent/Desktop/demoGeomtoets/"
 
 
 
-trajectenHDSR = "testtraject5"
+trajectenHDSR = "testtrajecten6"
 afstandKruinSegment = 0.5 # maximale afstand die tussen kruinsegmenten mag zijn om samen te voegen
 minKruinBreedte = 1.5
 ondergrensReferentie = 15 # aantal m onder toetsniveau
@@ -369,7 +369,7 @@ def maak_referentieprofielen(profielen,refprofielen,rasterWaterstaatswerk,toetsn
 
     print "Referentieprofielen gemaakt voor {}".format(trajectnaam)
 
-def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kruinpunten,plotmap,trajectnaam):
+def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kruinpunten,plotmap,trajectnaam,toetsniveau):
 
     ## 1 maken van bandbreedtepunten (totaal)
 
@@ -585,7 +585,12 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
             # plotbereik instellen
             minPlotX = sortProfileDf['afstand'].min()-10
             maxPlotX = sortProfileDf['afstand'].max()+10
+
+        
             minPlotY = sortProfileDf['z_ahn'].min()
+            # check of refprofiel zichtbaar is in plot
+            if minPlotY >= toetsniveau:
+                minPlotY = toetsniveau -2
             maxPlotY = sortProfileDf['z_ahn'].max()
 
 
@@ -611,6 +616,8 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
             # verschil bepalen tussen gewone profiel en referentieprofiel
             firstAfstand = baseMerge2['afstand_ref'].first_valid_index()
             lastAfstand = baseMerge2['afstand_ref'].last_valid_index()
+
+            # interpoleren van punten tussen de vier referentiepunten
             baseMerge2.loc[firstAfstand:lastAfstand, 'afstand_ref'] = baseMerge2.loc[firstAfstand:lastAfstand, 'afstand_ref'].interpolate()
             baseMerge2.loc[firstAfstand:lastAfstand, 'z_ref'] = baseMerge2.loc[firstAfstand:lastAfstand, 'z_ref'].interpolate()
             baseMerge2['difference'] = baseMerge2.z_ahn - baseMerge2.z_ref
@@ -796,4 +803,4 @@ with arcpy.da.SearchCursor(trajectenHDSR,['SHAPE@',code_hdsr,toetsniveaus]) as c
 
             plotmap = maak_plotmap(baseFigures=baseFigures,trajectnaam = id)
 
-            fitten_refprofiel(profielen=profielen,refprofielen=refprofielen, refprofielenpunten=refprofielenpunten,hoogtedata=rasterAHN3BAG2m,kruinpunten=kruinpunten,plotmap=plotmap,trajectnaam = id)
+            fitten_refprofiel(profielen=profielen,refprofielen=refprofielen, refprofielenpunten=refprofielenpunten,hoogtedata=rasterAHN3BAG2m,kruinpunten=kruinpunten,plotmap=plotmap,trajectnaam = id,toetsniveau=toetsniveau)
