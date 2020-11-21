@@ -127,7 +127,7 @@ def bepaal_kruinvlak_toetsniveau(trajectlijn,hoogtedata,toetsniveau,profielen,re
     arcpy.CopyFeatures_management("tempProfiellayer", "profielDelenOpBovenTn")
 
     ## 6 check of profieldelen "opBovenTn" aanwezig zijn
-    aantalOpBovenTn = arcpy.GetCount_management("profielDelenOpBovenTn")[0]
+    aantalOpBovenTn = int(arcpy.GetCount_management("profielDelenOpBovenTn")[0])
 
     if aantalOpBovenTn > 0:
     
