@@ -52,7 +52,7 @@ bgtWaterdelenTotaal = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_waterde
 bgtWegdelen = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_wegdeel"
 bgtWegdelenInritten = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_wegdeel_inritten"
 
-profielen = 'profielenTestGrecht'
+profielen = 'profiel3_117C1'
 code_hdsr = 'Naam'
 outputFigures = r"C:\Users\Vincent\Desktop\cPointsTest"
 
@@ -452,6 +452,8 @@ def voorbewerkingTest(profiel,trajectLijn):
         for item in taludDelenLos:
             # lijndeel naar punten
             tempTalud = item+"Point"
+
+           
             
             arcpy.FeatureVerticesToPoints_management(item, tempTalud, "BOTH_ENDS")
             # punten lokaliseren op route
@@ -472,27 +474,39 @@ def voorbewerkingTest(profiel,trajectLijn):
                     row[0] = row[1]
                     taludCursor.updateRow(row)
             del taludCursor
+
+          
+           
         
         
         
         ## controle op verloop toepassen
         buitenTaluds = []
         binnenTaluds = []
+        binnenTaludsTotaal = []
+        buitenTaludsTotaal = []
         for item in allTaludPoints:
             itemCursor = arcpy.da.SearchCursor(item,"locatie")
             for row in itemCursor:
                 if row[0] == "buitenzijde":
                     buitenTaluds.append(item)
+                    buitenTaludsTotaal.append(item)
                     break
                 if row[0]=="binnenzijde":
                     binnenTaluds.append(item)
+                    binnenTaludsTotaal.append(item)
                     break
 
   
         # controle verloop 
+       
         if binnenTaluds:
-            for talud in binnenTaluds:
 
+
+         
+            for talud in binnenTaludsTotaal:
+
+                
                 zList = [z[0] for z in arcpy.da.SearchCursor (talud, ["z_ahn"])] 
                 measList = [z[0] for z in arcpy.da.SearchCursor (talud, ["MEAS"])] 
                 maxZ = round(max(zList),2)
@@ -503,19 +517,30 @@ def voorbewerkingTest(profiel,trajectLijn):
                 
                 taludCursor = arcpy.da.SearchCursor(talud,["MEAS","z_ahn"])
                 taludCheck = False
-                for row in taludCursor:
-                    if (round(row[0],2) == minMeas) and (round(row[1],2) == minZ):
+                for tRow in taludCursor:
+                    if (round(tRow[0],2) == minMeas) and (round(tRow[1],2) == minZ):
                         taludCheck = True
-                    if (round(row[0],2) == maxMeas) and (round(row[1],2) == maxZ):
+                        break
+
+                    elif (round(tRow[0],2) == maxMeas) and (round(tRow[1],2) == maxZ):
                         taludCheck = True
+                        break
+
+                    else:
+                        taludCheck = False
+                        break
+
+
 
                 
-                if taludCheck is True:
+                if taludCheck == True:
                     pass
-                else:
+                if taludCheck == False:
                     arcpy.Delete_management(talud)
                     binnenTaluds.remove(talud)
                     print talud, " is verwijderd vanwege foutief verloop"
+
+                del taludCursor
 
             # vul schone lijst met lijnen zodat near kan worden toegepast
             # binnenTaludLijnen = []
@@ -606,7 +631,8 @@ def voorbewerkingTest(profiel,trajectLijn):
                 arcpy.Merge_management(binnenTaludLijnen, "binnenTaludLijnen")
 
         if buitenTaluds:
-            for talud in buitenTaluds:
+            for talud in buitenTaludsTotaal:
+                
 
                 zList = [z[0] for z in arcpy.da.SearchCursor (talud, ["z_ahn"])] 
                 measList = [z[0] for z in arcpy.da.SearchCursor (talud, ["MEAS"])] 
@@ -621,9 +647,15 @@ def voorbewerkingTest(profiel,trajectLijn):
                 for row in taludCursor:
                     if (round(row[0],2) == minMeas) and (round(row[1],2) == maxZ):
                         taludCheck = True
-                    if (round(row[0],2) == maxMeas) and (round(row[1],2) == minZ):
+                        break
+                    elif (round(row[0],2) == maxMeas) and (round(row[1],2) == minZ):
                         taludCheck = True
+                        break
+                    else:
+                        taludCheck = False
+                        break
 
+                
                 
                 if taludCheck is True:
                     pass
