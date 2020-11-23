@@ -1,3 +1,6 @@
+# lijsten met remove nog aanpassen!
+
+
 import arcpy
 import matplotlib.pyplot as plt 
 import pandas as pd
@@ -52,7 +55,7 @@ bgtWaterdelenTotaal = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_waterde
 bgtWegdelen = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_wegdeel"
 bgtWegdelenInritten = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_wegdeel_inritten"
 
-profielen = 'profiel3_117C1'
+profielen = 'profielenTestGrecht'
 code_hdsr = 'Naam'
 outputFigures = r"C:\Users\Vincent\Desktop\cPointsTest"
 
@@ -444,7 +447,9 @@ def voorbewerkingTest(profiel,trajectLijn):
     if taludDelenLos:
         allTaludPoints = []
         binnenTaludLijnen = []
+        binnenTaludLijnenTotaal = []
         buitenTaludLijnen = []
+        buitenTaludLijnenTotaal = []
 
         for item in taludDelenLos:
             allTaludPoints.append(item+"Point")
@@ -547,8 +552,9 @@ def voorbewerkingTest(profiel,trajectLijn):
             for talud in binnenTaluds:
                 taludLijn = talud.strip("Point")
                 binnenTaludLijnen.append(taludLijn)
+                binnenTaludLijnenTotaal.append(taludLijn)
             
-            for item in binnenTaludLijnen:
+            for item in binnenTaludLijnenTotaal:
                 arcpy.Near_analysis(item, binnenTaludLijnen, taludDistance, "NO_LOCATION", "NO_ANGLE", "PLANAR")
 
                 itemCursor = arcpy.da.SearchCursor(item,["NEAR_FID"])
@@ -669,8 +675,9 @@ def voorbewerkingTest(profiel,trajectLijn):
             for talud in buitenTaluds:
                 taludLijn = talud.strip("Point")
                 buitenTaludLijnen.append(taludLijn)
+                buitenTaludLijnenTotaal.append(taludLijn)
             
-            for item in buitenTaludLijnen:
+            for item in buitenTaludLijnenTotaal:
                 print item, "buitentalud"
                 arcpy.Near_analysis(item, buitenTaludLijnen, taludDistance, "NO_LOCATION", "NO_ANGLE", "PLANAR")
 
@@ -758,7 +765,7 @@ def voorbewerkingTest(profiel,trajectLijn):
     if binnenTaludLijnen:
         if len(binnenTaludLijnen) > 2: 
             print "Tweede samenvoeging uitvoeren binnekant met {} meter".format(taludDistance2)
-            for item in binnenTaludLijnen:
+            for item in binnenTaludLijnenTotaal:
                 arcpy.Near_analysis(item, binnenTaludLijnen, taludDistance2, "NO_LOCATION", "NO_ANGLE", "PLANAR")
 
                 itemCursor = arcpy.da.SearchCursor(item,["NEAR_FID"])
@@ -823,7 +830,7 @@ def voorbewerkingTest(profiel,trajectLijn):
         if len(buitenTaludLijnen) > 2: 
             print "Tweede samenvoeging uitvoeren buitenkant met {} meter".format(taludDistance2)
             print buitenTaludLijnen, "buitentaludlijnenlijst"
-            for item in buitenTaludLijnen:
+            for item in buitenTaludLijnenTotaal:
 
                 
 
@@ -991,11 +998,14 @@ def getBitBut(profiel):
     # binnenkant
     binnenkantCursor = arcpy.da.SearchCursor("taludLijnenBinnenkant",["SHAPE@","OID@"])
     taludDelenBinnenkantLijst = []
+    taludDelenBinnenkantLijstTotaal = []
+
     for row in binnenkantCursor:
         oid = int(row[1])
         name = "binnenTalud_{}".format(oid)
         arcpy.CopyFeatures_management(row[0], name)
         taludDelenBinnenkantLijst.append(name)
+        taludDelenBinnenkantLijstTotaal.append(name)
 
     binnenkantCheck = False
     if taludDelenBinnenkant > 1 and binnenkantCheck is False:
@@ -1003,7 +1013,7 @@ def getBitBut(profiel):
 
         
         # isect
-        for item in taludDelenBinnenkantLijst:
+        for item in taludDelenBinnenkantLijstTotaal:
             arcpy.Intersect_analysis([item,bgtWaterdelenTotaal], "isectTaluddeel", "ALL", "", "POINT")
             waterKruisingTD = int(arcpy.GetCount_management("isectTaluddeel").getOutput(0))
 
@@ -1025,11 +1035,13 @@ def getBitBut(profiel):
     # buitenkant
     buitenkantCursor = arcpy.da.SearchCursor("taludLijnenBuitenkant",["SHAPE@","OID@"])
     taludDelenBuitenkantLijst = []
+    taludDelenBuitenkantLijstTotaal = []
     for row in buitenkantCursor:
         oid = int(row[1])
         name = "buitenTalud_{}".format(oid)
         arcpy.CopyFeatures_management(row[0], name)
         taludDelenBuitenkantLijst.append(name)
+        taludDelenBuitenkantLijstTotaal.append(name)
 
     buitenkantCheck = False
     if taludDelenBuitenkant > 1 and buitenkantCheck is False:
@@ -1037,7 +1049,7 @@ def getBitBut(profiel):
 
         
         # isect
-        for item in taludDelenBuitenkantLijst:
+        for item in taludDelenBuitenkantLijstTotaal:
             arcpy.Intersect_analysis([item,bgtWaterdelenTotaal], "isectTaluddeel", "ALL", "", "POINT")
             waterKruisingTD = int(arcpy.GetCount_management("isectTaluddeel").getOutput(0))
 

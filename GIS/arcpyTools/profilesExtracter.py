@@ -32,7 +32,7 @@ profielen = "profielenLekWest"
 # defaultuitvoer
 invoerpunten = "punten_profielen"
 uitvoerpunten = "punten_profielen_z"
-excel = r'D:\Projecten\WSRL\safe\lekdata\uitvoerProfielen\profielenLekV2.xlsx'
+excel = r'D:\Projecten\WSRL\safe\lekdata\uitvoerProfielen\profielenLekV3.xlsx'
 veldnamen =['profielnummer', 'afstand', 'z_ahn', 'x', 'y']
 
 
