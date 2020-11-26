@@ -13,26 +13,26 @@ sys.path.append('HDSR2020')
 from basisRWK2020 import generate_profiles, copy_trajectory_lr, split_profielen
 
 arcpy.env.overwriteOutput = True
-arcpy.env.workspace = r"D:\Projecten\HDSR\2020\gisData\geomToets.gdb"
-workspace = r"D:\Projecten\HDSR\2020\gisData\geomToets.gdb"
+arcpy.env.workspace = r"D:\Projecten\HDSR\2020\gisData\geomtoetsTotaal.gdb"
+workspace = r"D:\Projecten\HDSR\2020\gisData\geomtoetsTotaal.gdb"
 
-baseFigures = r"C:/Users/Vincent/Desktop/demoGeomtoets/"
-
-
+baseFigures = r"C:/Users/Vincent/Desktop/geomtoetsTotaalV1/"
 
 
 
-trajectenHDSR = "testtrajecten6"
+
+
+trajectenHDSR = "rwk_noordwest"
 afstandKruinSegment = 0.5 # maximale afstand die tussen kruinsegmenten mag zijn om samen te voegen
 minKruinBreedte = 1.5
 ondergrensReferentie = 15 # aantal m onder toetsniveau
+profielInterval = 25
 code_hdsr = "Naam"
 toetsniveaus = "th2024"
-waterlopenBGTBoezem = "bgt_waterdeel_boezem"
-rasterWaterstaatswerk = "WWBAG2mPlusWaterlopenAHN3"
+waterlopenBGTBoezem = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_waterdeel_boezem"
 rasterAHN3BAG2m = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\BAG2mPlusWaterlopenAHN3"
 
-outputFigures = r"C:\Users\Vincent\Desktop\demoGeomtoets"
+#outputFigures = r"C:\Users\Vincent\Desktop\demoGeomtoets"
 
 
 def maak_plotmap(baseFigures,trajectnaam):
@@ -45,9 +45,9 @@ def maak_plotmap(baseFigures,trajectnaam):
     print "Plotmap gemaakt voor {}".format(trajectnaam)
 
 
-def maak_basisprofielen(trajectlijn,code,toetsniveau,profielen,refprofielen, bgt_waterdeel_boezem,trajectnaam):
+def maak_basisprofielen(trajectlijn,code,toetsniveau,profielen,refprofielen, bgt_waterdeel_boezem,trajectnaam,profiel_interval):
     ## 1 referentieprofielen maken
-    generate_profiles(profiel_interval=25,profiel_lengte_land=140,profiel_lengte_rivier=1000,trajectlijn=trajectlijn,code=code,
+    generate_profiles(profiel_interval=profiel_interval,profiel_lengte_land=140,profiel_lengte_rivier=1000,trajectlijn=trajectlijn,code=code,
     toetspeil=toetsniveau,profielen="tempRefProfielen")
     
     ## 2 normale profielen maken 
@@ -247,7 +247,7 @@ def bepaal_kruinvlak_toetsniveau(trajectlijn,hoogtedata,toetsniveau,profielen,re
 
 
 
-def maak_referentieprofielen(profielen,refprofielen,rasterWaterstaatswerk,toetsniveau, minKruinBreedte,refprofielenpunten,kruindelentraject,ondergrensReferentie,trajectnaam):
+def maak_referentieprofielen(profielen,refprofielen,toetsniveau, minKruinBreedte,refprofielenpunten,kruindelentraject,ondergrensReferentie,trajectnaam):
     ## 1 maak kruinpunten 
     arcpy.FeatureVerticesToPoints_management(kruindelentraject, "kruindelenTrajectEindpunten", "BOTH_ENDS")
 
@@ -656,11 +656,14 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
             iteraties = 1
             maxBreedte = abs(sortBandbreedteDf['afstand'].max() - sortBandbreedteDf['afstand'].min())
             resterend = round(maxBreedte* 2) / 2 - minKruinBreedte
-            test = (baseMerge2['difference'] < 0).values.any()
+            isectTest = (baseMerge2['difference'] < 0).values.any()
 
             
+
+            refKruin = baseMerge2.loc[baseMerge2['z_ref'] == toetsniveau]
+            refTest = refKruin['z_ahn'].isnull().values.any()
                 
-            while (test == True and ingepastRefprofiel == True) and resterend > 0:
+            while ((isectTest == True or refTest == True) and ingepastRefprofiel == True and resterend > 0):
 
                 print "Iteratie {}".format(iteraties)
 
@@ -668,26 +671,37 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
                 baseMerge2['z_ref'] = baseMerge2['z_ref'].shift(+1)
                 baseMerge2['difference'] = baseMerge2.z_ahn - baseMerge2.z_ref
                 
-                test = (baseMerge2['difference'] < 0).values.any()
+                isectTest = (baseMerge2['difference'] < 0).values.any()
 
                 iteraties += 1
                 resterend -= 0.5
                 print resterend
 
+                refKruin = baseMerge2.loc[baseMerge2['z_ref'] == toetsniveau]
 
+
+                # print kruinhoogte,"iteratie"
+                refTest = refKruin['z_ahn'].isnull().values.any()
+                
+               
+         
+            
 
             # terugkoppelen of fit wel/niet gelukt is 
             oordeelCursor = arcpy.da.UpdateCursor(profielen,["profielnummer_str","geometrieOordeel"])
             for oRow in oordeelCursor:
                 if oRow[0] == profielnummer:
 
-                    if test == True:
+                    if isectTest == True or refTest == True:
                         oRow[1] = "Onvoldoende"
                     
-                    if test == False and ingepastRefprofiel == True:
+                    if isectTest == False and refTest == False and ingepastRefprofiel == True:
                         oRow[1] = "Voldoende"
 
-                    if test == False and ingepastRefprofiel == False:
+                    if isectTest == False and ingepastRefprofiel == False:
+                        oRow[1] = "Onvoldoende"
+                    
+                    if refTest == False and ingepastRefprofiel == False:
                         oRow[1] = "Onvoldoende"
                 
                     oordeelCursor.updateRow(oRow)
@@ -695,7 +709,7 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
             del oordeelCursor
 
             # kruinlocatie als punt weergeven indien gefit
-            if test == False and ingepastRefprofiel == True:
+            if (isectTest == False and refTest == False and ingepastRefprofiel == True):
                 # plot groen profiel, profiel past
                 ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'],'--',label="Passend referentieprofiel", color="green",linewidth=3.5)
                 kruinHoogte = baseMerge2['z_ref'].max()
@@ -733,11 +747,11 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
                 # einde kruinlocatie
         
             
-            if test == True and ingepastRefprofiel == True:
+            if ((isectTest == True or refTest == True) and ingepastRefprofiel == True):
                 # plot rood profiel, profiel past niet
                 ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'],'--',label="Niet-passend referentieprofiel", color="red",linewidth=3.5)
 
-            if test == False and ingepastRefprofiel == False:
+            if (isectTest == False or refTest == False) and ingepastRefprofiel == False:
                 pass
 
             
@@ -757,9 +771,11 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
             plt.close()
 
             print profielnummer
+           
         
         
         del kruinpuntenCursor
+        
 
     print "Indien mogelijk referentieprofielen gefit voor {}".format(trajectnaam)
 
@@ -788,7 +804,7 @@ with arcpy.da.SearchCursor(trajectenHDSR,['SHAPE@',code_hdsr,toetsniveaus]) as c
 
 
       
-        maak_basisprofielen(trajectlijn=trajectlijn,code=code,toetsniveau=toetsniveau,profielen=profielen, refprofielen=refprofielen, bgt_waterdeel_boezem=waterlopenBGTBoezem,trajectnaam=id)
+        maak_basisprofielen(trajectlijn=trajectlijn,code=code,toetsniveau=toetsniveau,profielen=profielen, refprofielen=refprofielen, bgt_waterdeel_boezem=waterlopenBGTBoezem,trajectnaam=id,profiel_interval=profielInterval)
 
       
         
@@ -799,7 +815,7 @@ with arcpy.da.SearchCursor(trajectenHDSR,['SHAPE@',code_hdsr,toetsniveaus]) as c
 
         else: 
 
-            maak_referentieprofielen(profielen=profielen,refprofielen=refprofielen, rasterWaterstaatswerk=rasterWaterstaatswerk,toetsniveau=toetsniveau,minKruinBreedte=minKruinBreedte,refprofielenpunten= refprofielenpunten,kruindelentraject=hoogtetest,ondergrensReferentie=ondergrensReferentie,trajectnaam=id)
+            maak_referentieprofielen(profielen=profielen,refprofielen=refprofielen, toetsniveau=toetsniveau,minKruinBreedte=minKruinBreedte,refprofielenpunten= refprofielenpunten,kruindelentraject=hoogtetest,ondergrensReferentie=ondergrensReferentie,trajectnaam=id)
 
             plotmap = maak_plotmap(baseFigures=baseFigures,trajectnaam = id)
 

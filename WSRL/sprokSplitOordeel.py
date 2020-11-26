@@ -9,8 +9,8 @@ arcpy.env.workspace = r'D:\Projecten\WSRL\sterreschans_heteren\GIS\kaartmateriaa
 gdb = r'D:\Projecten\WSRL\sterreschans_heteren\GIS\kaartmateriaal.gdb'
 arcpy.env.overwriteOutput = True
 
-puntenOordeel ="basissom2025" #invoer uitvoerpunten
-outputOordeelLijn = "oordeel_basisssom2025_nieuw0" # uitvoer gesplitte trajectlijn
+puntenOordeel = r'C:\Users\Vincent\Desktop\eindoordelen_sh.gdb\dijkbasisregel_plus_cvoorland' #invoer uitvoerpunten
+outputOordeelLijn = "oordeel_dijkbasisregel_plus_cvoorland" # uitvoer gesplitte trajectlijn
 profielen = "profielen_sh"
 minTrajectLengte = 0
 trajectLijn = "trajectlijn_sh"
