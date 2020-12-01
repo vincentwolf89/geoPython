@@ -19,10 +19,10 @@ workspace = r"D:\Projecten\HDSR\2020\gisData\geomtoetsTotaal.gdb"
 baseFigures = r"C:/Users/Vincent/Desktop/geomtoetsTotaalV1/"
 
 
+  
 
 
-
-trajectenHDSR = "rwk_noordwest"
+trajectenHDSR = "rerun_rwk"
 afstandKruinSegment = 0.5 # maximale afstand die tussen kruinsegmenten mag zijn om samen te voegen
 minKruinBreedte = 1.5
 ondergrensReferentie = 15 # aantal m onder toetsniveau
@@ -54,6 +54,8 @@ def maak_basisprofielen(trajectlijn,code,toetsniveau,profielen,refprofielen, bgt
     generate_profiles(profiel_interval=25,profiel_lengte_land=40,profiel_lengte_rivier=1000,trajectlijn=trajectlijn,code=code,
     toetspeil=toetsniveau,profielen=profielen)
 
+
+
     ## 3 profielen knippen buitenzijde: BGT-waterdeel
     copy_trajectory_lr(trajectlijn=trajectlijn,code=code)
     split_profielen(profielen=profielen,trajectlijn=trajectlijn,code=code)
@@ -64,7 +66,7 @@ def maak_basisprofielen(trajectlijn,code,toetsniveau,profielen,refprofielen, bgt
     arcpy.MakeFeatureLayer_management("tempProfielenSplit", "tempProfiellayer") 
     
     # 3b selecteer deel uit splitsing dat snijdt met trajectlijn
-    arcpy.SelectLayerByLocation_management("tempProfiellayer", "INTERSECT", trajectlijn, "", "NEW_SELECTION", "NOT_INVERT")
+    arcpy.SelectLayerByLocation_management("tempProfiellayer", "INTERSECT", trajectlijn, "1 Meters", "NEW_SELECTION", "NOT_INVERT")
     arcpy.CopyFeatures_management("tempProfiellayer", "tempProfielen")
     ##
 
@@ -80,6 +82,14 @@ def maak_basisprofielen(trajectlijn,code,toetsniveau,profielen,refprofielen, bgt
     del profielCursor
     arcpy.CreateRoutes_lr("tempProfielen", "profielnummer", profielen,"TWO_FIELDS", "van", "tot", "UPPER_LEFT", "1", "0", "IGNORE", "INDEX")
     arcpy.AddField_management(profielen,"geometrieOordeel","TEXT", field_length=50)
+    
+    # veld voor trajectnaam toevoegen aan profielen
+    arcpy.AddField_management(profielen,"dijktraject", "TEXT", field_length=200)
+    tempCursor = arcpy.da.UpdateCursor(profielen,"dijktraject")
+    for tRow in tempCursor:
+        tRow[0] = trajectnaam
+        tempCursor.updateRow(tRow)
+    del tempCursor
 
     # 5 routes maken refprofielen
     profielCursor = arcpy.da.UpdateCursor("tempRefProfielen", ["van","tot","SHAPE@LENGTH"])
@@ -459,9 +469,10 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
     ## 4 maak kruinpunten voor terugkoppeling locatie kruin
     sr = arcpy.SpatialReference(28992)
     arcpy.CreateFeatureclass_management(workspace, kruinpunten, "POINT",spatial_reference= sr)
+    arcpy.AddField_management(kruinpunten,"dijktraject", "TEXT", field_length=200)
     arcpy.AddField_management(kruinpunten,"profielnummer","DOUBLE", 2, field_is_nullable="NULLABLE")
     arcpy.AddField_management(kruinpunten,"afstand","DOUBLE", 2, field_is_nullable="NULLABLE")
-    kruinpuntenCursor = arcpy.da.InsertCursor(kruinpunten, ["profielnummer","afstand","SHAPE@"])
+    kruinpuntenCursor = arcpy.da.InsertCursor(kruinpunten, ["dijktraject","profielnummer","afstand","SHAPE@"])
 
     ## 5 per profiel verder werken
 
@@ -740,7 +751,7 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
 
                 profielnummer_strip = profielnummer.strip("profielnummer_")
                 profielnummer_int = int(profielnummer_strip)
-                kruinpuntenCursor.insertRow([profielnummer_int,kruinMidden, geom])
+                kruinpuntenCursor.insertRow([trajectnaam,profielnummer_int,kruinMidden, geom])
 
                 del geom
             
@@ -757,8 +768,13 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
             
 
             # verdere plotinstellingen
-            plt.xlim(minPlotX, maxPlotX)
-            plt.ylim(minPlotY, maxPlotY)
+            try:
+                minPlotX, maxPlotX, minPlotY, maxPlotY
+                plt.xlim(minPlotX, maxPlotX)
+                plt.ylim(minPlotY, maxPlotY)
+
+            except ValueError:
+                pass
             
             # legenda aanzetten
             ax1.legend(frameon=False, loc='upper right',prop={'size': 20})

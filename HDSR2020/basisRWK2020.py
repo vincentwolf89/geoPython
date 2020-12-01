@@ -918,8 +918,8 @@ def split_profielen(profielen,trajectlijn,code):
 
     arcpy.SpatialJoin_analysis('profielsplits', rivierlijn, 'profieldeel_rivier', "JOIN_ONE_TO_ONE", "KEEP_COMMON",
                             fieldmappings,
-                            match_option="INTERSECT")
+                            match_option="INTERSECT",search_radius=3)
     arcpy.SpatialJoin_analysis('profielsplits', landlijn, 'profieldeel_land', "JOIN_ONE_TO_ONE", "KEEP_COMMON",
                             fieldmappings,
-                            match_option="INTERSECT")
+                            match_option="INTERSECT",search_radius=3)
 
