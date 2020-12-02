@@ -22,11 +22,13 @@ baseFigures = r"C:/Users/Vincent/Desktop/geomtoetsTotaalV1/"
   
 
 
-trajectenHDSR = "rerun_rwk"
+trajectenHDSR = "test239A2"
 afstandKruinSegment = 0.5 # maximale afstand die tussen kruinsegmenten mag zijn om samen te voegen
 minKruinBreedte = 1.5
 ondergrensReferentie = 15 # aantal m onder toetsniveau
 profielInterval = 25
+profiel_lengte_land = 40
+profiel_lengte_rivier = 1000
 code_hdsr = "Naam"
 toetsniveaus = "th2024"
 waterlopenBGTBoezem = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_waterdeel_boezem"
@@ -45,13 +47,13 @@ def maak_plotmap(baseFigures,trajectnaam):
     print "Plotmap gemaakt voor {}".format(trajectnaam)
 
 
-def maak_basisprofielen(trajectlijn,code,toetsniveau,profielen,refprofielen, bgt_waterdeel_boezem,trajectnaam,profiel_interval):
+def maak_basisprofielen(trajectlijn,code,toetsniveau,profielen,refprofielen, bgt_waterdeel_boezem,trajectnaam,profiel_interval,profiel_lengte_land,profiel_lengte_rivier):
     ## 1 referentieprofielen maken
     generate_profiles(profiel_interval=profiel_interval,profiel_lengte_land=140,profiel_lengte_rivier=1000,trajectlijn=trajectlijn,code=code,
     toetspeil=toetsniveau,profielen="tempRefProfielen")
     
     ## 2 normale profielen maken 
-    generate_profiles(profiel_interval=25,profiel_lengte_land=40,profiel_lengte_rivier=1000,trajectlijn=trajectlijn,code=code,
+    generate_profiles(profiel_interval=25,profiel_lengte_land=profiel_lengte_land,profiel_lengte_rivier=profiel_lengte_rivier,trajectlijn=trajectlijn,code=code,
     toetspeil=toetsniveau,profielen=profielen)
 
 
@@ -68,7 +70,97 @@ def maak_basisprofielen(trajectlijn,code,toetsniveau,profielen,refprofielen, bgt
     # 3b selecteer deel uit splitsing dat snijdt met trajectlijn
     arcpy.SelectLayerByLocation_management("tempProfiellayer", "INTERSECT", trajectlijn, "1 Meters", "NEW_SELECTION", "NOT_INVERT")
     arcpy.CopyFeatures_management("tempProfiellayer", "tempProfielen")
-    ##
+
+
+    arcpy.AddField_management("tempProfielen","objectid_str","TEXT", field_length=50)
+    arcpy.AddField_management("tempProfielen","profielnummer_str","TEXT", field_length=50)
+    tempCursor = arcpy.da.UpdateCursor("tempProfielen",["OBJECTID","objectid_str","profielnummer","profielnummer_str"])
+
+    for tRow in tempCursor:
+        profielnummer = str(int(tRow[2]))
+        tRow[3] = "profiel_"+profielnummer
+        
+        objectid = str(int(tRow[0]))
+        tRow[1] = "objectid_"+objectid
+        
+        tempCursor.updateRow(tRow)
+
+    del tempCursor
+
+    arcpy.AddField_management("traject_punten","profielnummer_str","TEXT", field_length=50)
+    tempCursor = arcpy.da.UpdateCursor("traject_punten",["profielnummer","profielnummer_str"])
+
+    for tRow in tempCursor:
+        profielnummer = str(int(tRow[0]))
+        tRow[1] = "profiel_"+profielnummer
+        tempCursor.updateRow(tRow)
+
+    del tempCursor
+
+
+    #3c selecteer profielen met meer dan 1 deel
+    dfCheck = pd.DataFrame(columns=['aantal_profieldelen'])
+    tempCursor = arcpy.da.UpdateCursor("tempProfielen",["objectid_str","profielnummer_str"])
+    for profielnummer, group in groupby(tempCursor, lambda x: x[1]):
+
+        aantalDelen = 0
+
+        for gRow in group:
+            aantalDelen += 1
+
+        dfCheck.loc[profielnummer] = aantalDelen
+    
+    del tempCursor
+    dfCheck = dfCheck.drop(dfCheck[dfCheck.aantal_profieldelen < 2].index)
+
+
+
+        
+
+
+
+    # 3d verwijder profielen zonder isect met boezem
+    tempCursor = arcpy.da.UpdateCursor("tempProfielen",["objectid_str","profielnummer_str"])
+    for tRow in tempCursor:
+        
+        objectid = tRow[0]
+        profielnummer = tRow[1]
+
+        if profielnummer in dfCheck.index:
+          
+
+            # # selecteer betreffend profiel en kopieer naar tijdelijke laag
+            where = '"' + 'objectid_str' + '" = ' + "'" + objectid + "'"
+            arcpy.Select_analysis("tempProfielen", "tempprofiel", where)
+            
+            
+            # selecteer trajectpunt en kopieer naar tijdelijke laag
+            where = '"' + 'profielnummer_str' + '" = ' + "'" + profielnummer + "'"
+            arcpy.Select_analysis("traject_punten", "profielrefpunt", where)
+
+            # isect, als 0 dan verwijderen
+            arcpy.Intersect_analysis(["tempprofiel","profielrefpunt"], "splitprofiellos", "ALL", "", "POINT")
+
+            isects = int(arcpy.GetCount_management("splitprofiellos")[0])
+            if isects == 0:
+                tempCursor.deleteRow()
+        else:
+            pass
+
+    del tempCursor
+
+    
+
+    # 3e verwijder profielen die niet afgesneden zijn
+    beginLengte = int(round(profiel_lengte_land+profiel_lengte_rivier,0))
+    tempCursor = arcpy.da.UpdateCursor("tempProfielen",["SHAPE@LENGTH"])
+    for tRow in tempCursor:
+        if int(round(tRow[0],0))== beginLengte:
+            tempCursor.deleteRow()
+        else:
+            pass
+    
+    del tempCursor
 
     # 4 routes maken normale profielen (dit is tevens de defintieve profielenlaag waaraan oordelen worden gekoppeld)
     profielCursor = arcpy.da.UpdateCursor("tempProfielen", ["van","tot","SHAPE@LENGTH"])
@@ -820,7 +912,7 @@ with arcpy.da.SearchCursor(trajectenHDSR,['SHAPE@',code_hdsr,toetsniveaus]) as c
 
 
       
-        maak_basisprofielen(trajectlijn=trajectlijn,code=code,toetsniveau=toetsniveau,profielen=profielen, refprofielen=refprofielen, bgt_waterdeel_boezem=waterlopenBGTBoezem,trajectnaam=id,profiel_interval=profielInterval)
+        maak_basisprofielen(trajectlijn=trajectlijn,code=code,toetsniveau=toetsniveau,profielen=profielen, refprofielen=refprofielen, bgt_waterdeel_boezem=waterlopenBGTBoezem,trajectnaam=id,profiel_interval=profielInterval,profiel_lengte_land=profiel_lengte_land,profiel_lengte_rivier=profiel_lengte_rivier)
 
       
         
