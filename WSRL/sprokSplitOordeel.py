@@ -5,15 +5,15 @@ from itertools import groupby
 
 # from basisfuncties import*
 
-arcpy.env.workspace = r'D:\Projecten\WSRL\sterreschans_heteren\GIS\kaartmateriaal.gdb'
-gdb = r'D:\Projecten\WSRL\sterreschans_heteren\GIS\kaartmateriaal.gdb'
+arcpy.env.workspace = r'C:\Users\Vincent\Desktop\pipingdata\gis.gdb'
+gdb = r'C:\Users\Vincent\Desktop\pipingdata\gis.gdb'
 arcpy.env.overwriteOutput = True
 
-puntenOordeel = r'C:\Users\Vincent\Desktop\eindoordelen_sh.gdb\dijkbasisregel_plus_cvoorland' #invoer uitvoerpunten
-outputOordeelLijn = "oordeel_dijkbasisregel_plus_cvoorland" # uitvoer gesplitte trajectlijn
-profielen = "profielen_sh"
+puntenOordeel = 'stph2075_gemiddeld_punten' #invoer uitvoerpunten
+outputOordeelLijn = "oordeel_gevoeligheid" # uitvoer gesplitte trajectlijn
+profielen = "profielenTotaal"
 minTrajectLengte = 0
-trajectLijn = "trajectlijn_sh"
+trajectLijn = r"D:\GoogleDrive\WSRL\safe_basis.gdb\dvIndelingSept2020"
 veldenOordeelPunten = ['Eindoordeel','profielnummer']
 veldenProfielen = ['profielnummer','eindoordeelPiping']
 lijstOnvoldoende = ["IVv", "Vv", "VIv","Voldoet niet vanwege dijkbasisregel"]

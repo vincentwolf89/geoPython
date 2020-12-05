@@ -14,7 +14,7 @@ from arcpy.sa import *
 arcpy.env.overwriteOutput = True
 
 
-taludValue = 0.06
+taludValue = 0.03
 taludDistance = "1 Meters"
 taludDistance2 = "1,5 Meters"
 pointDistance = 0.5
@@ -37,8 +37,8 @@ breedteSmal = 3
 
 
 # invoer hdsr
-workspaceProfielen = r"D:\Projecten\HDSR\2020\gisData\cPointsTest.gdb"
-arcpy.env.workspace = r"D:\Projecten\HDSR\2020\gisData\cPointsTest.gdb"
+workspaceProfielen = r"D:\Projecten\HDSR\2020\gisData\cPointsPilot.gdb"
+arcpy.env.workspace = r"D:\Projecten\HDSR\2020\gisData\cPointsPilot.gdb"
 
 
 
@@ -51,13 +51,14 @@ trajectenHDSR = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\RWK_areaal_2024"
 bgtPanden = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_pand"
 bgtWaterdelen = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_waterdeel"
 bgtWaterdelenOndersteunend = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_ondersteunendWaterdeel"
-bgtWaterdelenTotaal = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_waterdeel_totaal"
+bgtWaterdelenTotaal = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_waterdeel_totaal_testoevers"
 bgtWegdelen = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_wegdeel"
 bgtWegdelenInritten = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_wegdeel_inritten"
+waterstaatswerkHDSR = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\waterstaatswerkHDSR"
 
-profielen = 'profielenTestGrecht'
+profielen = 'profielenPilot'
 code_hdsr = 'Naam'
-outputFigures = r"C:\Users\Vincent\Desktop\cPointsTest"
+outputFigures = r"C:\Users\Vincent\Desktop\cPointsPilot"
 
 
 # # invoer safe
@@ -154,7 +155,10 @@ def taludDelen(profiel):
     arcpy.gp.FocalStatistics_sa("testClip", "testClipFocal", "Rectangle 3 3 CELL", "MEAN", "DATA")
 
     # contour op focal
-    arcpy.Contour_3d("testClipFocal", "testClipFocalContour", "0,01", "0", "1")
+    arcpy.Contour_3d("testClipFocal", "testClipFocalContour", "0,005", "0", "1")
+
+    # test smooth
+    # arcpy.SmoothLine_cartography("testClipFocalContour", "testClipFocalContourSmooth", "PAEK", "5 Meters", "FIXED_CLOSED_ENDPOINT", "NO_CHECK")
 
     # intersect op profiel en focal
     arcpy.Intersect_analysis([profiel,"testClipFocalContour"], "testIsectFocal", "ALL", "", "POINT")
@@ -306,7 +310,7 @@ def taludDelen(profiel):
 
 
 
-def getKruin(profiel, trajectLijn): 
+def getKruin(profiel, trajectLijn,waterstaatswerkzone,hoogtedata): 
     ## aanpassing kruinbepalen:
     # intersect trajectlijn met profiel
     arcpy.Intersect_analysis([profiel,trajectLijn], "kruinPunt", "ALL", "", "POINT")
@@ -329,63 +333,149 @@ def getKruin(profiel, trajectLijn):
     for item in tempNEARList:
         nearFID = int(item)
 
-    arcpy.CopyFeatures_management("profielDelenVlak", "kruinLijn")
-    # select OBJECTID met NEAR_FID waarde uit profielDelenVlak
-    kruinCursor = arcpy.da.UpdateCursor("kruinLijn",["OBJECTID"])
-    for row in kruinCursor:
-        if int(row[0]) == nearFID:
-            pass
-        else:
-            kruinCursor.deleteRow()
+    
+    ## test
+    # selecteer alleen delen binnen waterstaatswerkzone
+    arcpy.MakeFeatureLayer_management("profielDelenVlak", "temp_profielDelenVlak") 
+   
+    arcpy.SelectLayerByLocation_management("temp_profielDelenVlak", "WITHIN", waterstaatswerkzone, "", "NEW_SELECTION", "NOT_INVERT")
+    arcpy.CopyFeatures_management("temp_profielDelenVlak", "profielDelenVlakWS")
+
+
+    # knip profieldelenvlak op grens bgtwaterlopen indien geen buitentalud
+    arcpy.Intersect_analysis(["profielDelenVlakWS",bgtWaterdelenTotaal], "isectProfielDelenVlakWS", "ALL", "", "POINT") 
+    profielDelenVlakWSIsects = int(arcpy.GetCount_management("isectProfielDelenVlakWS").getOutput(0))
+
+    if profielDelenVlakWSIsects > 0:
+        pass
+
+        arcpy.SplitLineAtPoint_management("profielDelenVlakWS", "isectProfielDelenVlakWS", "splitWS", 1)
+
+
+        arcpy.MakeFeatureLayer_management("splitWS", "temp_splitWS") 
+        arcpy.SelectLayerByLocation_management("temp_splitWS", "WITHIN", bgtWaterdelenTotaal, "", "NEW_SELECTION", "INVERT")
+        arcpy.CopyFeatures_management("temp_splitWS", "profielDelenVlakWS")
+    else:
+        pass
+
+
+
+
+    # maak middenpunten voor hoogtebepaling
+    arcpy.FeatureVerticesToPoints_management("profielDelenVlakWS", "profielDelenVlakWSMidPoints", "MID")
+
+    # koppel AHN3-waardes aan midpoints
+    arcpy.CheckOutExtension("Spatial")
+    ExtractValuesToPoints("profielDelenVlakWSMidPoints", hoogtedata, "profielDelenVlakWSMidPointsZ","INTERPOLATE", "VALUE_ONLY")
+    arcpy.AlterField_management("profielDelenVlakWSMidPointsZ", 'RASTERVALU', 'z_ahn')
+
+    # selecteer punt met hoogste waarde
+    arcpy.JoinField_management("profielDelenVlakWS","OBJECTID","profielDelenVlakWSMidPointsZ","OBJECTID","z_ahn")
+
+    try:
+        maxTaludZ = round(max([z[0] for z in arcpy.da.SearchCursor ("profielDelenVlakWS", ["z_ahn"])]),2)
+
+        tempCursor = arcpy.da.UpdateCursor("profielDelenVlakWS",["z_ahn","OBJECTID"],sql_clause=(None, 'ORDER BY z_ahn DESC'))
+        OIDkruinlijn = int(tempCursor.next()[1])
+        
+
+        for tRow in tempCursor:
+            if int(tRow[1]) == OIDkruinlijn:
+                pass
+
+            else:
+                tempCursor.deleteRow()
+
+        del tempCursor
+
+
+        # koppel met kruinlijn
+
+
+
+
+
+
+        ## einde test
+
+        # stond aan!!
+        arcpy.CopyFeatures_management("profielDelenVlakWS", "kruinLijn")
+        # select OBJECTID met NEAR_FID waarde uit profielDelenVlak
+        # kruinCursor = arcpy.da.UpdateCursor("kruinLijn",["OBJECTID"])
+        # for row in kruinCursor:
+        #     if int(row[0]) == nearFID:
+        #         pass
+        #     else:
+        #         kruinCursor.deleteRow()
+
+        ## einde stond aan!
 
     
-    # where = '"' + "OBJECTID" + '" = ' + "'" + str(nearFID) + "'"
-    # arcpy.Select_analysis("profielDelenVlak", "kruinLijn", where)
+  
 
 
-    # binnen- en buitenkruin bepalen (profielen liggen van binnen naar buiten)
-    arcpy.FeatureVerticesToPoints_management("kruinLijn", "binnenkruin", "START")
-    arcpy.FeatureVerticesToPoints_management("kruinLijn", "buitenkruin", "END")
+        # binnen- en buitenkruin bepalen (profielen liggen van binnen naar buiten)
+        arcpy.FeatureVerticesToPoints_management("kruinLijn", "binnenkruin", "START")
+        arcpy.FeatureVerticesToPoints_management("kruinLijn", "buitenkruin", "END")
 
-    # lokaliseer binnenkruin
-    arcpy.LocateFeaturesAlongRoutes_lr("binnenkruin", "testRoute", "rid", "0,1 Meters", "bitTable", "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS", "M_DIRECTON")
-    arcpy.JoinField_management("binnenkruin","OBJECTID","bitTable","OBJECTID","MEAS")
+        # lokaliseer binnenkruin
+        arcpy.LocateFeaturesAlongRoutes_lr("binnenkruin", "testRoute", "rid", "0,1 Meters", "bitTable", "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS", "M_DIRECTON")
+        arcpy.JoinField_management("binnenkruin","OBJECTID","bitTable","OBJECTID","MEAS")
 
-    # lokaliseer buitenkruin
-    arcpy.LocateFeaturesAlongRoutes_lr("buitenkruin", "testRoute", "rid", "0,1 Meters", "butTable", "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS", "M_DIRECTON")
-    arcpy.JoinField_management("buitenkruin","OBJECTID","butTable","OBJECTID","MEAS")
+        # lokaliseer buitenkruin
+        arcpy.LocateFeaturesAlongRoutes_lr("buitenkruin", "testRoute", "rid", "0,1 Meters", "butTable", "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS", "M_DIRECTON")
+        arcpy.JoinField_management("buitenkruin","OBJECTID","butTable","OBJECTID","MEAS")
 
 
-    
-    # voeg bikPunten toe aan profiel
-    bikCursor = arcpy.da.InsertCursor(outPath, ['cPoint','SHAPE@XY'])
-    xyBikList = [z[0] for z in arcpy.da.SearchCursor ("binnenkruin", ["SHAPE@XY"])]
-    for bikPunt in xyBikList:
-        iRow = ['binnenkruin', bikPunt]
-        print iRow, bikPunt
-        bikCursor.insertRow(iRow)
+        
+        # voeg bikPunten toe aan profiel
+        bikCursor = arcpy.da.InsertCursor(outPath, ['cPoint','SHAPE@XY'])
+        xyBikList = [z[0] for z in arcpy.da.SearchCursor ("binnenkruin", ["SHAPE@XY"])]
+        for bikPunt in xyBikList:
+            iRow = ['binnenkruin', bikPunt]
+            print iRow, bikPunt
+            bikCursor.insertRow(iRow)
 
-    del bikCursor
-    # voeg bukPunten toe aan profiel
-    bukCursor = arcpy.da.InsertCursor(outPath, ['cPoint','SHAPE@XY'])
-    xyBukList = [z[0] for z in arcpy.da.SearchCursor ("buitenkruin", ["SHAPE@XY"])]
-    for bukPunt in xyBukList:
-        iRow = ['buitenkruin', bukPunt]
-        print iRow, bukPunt
-        bukCursor.insertRow(iRow)
+        del bikCursor
+        # voeg bukPunten toe aan profiel
+        bukCursor = arcpy.da.InsertCursor(outPath, ['cPoint','SHAPE@XY'])
+        xyBukList = [z[0] for z in arcpy.da.SearchCursor ("buitenkruin", ["SHAPE@XY"])]
+        for bukPunt in xyBukList:
+            iRow = ['buitenkruin', bukPunt]
+            print iRow, bukPunt
+            bukCursor.insertRow(iRow)
 
-    del bukCursor
+        del bukCursor
+    except:
+        pass
 
 def testKruin(profiel):
-    arcpy.Merge_management(["binnenkruin","buitenkruin"],"kruinPunten")
 
-    # check of kruinpunten in waterdeel liggen, indien zo berekening afbreken
-    arcpy.Intersect_analysis(["kruinPunten",bgtWaterdelenTotaal], "kruinPuntenWater", "ALL", "", "POINT") 
-    snijpuntenKruinWater = int(arcpy.GetCount_management("kruinPuntenWater").getOutput(0))
-    if snijpuntenKruinWater is not 0:
-        return "STOP"
+    # probeer of binnenkruin en buitenkruin bestaan
+    binnenkruin = False
+    buitenkruin = False
+    if arcpy.Exists("binnenkruin"):
+        binnenkruin = True
+
+    if arcpy.Exists("buitenkruin"):
+        buitenkruin = True
+
+    if binnenkruin == True and buitenkruin == True:
+
+
+
+        arcpy.Merge_management(["binnenkruin","buitenkruin"],"kruinPunten")
+
+        # check of kruinpunten in waterdeel liggen, indien zo berekening afbreken
+        arcpy.Intersect_analysis(["kruinPunten",bgtWaterdelenTotaal], "kruinPuntenWater", "ALL", "", "POINT") 
+        snijpuntenKruinWater = int(arcpy.GetCount_management("kruinPuntenWater").getOutput(0))
+        if snijpuntenKruinWater is not 0:
+            return "STOP"
+        else:
+            return "DOORGAAN"
+
     else:
-        return "DOORGAAN"
+        return "STOP"
     
 
 def voorbewerkingTest(profiel,trajectLijn):
@@ -437,485 +527,496 @@ def voorbewerkingTest(profiel,trajectLijn):
     arcpy.CopyFeatures_management("temp_splitTaludLijnenTotaal", "taludLijnenProfielBasis")
 
     # controle op helling taluddelen
-    taludDelenLos = splitByAttributes("taludLijnenProfielBasis","groupNr")
+    try: 
+        taludDelenLos = splitByAttributes("taludLijnenProfielBasis","groupNr")
+   
+
 
 
     
-    print len(taludDelenLos), taludDelenLos
+   
 
-    # controle taluds
-    if taludDelenLos:
-        allTaludPoints = []
-        binnenTaludLijnen = []
-        binnenTaludLijnenTotaal = []
-        buitenTaludLijnen = []
-        buitenTaludLijnenTotaal = []
+        # controle taluds
+        if taludDelenLos:
+            allTaludPoints = []
+            binnenTaludLijnen = []
+            binnenTaludLijnenTotaal = []
+            buitenTaludLijnen = []
+            buitenTaludLijnenTotaal = []
 
-        for item in taludDelenLos:
-            allTaludPoints.append(item+"Point")
+            for item in taludDelenLos:
+                allTaludPoints.append(item+"Point")
 
-        for item in taludDelenLos:
-            # lijndeel naar punten
-            tempTalud = item+"Point"
+            for item in taludDelenLos:
+                # lijndeel naar punten
+                tempTalud = item+"Point"
 
-           
             
-            arcpy.FeatureVerticesToPoints_management(item, tempTalud, "BOTH_ENDS")
-            # punten lokaliseren op route
-            arcpy.LocateFeaturesAlongRoutes_lr(tempTalud, "testRoute", "rid", "0,1 Meters", "tempTaludTable", "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS", "M_DIRECTON")
-            arcpy.JoinField_management(tempTalud,"OBJECTID","tempTaludTable","OBJECTID","MEAS")
-
-            # hoogtewaarde aan punten koppelen
-            tempTaludZ = item+"PointZ"
-            arcpy.CheckOutExtension("Spatial")
-            ExtractValuesToPoints(tempTalud, hoogtedata, tempTaludZ,"INTERPOLATE", "VALUE_ONLY")
-            arcpy.AlterField_management(tempTaludZ, 'RASTERVALU', 'z_ahn')
-
-            # koppel aan contourwaardes en geef z-waarde contour-waarde indien niet aanwezig (raster nodata)
-            arcpy.SpatialJoin_analysis(tempTaludZ, "testIsectFocalPoint_", tempTalud, "JOIN_ONE_TO_ONE", "KEEP_ALL","","CLOSEST", "", "")
-            taludCursor = arcpy.da.UpdateCursor(tempTalud,["z_ahn","Contour"])
-            for row in taludCursor:
-                if row[0] == None:
-                    row[0] = row[1]
-                    taludCursor.updateRow(row)
-            del taludCursor
-
-          
-           
-        
-        
-        
-        ## controle op verloop toepassen
-        buitenTaluds = []
-        binnenTaluds = []
-        binnenTaludsTotaal = []
-        buitenTaludsTotaal = []
-        for item in allTaludPoints:
-            itemCursor = arcpy.da.SearchCursor(item,"locatie")
-            for row in itemCursor:
-                if row[0] == "buitenzijde":
-                    buitenTaluds.append(item)
-                    buitenTaludsTotaal.append(item)
-                    break
-                if row[0]=="binnenzijde":
-                    binnenTaluds.append(item)
-                    binnenTaludsTotaal.append(item)
-                    break
-
-  
-        # controle verloop 
-       
-        if binnenTaluds:
-
-
-         
-            for talud in binnenTaludsTotaal:
-
                 
-                zList = [z[0] for z in arcpy.da.SearchCursor (talud, ["z_ahn"])] 
-                measList = [z[0] for z in arcpy.da.SearchCursor (talud, ["MEAS"])] 
-                maxZ = round(max(zList),2)
-                minZ = round(min(zList),2)
-                maxMeas = round(max(measList),2)
-                minMeas = round(min(measList),2)
+                arcpy.FeatureVerticesToPoints_management(item, tempTalud, "BOTH_ENDS")
+                # punten lokaliseren op route
+                arcpy.LocateFeaturesAlongRoutes_lr(tempTalud, "testRoute", "rid", "0,1 Meters", "tempTaludTable", "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS", "M_DIRECTON")
+                arcpy.JoinField_management(tempTalud,"OBJECTID","tempTaludTable","OBJECTID","MEAS")
 
-                
-                taludCursor = arcpy.da.SearchCursor(talud,["MEAS","z_ahn"])
-                taludCheck = False
-                for tRow in taludCursor:
-                    if (round(tRow[0],2) == minMeas) and (round(tRow[1],2) == minZ):
-                        taludCheck = True
-                        break
+                # hoogtewaarde aan punten koppelen
+                tempTaludZ = item+"PointZ"
+                arcpy.CheckOutExtension("Spatial")
+                ExtractValuesToPoints(tempTalud, hoogtedata, tempTaludZ,"INTERPOLATE", "VALUE_ONLY")
+                arcpy.AlterField_management(tempTaludZ, 'RASTERVALU', 'z_ahn')
 
-                    elif (round(tRow[0],2) == maxMeas) and (round(tRow[1],2) == maxZ):
-                        taludCheck = True
-                        break
-
-                    else:
-                        taludCheck = False
-                        break
-
-
-
-                
-                if taludCheck == True:
-                    pass
-                if taludCheck == False:
-                    arcpy.Delete_management(talud)
-                    binnenTaluds.remove(talud)
-                    print talud, " is verwijderd vanwege foutief verloop"
-
+                # koppel aan contourwaardes en geef z-waarde contour-waarde indien niet aanwezig (raster nodata)
+                arcpy.SpatialJoin_analysis(tempTaludZ, "testIsectFocalPoint_", tempTalud, "JOIN_ONE_TO_ONE", "KEEP_ALL","","CLOSEST", "", "")
+                taludCursor = arcpy.da.UpdateCursor(tempTalud,["z_ahn","Contour"])
+                for row in taludCursor:
+                    if row[0] == None:
+                        row[0] = row[1]
+                        taludCursor.updateRow(row)
                 del taludCursor
 
-            # vul schone lijst met lijnen zodat near kan worden toegepast
-            # binnenTaludLijnen = []
-            for talud in binnenTaluds:
-                taludLijn = talud.strip("Point")
-                binnenTaludLijnen.append(taludLijn)
-                binnenTaludLijnenTotaal.append(taludLijn)
             
-            for item in binnenTaludLijnenTotaal:
-                arcpy.Near_analysis(item, binnenTaludLijnen, taludDistance, "NO_LOCATION", "NO_ANGLE", "PLANAR")
-
-                itemCursor = arcpy.da.SearchCursor(item,["NEAR_FID"])
+            
+            
+            
+            
+            ## controle op verloop toepassen
+            buitenTaluds = []
+            binnenTaluds = []
+            binnenTaludsTotaal = []
+            buitenTaludsTotaal = []
+            for item in allTaludPoints:
+                itemCursor = arcpy.da.SearchCursor(item,"locatie")
                 for row in itemCursor:
-                    nearFID = row[0]
+                    if row[0] == "buitenzijde":
+                        buitenTaluds.append(item)
+                        buitenTaludsTotaal.append(item)
+                        break
+                    if row[0]=="binnenzijde":
+                        binnenTaluds.append(item)
+                        binnenTaludsTotaal.append(item)
+                        break
 
-                del itemCursor
+    
+            # controle verloop 
+        
+            if binnenTaluds:
 
-                if nearFID is not -1:
-                    itemCursor = arcpy.da.SearchCursor(item,["NEAR_FC"])
-                    for row in itemCursor:
-                        nearFC = row[0]
+
+            
+                for talud in binnenTaludsTotaal:
+
                     
+                    zList = [z[0] for z in arcpy.da.SearchCursor (talud, ["z_ahn"])] 
+                    measList = [z[0] for z in arcpy.da.SearchCursor (talud, ["MEAS"])] 
+                    maxZ = round(max(zList),2)
+                    minZ = round(min(zList),2)
+                    maxMeas = round(max(measList),2)
+                    minMeas = round(min(measList),2)
+
+                    
+                    taludCursor = arcpy.da.SearchCursor(talud,["MEAS","z_ahn"])
+                    taludCheck = False
+                    for tRow in taludCursor:
+                        if (round(tRow[0],2) == minMeas) and (round(tRow[1],2) == minZ):
+                            taludCheck = True
+                            break
+
+                        elif (round(tRow[0],2) == maxMeas) and (round(tRow[1],2) == maxZ):
+                            taludCheck = True
+                            break
+
+                        else:
+                            taludCheck = False
+                            break
+
+
+
+                    
+                    if taludCheck == True:
+                        pass
+                    if taludCheck == False:
+                        arcpy.Delete_management(talud)
+                        binnenTaluds.remove(talud)
+                        print talud, " is verwijderd vanwege foutief verloop"
+
+                    del taludCursor
+
+                # vul schone lijst met lijnen zodat near kan worden toegepast
+                # binnenTaludLijnen = []
+                for talud in binnenTaluds:
+                    taludLijn = talud.strip("Point")
+                    binnenTaludLijnen.append(taludLijn)
+                    binnenTaludLijnenTotaal.append(taludLijn)
+                
+                print binnenTaludLijnenTotaal, "binnentaludlijnen"
+                for item in binnenTaludLijnenTotaal:
+                    arcpy.Near_analysis(item, binnenTaludLijnen, taludDistance, "NO_LOCATION", "NO_ANGLE", "PLANAR")
+
+                    itemCursor = arcpy.da.SearchCursor(item,["NEAR_FID"])
+                    for row in itemCursor:
+                        nearFID = row[0]
+
                     del itemCursor
 
-                    nearFC = nearFC.split("\\")[-1]
-                    arcpy.Merge_management([item,nearFC],"tempMerge")
-                    arcpy.FeatureVerticesToPoints_management("tempMerge", "tempTaludPoints", "BOTH_ENDS")
+                    if nearFID is not -1:
+                        itemCursor = arcpy.da.SearchCursor(item,["NEAR_FC"])
+                        for row in itemCursor:
+                            nearFC = row[0]
+                        
+                        del itemCursor
+
+                        nearFC = nearFC.split("\\")[-1]
+                        arcpy.Merge_management([item,nearFC],"tempMerge")
+                        arcpy.FeatureVerticesToPoints_management("tempMerge", "tempTaludPoints", "BOTH_ENDS")
 
 
-                    # endpoints
+                        # endpoints
+                        
+                        arcpy.LocateFeaturesAlongRoutes_lr("tempTaludPoints", "testRoute", "rid", "0,1 Meters", "tempTaludPointsTable", "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS", "M_DIRECTON")
+                        arcpy.JoinField_management("tempTaludPoints","OBJECTID","tempTaludPointsTable","OBJECTID","MEAS")
+                        minMeas = min([z[0] for z in arcpy.da.SearchCursor ("tempTaludPoints", ["MEAS"])])
+                        minMeas = round(minMeas,2) 
+                        maxMeas = max([z[0] for z in arcpy.da.SearchCursor ("tempTaludPoints", ["MEAS"])]) 
+                        maxMeas = round(maxMeas,2)
+
+                        endPoints = [minMeas,maxMeas]
+
+                        tempCursor = arcpy.da.UpdateCursor("tempTaludPoints","MEAS")
+                        for tempRow in tempCursor:
+                            print round(tempRow[0],2)
+                            if round(tempRow[0],2) in endPoints:
+                                pass
+                            else:
+                                tempCursor.deleteRow()
+                        
+                        del tempCursor
+                        arcpy.PointsToLine_management("tempTaludPoints", item, "locatie", "", "NO_CLOSE")
+
+                        # bereken gemiddelde MEAS voor nieuwe deel
+                        arcpy.AddField_management(item,"avMEAS","DOUBLE", 2, field_is_nullable="NULLABLE")
+                        averageMEAS = average(endPoints)
+                        taludDeelCursor = arcpy.da.UpdateCursor(item,["avMEAS"])
+                        for avRow in taludDeelCursor:
+                            avRow[0] = averageMEAS
+                            taludDeelCursor.updateRow(avRow)
+
+                        del taludDeelCursor
+                        
                     
-                    arcpy.LocateFeaturesAlongRoutes_lr("tempTaludPoints", "testRoute", "rid", "0,1 Meters", "tempTaludPointsTable", "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS", "M_DIRECTON")
-                    arcpy.JoinField_management("tempTaludPoints","OBJECTID","tempTaludPointsTable","OBJECTID","MEAS")
-                    minMeas = min([z[0] for z in arcpy.da.SearchCursor ("tempTaludPoints", ["MEAS"])])
-                    minMeas = round(minMeas,2) 
-                    maxMeas = max([z[0] for z in arcpy.da.SearchCursor ("tempTaludPoints", ["MEAS"])]) 
-                    maxMeas = round(maxMeas,2)
 
-                    endPoints = [minMeas,maxMeas]
 
-                    tempCursor = arcpy.da.UpdateCursor("tempTaludPoints","MEAS")
-                    for tempRow in tempCursor:
-                        print round(tempRow[0],2)
-                        if round(tempRow[0],2) in endPoints:
-                            pass
+                
+
+
+
+                        arcpy.Delete_management(nearFC)
+                        binnenTaludLijnen.remove(nearFC)
+                        binnenTaludLijnenTotaal.remove(nearFC)
+
+
+
+
+
+
+                # schoonmaken en samenvoegen binnentaludlijnen
+                if binnenTaludLijnen:
+                    for item in binnenTaludLijnen:
+                        fields = [f.name for f in arcpy.ListFields(item)]
+                        delFields = ["groupNr","NEAR_FC","NEAR_FID","NEAR_DIST","splitID"]
+                        
+                        for field in fields:
+                            if field in delFields:
+                                arcpy.DeleteField_management(item,field)
+                            else:
+                                pass
+                    
+                    arcpy.Merge_management(binnenTaludLijnen, "binnenTaludLijnen")
+
+            if buitenTaluds:
+                for talud in buitenTaludsTotaal:
+                    
+
+                    zList = [z[0] for z in arcpy.da.SearchCursor (talud, ["z_ahn"])] 
+                    measList = [z[0] for z in arcpy.da.SearchCursor (talud, ["MEAS"])] 
+                    maxZ = round(max(zList),2)
+                    minZ = round(min(zList),2)
+                    maxMeas = round(max(measList),2)
+                    minMeas = round(min(measList),2)
+
+                    
+                    taludCursor = arcpy.da.SearchCursor(talud,["MEAS","z_ahn"])
+                    taludCheck = False
+                    for row in taludCursor:
+                        if (round(row[0],2) == minMeas) and (round(row[1],2) == maxZ):
+                            taludCheck = True
+                            break
+                        elif (round(row[0],2) == maxMeas) and (round(row[1],2) == minZ):
+                            taludCheck = True
+                            break
                         else:
-                            tempCursor.deleteRow()
+                            taludCheck = False
+                            break
+
                     
-                    del tempCursor
-                    arcpy.PointsToLine_management("tempTaludPoints", item, "locatie", "", "NO_CLOSE")
-
-                    # bereken gemiddelde MEAS voor nieuwe deel
-                    arcpy.AddField_management(item,"avMEAS","DOUBLE", 2, field_is_nullable="NULLABLE")
-                    averageMEAS = average(endPoints)
-                    taludDeelCursor = arcpy.da.UpdateCursor(item,["avMEAS"])
-                    for avRow in taludDeelCursor:
-                        avRow[0] = averageMEAS
-                        taludDeelCursor.updateRow(avRow)
-
-                    del taludDeelCursor
                     
-                
-
-
-            
-
-
-
-                    arcpy.Delete_management(nearFC)
-                    binnenTaludLijnen.remove(nearFC)
-
-
-
-
-
-
-            # schoonmaken en samenvoegen binnentaludlijnen
-            if binnenTaludLijnen:
-                for item in binnenTaludLijnen:
-                    fields = [f.name for f in arcpy.ListFields(item)]
-                    delFields = ["groupNr","NEAR_FC","NEAR_FID","NEAR_DIST","splitID"]
-                    
-                    for field in fields:
-                        if field in delFields:
-                            arcpy.DeleteField_management(item,field)
-                        else:
-                            pass
-                
-                arcpy.Merge_management(binnenTaludLijnen, "binnenTaludLijnen")
-
-        if buitenTaluds:
-            for talud in buitenTaludsTotaal:
-                
-
-                zList = [z[0] for z in arcpy.da.SearchCursor (talud, ["z_ahn"])] 
-                measList = [z[0] for z in arcpy.da.SearchCursor (talud, ["MEAS"])] 
-                maxZ = round(max(zList),2)
-                minZ = round(min(zList),2)
-                maxMeas = round(max(measList),2)
-                minMeas = round(min(measList),2)
-
-                
-                taludCursor = arcpy.da.SearchCursor(talud,["MEAS","z_ahn"])
-                taludCheck = False
-                for row in taludCursor:
-                    if (round(row[0],2) == minMeas) and (round(row[1],2) == maxZ):
-                        taludCheck = True
-                        break
-                    elif (round(row[0],2) == maxMeas) and (round(row[1],2) == minZ):
-                        taludCheck = True
-                        break
+                    if taludCheck is True:
+                        pass
                     else:
-                        taludCheck = False
-                        break
+                        arcpy.Delete_management(talud)
+                        buitenTaluds.remove(talud)
+                        print talud, " is verwijderd vanwege foutief verloop"
 
+                # vul schone lijst met lijnen zodat near kan worden toegepast
+                # buitenTaludLijnen = []
+                for talud in buitenTaluds:
+                    taludLijn = talud.strip("Point")
+                    buitenTaludLijnen.append(taludLijn)
+                    buitenTaludLijnenTotaal.append(taludLijn)
+
+                print binnenTaludLijnenTotaal, "buitentaludlijnen"
                 
-                
-                if taludCheck is True:
-                    pass
-                else:
-                    arcpy.Delete_management(talud)
-                    buitenTaluds.remove(talud)
-                    print talud, " is verwijderd vanwege foutief verloop"
+                for item in buitenTaludLijnenTotaal:
+                    print item, "buitentalud"
+                    arcpy.Near_analysis(item, buitenTaludLijnen, taludDistance, "NO_LOCATION", "NO_ANGLE", "PLANAR")
 
-            # vul schone lijst met lijnen zodat near kan worden toegepast
-            # buitenTaludLijnen = []
-            for talud in buitenTaluds:
-                taludLijn = talud.strip("Point")
-                buitenTaludLijnen.append(taludLijn)
-                buitenTaludLijnenTotaal.append(taludLijn)
-            
-            for item in buitenTaludLijnenTotaal:
-                print item, "buitentalud"
-                arcpy.Near_analysis(item, buitenTaludLijnen, taludDistance, "NO_LOCATION", "NO_ANGLE", "PLANAR")
-
-                itemCursor = arcpy.da.SearchCursor(item,["NEAR_FID"])
-                for row in itemCursor:
-                    nearFID = row[0]
-
-                del itemCursor
-
-                if nearFID is not -1:
-                    itemCursor = arcpy.da.SearchCursor(item,["NEAR_FC"])
+                    itemCursor = arcpy.da.SearchCursor(item,["NEAR_FID"])
                     for row in itemCursor:
-                        nearFC = row[0]
-                    
-                    del itemCursor
-                    nearFC = nearFC.split("\\")[-1]
-                    arcpy.Merge_management([item,nearFC],"tempMerge")
-                    arcpy.FeatureVerticesToPoints_management("tempMerge", "tempTaludPoints", "BOTH_ENDS")
+                        nearFID = row[0]
 
-
-                    # endpoints
-                    
-                    arcpy.LocateFeaturesAlongRoutes_lr("tempTaludPoints", "testRoute", "rid", "0,1 Meters", "tempTaludPointsTable", "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS", "M_DIRECTON")
-                    arcpy.JoinField_management("tempTaludPoints","OBJECTID","tempTaludPointsTable","OBJECTID","MEAS")
-                    minMeas = min([z[0] for z in arcpy.da.SearchCursor ("tempTaludPoints", ["MEAS"])])
-                    minMeas = round(minMeas,2) 
-                    maxMeas = max([z[0] for z in arcpy.da.SearchCursor ("tempTaludPoints", ["MEAS"])]) 
-                    maxMeas = round(maxMeas,2)
-
-                    endPoints = [minMeas,maxMeas]
-
-                    tempCursor = arcpy.da.UpdateCursor("tempTaludPoints","MEAS")
-                    for tempRow in tempCursor:
-                        print round(tempRow[0],2)
-                        if round(tempRow[0],2) in endPoints:
-                            pass
-                        else:
-                            tempCursor.deleteRow()
-                    
-                    del tempCursor
-                    arcpy.PointsToLine_management("tempTaludPoints", item, "locatie", "", "NO_CLOSE")
-
-                    # bereken gemiddelde MEAS voor nieuwe deel
-                    arcpy.AddField_management(item,"avMEAS","DOUBLE", 2, field_is_nullable="NULLABLE")
-                    averageMEAS = average(endPoints)
-                    taludDeelCursor = arcpy.da.UpdateCursor(item,["avMEAS"])
-                    for avRow in taludDeelCursor:
-                        avRow[0] = averageMEAS
-                        taludDeelCursor.updateRow(avRow)
-
-                    del taludDeelCursor
-                    
-                
-
-
-            
-
-
-
-                    arcpy.Delete_management(nearFC)
-                    buitenTaludLijnen.remove(nearFC)
-
-
-
-
-
-
-            # schoonmaken en samenvoegen binnentaludlijnen
-            if buitenTaludLijnen:
-                for item in buitenTaludLijnen:
-                    fields = [f.name for f in arcpy.ListFields(item)]
-                    delFields = ["groupNr","NEAR_FC","NEAR_FID","NEAR_DIST","splitID"]
-                    
-                    for field in fields:
-                        if field in delFields:
-                            arcpy.DeleteField_management(item,field)
-                        else:
-                            pass
-                
-                arcpy.Merge_management(buitenTaludLijnen, "buitenTaludLijnen")
-                
-
-
-    # indien meer dan 2 taluddelen, voeg twee dichtstbijzijnde delen samen o.b.v. taludDistance2
-    if binnenTaludLijnen:
-        if len(binnenTaludLijnen) > 2: 
-            print "Tweede samenvoeging uitvoeren binnekant met {} meter".format(taludDistance2)
-            for item in binnenTaludLijnenTotaal:
-                arcpy.Near_analysis(item, binnenTaludLijnen, taludDistance2, "NO_LOCATION", "NO_ANGLE", "PLANAR")
-
-                itemCursor = arcpy.da.SearchCursor(item,["NEAR_FID"])
-                for row in itemCursor:
-                    nearFID = row[0]
-
-                del itemCursor
-
-                if nearFID is not -1:
-    
-                    itemCursor = arcpy.da.SearchCursor(item,["NEAR_FC"])
-                    for row in itemCursor:
-                        nearFC = row[0]
-                    
                     del itemCursor
 
-                    nearFC = nearFC.split("\\")[-1]
-                    arcpy.Merge_management([item,nearFC],"tempMerge")
-                    arcpy.FeatureVerticesToPoints_management("tempMerge", "tempTaludPoints", "BOTH_ENDS")
+                    if nearFID is not -1:
+                        itemCursor = arcpy.da.SearchCursor(item,["NEAR_FC"])
+                        for row in itemCursor:
+                            nearFC = row[0]
+                        
+                        del itemCursor
+                        nearFC = nearFC.split("\\")[-1]
+                        arcpy.Merge_management([item,nearFC],"tempMerge")
+                        arcpy.FeatureVerticesToPoints_management("tempMerge", "tempTaludPoints", "BOTH_ENDS")
 
 
-                    arcpy.LocateFeaturesAlongRoutes_lr("tempTaludPoints", "testRoute", "rid", "0,1 Meters", "tempTaludPointsTable", "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS", "M_DIRECTON")
-                    arcpy.JoinField_management("tempTaludPoints","OBJECTID","tempTaludPointsTable","OBJECTID","MEAS")
-                    minMeas = min([z[0] for z in arcpy.da.SearchCursor ("tempTaludPoints", ["MEAS"])])
-                    minMeas = round(minMeas,2) 
-                    maxMeas = max([z[0] for z in arcpy.da.SearchCursor ("tempTaludPoints", ["MEAS"])]) 
-                    maxMeas = round(maxMeas,2)
+                        # endpoints
+                        
+                        arcpy.LocateFeaturesAlongRoutes_lr("tempTaludPoints", "testRoute", "rid", "0,1 Meters", "tempTaludPointsTable", "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS", "M_DIRECTON")
+                        arcpy.JoinField_management("tempTaludPoints","OBJECTID","tempTaludPointsTable","OBJECTID","MEAS")
+                        minMeas = min([z[0] for z in arcpy.da.SearchCursor ("tempTaludPoints", ["MEAS"])])
+                        minMeas = round(minMeas,2) 
+                        maxMeas = max([z[0] for z in arcpy.da.SearchCursor ("tempTaludPoints", ["MEAS"])]) 
+                        maxMeas = round(maxMeas,2)
 
-                    endPoints = [minMeas,maxMeas]
+                        endPoints = [minMeas,maxMeas]
 
-                    tempCursor = arcpy.da.UpdateCursor("tempTaludPoints","MEAS")
-                    for tempRow in tempCursor:
-                        print round(tempRow[0],2)
-                        if round(tempRow[0],2) in endPoints:
-                            pass
-                        else:
-                            tempCursor.deleteRow()
+                        tempCursor = arcpy.da.UpdateCursor("tempTaludPoints","MEAS")
+                        for tempRow in tempCursor:
+                            print round(tempRow[0],2)
+                            if round(tempRow[0],2) in endPoints:
+                                pass
+                            else:
+                                tempCursor.deleteRow()
+                        
+                        del tempCursor
+                        arcpy.PointsToLine_management("tempTaludPoints", item, "locatie", "", "NO_CLOSE")
+
+                        # bereken gemiddelde MEAS voor nieuwe deel
+                        arcpy.AddField_management(item,"avMEAS","DOUBLE", 2, field_is_nullable="NULLABLE")
+                        averageMEAS = average(endPoints)
+                        taludDeelCursor = arcpy.da.UpdateCursor(item,["avMEAS"])
+                        for avRow in taludDeelCursor:
+                            avRow[0] = averageMEAS
+                            taludDeelCursor.updateRow(avRow)
+
+                        del taludDeelCursor
+                        
                     
-                    del tempCursor
-                    arcpy.PointsToLine_management("tempTaludPoints", item, "locatie", "", "NO_CLOSE")
 
-                    # bereken gemiddelde MEAS voor nieuwe deel
-                    arcpy.AddField_management(item,"avMEAS","DOUBLE", 2, field_is_nullable="NULLABLE")
-                    averageMEAS = average(endPoints)
-                    taludDeelCursor = arcpy.da.UpdateCursor(item,["avMEAS"])
-                    for avRow in taludDeelCursor:
-                        avRow[0] = averageMEAS
-                        taludDeelCursor.updateRow(avRow)
-
-                    del taludDeelCursor
-                    
-
-                    arcpy.Delete_management(nearFC)
-                    binnenTaludLijnen.remove(nearFC)
-
-                    # stoppen met samenvoegen als twee delen over zijn 
-                    if len(binnenTaludLijnen) == 2:
-                        # test voor samenvallen met waterloopIsect
-                        break
-    
-    if buitenTaludLijnen:                
-        if len(buitenTaludLijnen) > 2: 
-            print "Tweede samenvoeging uitvoeren buitenkant met {} meter".format(taludDistance2)
-            print buitenTaludLijnen, "buitentaludlijnenlijst"
-            for item in buitenTaludLijnenTotaal:
 
                 
 
-                arcpy.Near_analysis(item, buitenTaludLijnen, taludDistance2, "NO_LOCATION", "NO_ANGLE", "PLANAR")
 
-                itemCursor = arcpy.da.SearchCursor(item,["NEAR_FID"])
-                for row in itemCursor:
-                    nearFID = row[0]
 
-                del itemCursor
+                        arcpy.Delete_management(nearFC)
+                        buitenTaludLijnen.remove(nearFC)
+                        buitenTaludLijnenTotaal.remove(nearFC)
 
-                if nearFID is not -1:
+
+
+
+
+
+                # schoonmaken en samenvoegen binnentaludlijnen
+                if buitenTaludLijnen:
+                    for item in buitenTaludLijnen:
+                        fields = [f.name for f in arcpy.ListFields(item)]
+                        delFields = ["groupNr","NEAR_FC","NEAR_FID","NEAR_DIST","splitID"]
+                        
+                        for field in fields:
+                            if field in delFields:
+                                arcpy.DeleteField_management(item,field)
+                            else:
+                                pass
+                    
+                    arcpy.Merge_management(buitenTaludLijnen, "buitenTaludLijnen")
+                    
+
+
+            # indien meer dan 2 taluddelen, voeg twee dichtstbijzijnde delen samen o.b.v. taludDistance2
+            if binnenTaludLijnen:
+                if len(binnenTaludLijnen) > 2: 
+                    print "Tweede samenvoeging uitvoeren binnekant met {} meter".format(taludDistance2)
+                    for item in binnenTaludLijnenTotaal:
+                        arcpy.Near_analysis(item, binnenTaludLijnen, taludDistance2, "NO_LOCATION", "NO_ANGLE", "PLANAR")
+
+                        itemCursor = arcpy.da.SearchCursor(item,["NEAR_FID"])
+                        for row in itemCursor:
+                            nearFID = row[0]
+
+                        del itemCursor
+
+                        if nearFID is not -1:
             
-                    itemCursor = arcpy.da.SearchCursor(item,["NEAR_FC"])
-                    for row in itemCursor:
-                        nearFC = row[0]
+                            itemCursor = arcpy.da.SearchCursor(item,["NEAR_FC"])
+                            for row in itemCursor:
+                                nearFC = row[0]
+                            
+                            del itemCursor
+
+                            nearFC = nearFC.split("\\")[-1]
+                            arcpy.Merge_management([item,nearFC],"tempMerge")
+                            arcpy.FeatureVerticesToPoints_management("tempMerge", "tempTaludPoints", "BOTH_ENDS")
+
+
+                            arcpy.LocateFeaturesAlongRoutes_lr("tempTaludPoints", "testRoute", "rid", "0,1 Meters", "tempTaludPointsTable", "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS", "M_DIRECTON")
+                            arcpy.JoinField_management("tempTaludPoints","OBJECTID","tempTaludPointsTable","OBJECTID","MEAS")
+                            minMeas = min([z[0] for z in arcpy.da.SearchCursor ("tempTaludPoints", ["MEAS"])])
+                            minMeas = round(minMeas,2) 
+                            maxMeas = max([z[0] for z in arcpy.da.SearchCursor ("tempTaludPoints", ["MEAS"])]) 
+                            maxMeas = round(maxMeas,2)
+
+                            endPoints = [minMeas,maxMeas]
+
+                            tempCursor = arcpy.da.UpdateCursor("tempTaludPoints","MEAS")
+                            for tempRow in tempCursor:
+                                print round(tempRow[0],2)
+                                if round(tempRow[0],2) in endPoints:
+                                    pass
+                                else:
+                                    tempCursor.deleteRow()
+                            
+                            del tempCursor
+                            arcpy.PointsToLine_management("tempTaludPoints", item, "locatie", "", "NO_CLOSE")
+
+                            # bereken gemiddelde MEAS voor nieuwe deel
+                            arcpy.AddField_management(item,"avMEAS","DOUBLE", 2, field_is_nullable="NULLABLE")
+                            averageMEAS = average(endPoints)
+                            taludDeelCursor = arcpy.da.UpdateCursor(item,["avMEAS"])
+                            for avRow in taludDeelCursor:
+                                avRow[0] = averageMEAS
+                                taludDeelCursor.updateRow(avRow)
+
+                            del taludDeelCursor
+                            
+
+                            arcpy.Delete_management(nearFC)
+                            binnenTaludLijnen.remove(nearFC)
+
+                            # stoppen met samenvoegen als twee delen over zijn 
+                            if len(binnenTaludLijnen) == 2:
+                                # test voor samenvallen met waterloopIsect
+                                break
+            
+            if buitenTaludLijnen:                
+                if len(buitenTaludLijnen) > 2: 
+                    print "Tweede samenvoeging uitvoeren buitenkant met {} meter".format(taludDistance2)
+                    print buitenTaludLijnen, "buitentaludlijnenlijst"
+                    for item in buitenTaludLijnenTotaal:
+
+                        
+
+                        arcpy.Near_analysis(item, buitenTaludLijnen, taludDistance2, "NO_LOCATION", "NO_ANGLE", "PLANAR")
+
+                        itemCursor = arcpy.da.SearchCursor(item,["NEAR_FID"])
+                        for row in itemCursor:
+                            nearFID = row[0]
+
+                        del itemCursor
+
+                        if nearFID is not -1:
                     
-                    del itemCursor
+                            itemCursor = arcpy.da.SearchCursor(item,["NEAR_FC"])
+                            for row in itemCursor:
+                                nearFC = row[0]
+                            
+                            del itemCursor
 
-                    nearFC = nearFC.split("\\")[-1]
-                    arcpy.Merge_management([item,nearFC],"tempMerge")
-                    arcpy.FeatureVerticesToPoints_management("tempMerge", "tempTaludPoints", "BOTH_ENDS")
+                            nearFC = nearFC.split("\\")[-1]
+                            arcpy.Merge_management([item,nearFC],"tempMerge")
+                            arcpy.FeatureVerticesToPoints_management("tempMerge", "tempTaludPoints", "BOTH_ENDS")
 
 
-                    arcpy.LocateFeaturesAlongRoutes_lr("tempTaludPoints", "testRoute", "rid", "0,1 Meters", "tempTaludPointsTable", "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS", "M_DIRECTON")
-                    arcpy.JoinField_management("tempTaludPoints","OBJECTID","tempTaludPointsTable","OBJECTID","MEAS")
-                    minMeas = min([z[0] for z in arcpy.da.SearchCursor ("tempTaludPoints", ["MEAS"])])
-                    minMeas = round(minMeas,2) 
-                    maxMeas = max([z[0] for z in arcpy.da.SearchCursor ("tempTaludPoints", ["MEAS"])]) 
-                    maxMeas = round(maxMeas,2)
+                            arcpy.LocateFeaturesAlongRoutes_lr("tempTaludPoints", "testRoute", "rid", "0,1 Meters", "tempTaludPointsTable", "RID POINT MEAS", "FIRST", "DISTANCE", "ZERO", "FIELDS", "M_DIRECTON")
+                            arcpy.JoinField_management("tempTaludPoints","OBJECTID","tempTaludPointsTable","OBJECTID","MEAS")
+                            minMeas = min([z[0] for z in arcpy.da.SearchCursor ("tempTaludPoints", ["MEAS"])])
+                            minMeas = round(minMeas,2) 
+                            maxMeas = max([z[0] for z in arcpy.da.SearchCursor ("tempTaludPoints", ["MEAS"])]) 
+                            maxMeas = round(maxMeas,2)
 
-                    endPoints = [minMeas,maxMeas]
+                            endPoints = [minMeas,maxMeas]
 
-                    tempCursor = arcpy.da.UpdateCursor("tempTaludPoints","MEAS")
-                    for tempRow in tempCursor:
-                        print round(tempRow[0],2)
-                        if round(tempRow[0],2) in endPoints:
-                            pass
-                        else:
-                            tempCursor.deleteRow()
-                    
-                    del tempCursor
-                    arcpy.PointsToLine_management("tempTaludPoints", item, "locatie", "", "NO_CLOSE")
+                            tempCursor = arcpy.da.UpdateCursor("tempTaludPoints","MEAS")
+                            for tempRow in tempCursor:
+                                print round(tempRow[0],2)
+                                if round(tempRow[0],2) in endPoints:
+                                    pass
+                                else:
+                                    tempCursor.deleteRow()
+                            
+                            del tempCursor
+                            arcpy.PointsToLine_management("tempTaludPoints", item, "locatie", "", "NO_CLOSE")
 
-                    # bereken gemiddelde MEAS voor nieuwe deel
-                    arcpy.AddField_management(item,"avMEAS","DOUBLE", 2, field_is_nullable="NULLABLE")
-                    averageMEAS = average(endPoints)
-                    taludDeelCursor = arcpy.da.UpdateCursor(item,["avMEAS"])
-                    for avRow in taludDeelCursor:
-                        avRow[0] = averageMEAS
-                        taludDeelCursor.updateRow(avRow)
+                            # bereken gemiddelde MEAS voor nieuwe deel
+                            arcpy.AddField_management(item,"avMEAS","DOUBLE", 2, field_is_nullable="NULLABLE")
+                            averageMEAS = average(endPoints)
+                            taludDeelCursor = arcpy.da.UpdateCursor(item,["avMEAS"])
+                            for avRow in taludDeelCursor:
+                                avRow[0] = averageMEAS
+                                taludDeelCursor.updateRow(avRow)
 
-                    del taludDeelCursor
-                    
+                            del taludDeelCursor
+                            
 
-                    arcpy.Delete_management(nearFC)
-                    buitenTaludLijnen.remove(nearFC)
+                            arcpy.Delete_management(nearFC)
+                            buitenTaludLijnen.remove(nearFC)
 
-                    # stoppen met samenvoegen als twee delen over zijn 
-                    if len(buitenTaludLijnen) == 2:
-                        # test voor samenvallen met waterloopIsect
-                        break
+                            # stoppen met samenvoegen als twee delen over zijn 
+                            if len(buitenTaludLijnen) == 2:
+                                # test voor samenvallen met waterloopIsect
+                                break
 
-    
-    if binnenTaludLijnen and buitenTaludLijnen:
-        taludLijnen = binnenTaludLijnen+buitenTaludLijnen
-        arcpy.Merge_management(taludLijnen,"taludLijnenTotaal")
-        print "Taludlijnen aan beide kanten gevonden"
-        return "DOORGAAN"
+            
+            if binnenTaludLijnen and buitenTaludLijnen:
+                taludLijnen = binnenTaludLijnen+buitenTaludLijnen
+                arcpy.Merge_management(taludLijnen,"taludLijnenTotaal")
+                print "Taludlijnen aan beide kanten gevonden"
+                return "DOORGAAN"
 
-    if buitenTaludLijnen and not binnenTaludLijnen:
-    
-        taludLijnen = buitenTaludLijnen
-        arcpy.Merge_management(taludLijnen,"taludLijnenTotaal")
-        print "Alleen buitentaluds gevonden"
-        return "DOORGAAN"
+            if buitenTaludLijnen and not binnenTaludLijnen:
+            
+                taludLijnen = buitenTaludLijnen
+                arcpy.Merge_management(taludLijnen,"taludLijnenTotaal")
+                print "Alleen buitentaluds gevonden"
+                return "DOORGAAN"
 
-    if binnenTaludLijnen and not buitenTaludLijnen:
-        taludLijnen = binnenTaludLijnen
-        arcpy.Merge_management(taludLijnen,"taludLijnenTotaal")
-        print "Alleen binnentaluds gevonden"
-        return "DOORGAAN"
-    
-    if not binnenTaludLijnen and not buitenTaludLijnen:
-        print "Geen taludlijnen gevonden"
+            if binnenTaludLijnen and not buitenTaludLijnen:
+                taludLijnen = binnenTaludLijnen
+                arcpy.Merge_management(taludLijnen,"taludLijnenTotaal")
+                print "Alleen binnentaluds gevonden"
+                return "DOORGAAN"
+            
+            if not binnenTaludLijnen and not buitenTaludLijnen:
+                print "Geen taludlijnen gevonden"
+                return "STOP"
+    except RuntimeError as e:
+        print "STOP", e
         return "STOP"
 
     
@@ -1117,27 +1218,42 @@ def getBitBut(profiel):
                 row[0] = row[1]
                 taludCursor.updateRow(row)
 
-        zListBit = [z[0] for z in arcpy.da.SearchCursor ("binnenTaludPointsZ", ["z_ahn"])] 
-        bitCursor = arcpy.da.UpdateCursor("binnenTaludPointsZ",["MEAS","z_ahn"])
-
-        for row in bitCursor:
-            if (round(row[0],2) == round(bikMEAS,2)):
-                bitCursor.deleteRow()
-            else:
-                pass
-
+        del taludCursor
         
-        arcpy.CopyFeatures_management("binnenTaludPointsZ", "binnenteen")
+        # zListBit = [z[0] for z in arcpy.da.SearchCursor ("binnenTaludPointsZ", ["z_ahn"])] 
+        # tempCursor = arcpy.da.UpdateCursor("binnenTaludPointsZ",["MEAS","z_ahn"],sql_clause=(None, 'ORDER BY z_ahn ASC'))
+
+        # for tRow in tempCursor:
+        #     if (round(tRow[0],2) == round(bikMEAS,2)):
+        #         tempCursor.deleteRow()
+        #     else:
+        #         pass
+
+        # del tempCursor
+        # arcpy.CopyFeatures_management("binnenTaludPointsZ", "binnenteen")
 
         # voeg bitPunten toe aan profiel
         bitCursor = arcpy.da.InsertCursor(outPath, ['cPoint','SHAPE@XY'])
-        xyBitList = [z[0] for z in arcpy.da.SearchCursor ("binnenteen", ["SHAPE@XY"])]
-        for bitPunt in xyBitList:
-            iRow = ['binnenteen', bitPunt]
-            print iRow, bitPunt
-            bitCursor.insertRow(iRow)
 
-        del bitCursor
+        taludBitCursor = arcpy.da.SearchCursor("binnenTaludPointsZ",['z_ahn','SHAPE@XY'],sql_clause = (None, 'ORDER BY z_ahn ASC'))
+        bitwaarde = taludBitCursor.next()[1] # eerste waarde
+        iRow = ['binnenteen', bitwaarde]
+     
+        bitCursor.insertRow(iRow)
+
+        del bitCursor, taludBitCursor
+
+    
+        # xyBitList = [z[0] for z in arcpy.da.SearchCursor ("binnenteen", ["SHAPE@XY"],sql_clause=(None, 'ORDER BY z_ahn ASC'))][0]
+
+        # print xyBitList
+        # for bitPunt in xyBitList:
+        #     iRow = ['binnenteen', bitPunt]
+        #     print iRow, bitPunt
+        #     bitCursor.insertRow(iRow)
+        #     break
+
+        # del bitCursor
 
 
     if taludDelenBinnenkant > 1:
@@ -1194,7 +1310,9 @@ def getBitBut(profiel):
 
         
         # split in losse delen
+        
         taludDelenB = splitByAttributes("binnenTaludPointsZJoin","ORIG_FID")
+     
         removeList = []
 
         for taludDeel in taludDelenB:
@@ -1279,7 +1397,7 @@ def getBitBut(profiel):
                                     bitCursor.deleteRow()
                             row[1] = "onderzijde_"+onderdeel
                             taludCursor.updateRow(row)
-                        
+                            del bitCursor
                         else:
                             arcpy.CopyFeatures_management(talud,"bovenkantOndertaludBinnen")
                             boCursor = arcpy.da.UpdateCursor("bovenkantOndertaludBinnen",["z_ahn"])
@@ -1288,6 +1406,8 @@ def getBitBut(profiel):
                                     pass
                                 else:
                                     boCursor.deleteRow()
+
+                            del boCursor
 
                             row[1] = "onderzijde_"+onderdeel
                             taludCursor.updateRow(row)
@@ -1301,6 +1421,8 @@ def getBitBut(profiel):
                                         pass
                                     else:
                                         obCursor.deleteRow()
+
+                                del obCursor
                                 row[1] = "onderzijde_"+onderdeel
                                 taludCursor.updateRow(row)
 
@@ -1311,14 +1433,26 @@ def getBitBut(profiel):
                 del zList, maxZ, minZ, taludCursor
 
             # voeg bitPunten toe aan profiel
-            bitCursor = arcpy.da.InsertCursor(outPath, ['cPoint','SHAPE@XY'])
-            xyBitList = [z[0] for z in arcpy.da.SearchCursor ("binnenteen", ["SHAPE@XY"])]
-            for bitPunt in xyBitList:
-                iRow = ['binnenteen', bitPunt]
-                print iRow, bitPunt
-                bitCursor.insertRow(iRow)
 
-            del bitCursor
+            # voeg butPunten toe aan profiel
+            bitCursor = arcpy.da.InsertCursor(outPath, ['cPoint','SHAPE@XY'])
+
+            taludBitCursor = arcpy.da.SearchCursor("binnenteen",['z_ahn','SHAPE@XY'],sql_clause = (None, 'ORDER BY z_ahn ASC'))
+            bitwaarde = taludBitCursor .next()[1] # eerste waarde
+            iRow = ['binnenteen', bitwaarde]
+            print iRow, bitwaarde
+            bitCursor.insertRow(iRow)
+
+            del bitCursor, taludBitCursor 
+            
+            # bitCursor = arcpy.da.InsertCursor(outPath, ['cPoint','SHAPE@XY'])
+            # xyBitList = [z[0] for z in arcpy.da.SearchCursor ("binnenteen", ["SHAPE@XY","z_ahn"])]
+            # for bitPunt in xyBitList:
+            #     iRow = ['binnenteen', bitPunt]
+            #     print iRow, bitPunt
+            #     bitCursor.insertRow(iRow)
+
+            # del bitCursor
 
             # voeg BinnentaludPunten toe aan profiel
             bermCursor = arcpy.da.InsertCursor(outPath, ['cPoint','SHAPE@XY'])
@@ -1399,15 +1533,17 @@ def getBitBut(profiel):
                 row[0] = row[1]
                 taludCursor.updateRow(row)
 
+        del taludCursor
         zListBut = [z[0] for z in arcpy.da.SearchCursor ("buitenTaludPointsZ", ["z_ahn"])] 
-        butCursor = arcpy.da.UpdateCursor("buitenTaludPointsZ",["MEAS","z_ahn"])
+        tempCursor = arcpy.da.UpdateCursor("buitenTaludPointsZ",["MEAS","z_ahn"])
 
-        for row in butCursor:
-            if (round(row[0],2) == round(bukMEAS,2)):
-                butCursor.deleteRow()
+        for tRow  in tempCursor:
+            if (round(tRow [0],2) == round(bukMEAS,2)):
+                tempCursor.deleteRow()
             else:
                 pass
        
+        del tempCursor
        
     	
         
@@ -1430,16 +1566,30 @@ def getBitBut(profiel):
 
 
         
-        arcpy.CopyFeatures_management("buitenTaludPointsZ", "buitenteen")
-        # voeg butPunten toe aan profiel
+        # voeg bitPunten toe aan profiel
         butCursor = arcpy.da.InsertCursor(outPath, ['cPoint','SHAPE@XY'])
-        xyButList = [z[0] for z in arcpy.da.SearchCursor ("buitenteen", ["SHAPE@XY"])]
-        for butPunt in xyButList:
-            iRow = ['buitenteen', butPunt]
-            print iRow, butPunt
-            butCursor.insertRow(iRow)
 
-        del butCursor
+        taludButCursor = arcpy.da.SearchCursor("buitenTaludPointsZ",['z_ahn','SHAPE@XY'],sql_clause = (None, 'ORDER BY z_ahn ASC'))
+        butwaarde = taludButCursor .next()[1] # eerste waarde
+        iRow = ['buitenteen', butwaarde]
+      
+        butCursor.insertRow(iRow)
+
+        del butCursor, taludButCursor 
+        
+        # arcpy.CopyFeatures_management("buitenTaludPointsZ", "buitenteen")
+        # # voeg butPunten toe aan profiel
+        # butCursor = arcpy.da.InsertCursor(outPath, ['cPoint','SHAPE@XY'])
+        # xyButList = [z[0] for z in arcpy.da.SearchCursor ("buitenteen", ["SHAPE@XY"],sql_clause=(None, 'ORDER BY z_ahn ASC'))][0]
+        # print xyButList
+        
+        # for butPunt in xyButList:
+        #     iRow = ['buitenteen', butPunt]
+        #     print iRow, butPunt
+        #     butCursor.insertRow(iRow)
+        #     break
+
+        # del butCursor
 
 
     if taludDelenBuitenkant > 1:
@@ -1498,7 +1648,9 @@ def getBitBut(profiel):
 
         # indien het geval, controleer of talud afloopt en niet stijgt t.o.v. de kruin
         # split in losse delen
+       
         taludDelenB = splitByAttributes("buitenTaludPointsZJoin","ORIG_FID")
+    
 
 
         for taludDeel in taludDelenB:
@@ -1580,6 +1732,8 @@ def getBitBut(profiel):
                                     pass
                                 else:
                                     bitCursor.deleteRow()
+
+                            del bitCursor
                             row[1] = "onderzijde_"+onderdeel
                             taludCursor.updateRow(row)
                         
@@ -1591,6 +1745,8 @@ def getBitBut(profiel):
                                     pass
                                 else:
                                     boCursor.deleteRow()
+
+                            del boCursor
 
                             row[1] = "onderzijde_"+onderdeel
                             taludCursor.updateRow(row)
@@ -1604,6 +1760,8 @@ def getBitBut(profiel):
                                         pass
                                     else:
                                         obCursor.deleteRow()
+
+                                del obCursor
                                 row[1] = "onderzijde_"+onderdeel
                                 taludCursor.updateRow(row)
 
@@ -1613,15 +1771,29 @@ def getBitBut(profiel):
 
                 del zList, maxZ, minZ, taludCursor
             
-            # voeg bitPunten toe aan profiel
-            butCursor = arcpy.da.InsertCursor(outPath, ['cPoint','SHAPE@XY'])
-            xyButList = [z[0] for z in arcpy.da.SearchCursor ("buitenteen", ["SHAPE@XY"])]
-            for butPunt in xyButList:
-                iRow = ['buitenteen', butPunt]
-                print iRow, butPunt
-                butCursor.insertRow(iRow)
+    
 
-            del butCursor
+            # voeg butPunten toe aan profiel
+            butCursor = arcpy.da.InsertCursor(outPath, ['cPoint','SHAPE@XY'])
+
+            taludButCursor = arcpy.da.SearchCursor("buitenteen",['z_ahn','SHAPE@XY'],sql_clause = (None, 'ORDER BY z_ahn ASC'))
+            butwaarde = taludButCursor .next()[1] # eerste waarde
+            iRow = ['buitenteen', butwaarde]
+            print iRow, butwaarde
+            butCursor.insertRow(iRow)
+
+            del butCursor, taludButCursor 
+
+
+
+            # butCursor = arcpy.da.InsertCursor(outPath, ['cPoint','SHAPE@XY'])
+            # xyButList = [z[0] for z in arcpy.da.SearchCursor ("buitenteen", ["SHAPE@XY","z_ahn"])]
+            # for butPunt in xyButList:
+            #     iRow = ['buitenteen', butPunt]
+            #     print iRow, butPunt
+            #     butCursor.insertRow(iRow)
+
+            # del butCursor
 
             # voeg BinnentaludPunten toe aan profiel
             bermCursor = arcpy.da.InsertCursor(outPath, ['cPoint','SHAPE@XY'])
@@ -2655,7 +2827,7 @@ for row in profielIterator:
     test = profielControle("tempProfiel")
     if test == "DOORGAAN":
         taludDelen("tempProfiel")
-        getKruin("tempProfiel",trajectLijn)
+        getKruin("tempProfiel",trajectLijn,waterstaatswerkzone=waterstaatswerkHDSR,hoogtedata=hoogtedata)
         
         
         kruinTest = testKruin("tempProfiel")

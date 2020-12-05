@@ -30,11 +30,77 @@ profielInterval = 25
 profiel_lengte_land = 40
 profiel_lengte_rivier = 1000
 code_hdsr = "Naam"
+bodemdalingsveld = "bodemdaling_mmjr"
 toetsniveaus = "th2024"
+toetsniveaus_bodemdaling = "tn_bodemdaling"
+jaren_bodemdaling = 5 # uitgaande van vliegjaar ahn3: 2015
 waterlopenBGTBoezem = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_waterdeel_boezem"
 rasterAHN3BAG2m = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\BAG2mPlusWaterlopenAHN3"
+bodemdalingskaart = r'D:\GIS\losse rasters\bodemdalingskaart_app_data_geotiff_Bodemdalingskaart_10de_percentiel_mm_per_jaar_verticale_richting_v2018002.tif'
 
 #outputFigures = r"C:\Users\Vincent\Desktop\demoGeomtoets"
+
+def bepaal_bodemdaling(trajecten,bodemdalingskaart,code,bodemdalingsveld,jaren_bodemdaling,toetsniveaus,toetsniveaus_bodemdaling):
+    # check op veld bodemdaling en voeg voor de zekerheid toe als nieuwe double
+    fields = [f.name for f in arcpy.ListFields(trajecten)]
+
+    if bodemdalingsveld in fields:
+        arcpy.DeleteField_management(trajecten,bodemdalingsveld)
+    else:
+        pass
+
+    if toetsniveaus_bodemdaling in fields:
+        arcpy.DeleteField_management(trajecten,toetsniveaus_bodemdaling)
+    else:
+        pass
+    
+
+    # maak middelpunten op de trajecten om bodemdaling te koppelen
+    arcpy.FeatureVerticesToPoints_management(trajecten, "trajecten_midpoints", "MID")
+
+    # koppel bodemdalingswaarde uit raster aan middelpunten
+    arcpy.CheckOutExtension("Spatial")
+    ExtractValuesToPoints("trajecten_midpoints", bodemdalingskaart, "trajecten_midpoints_bd","INTERPOLATE", "VALUE_ONLY")
+    arcpy.AlterField_management("trajecten_midpoints_bd", 'RASTERVALU', bodemdalingsveld)
+
+
+    # koppel middelpunten terug aan trajecten
+    arcpy.JoinField_management(trajecten,code,"trajecten_midpoints_bd",code,bodemdalingsveld)
+
+    # voeg veld toe met toetspeil+bodemdaling
+    arcpy.AddField_management(trajecten, toetsniveaus_bodemdaling,"DOUBLE", 2, field_is_nullable="NULLABLE")
+
+    # bereken nieuwe toetspeil met bodemdaling
+    tempCursor = arcpy.da.UpdateCursor(trajecten,[toetsniveaus,bodemdalingsveld,toetsniveaus_bodemdaling])
+    for tRow in tempCursor:
+        try:
+            bodemdaling_mm_jaar = round(tRow[1],2)
+            toetsniveau = round(tRow[0],2)
+            toetsniveau_nieuw = ((bodemdaling_mm_jaar*10)*jaren_bodemdaling)+toetsniveau
+            tRow[2] = toetsniveau_nieuw
+            
+
+        except:
+            tRow[2] = 0
+
+        
+        tempCursor.updateRow(tRow)
+
+    del tempCursor
+
+    print "Bodemdaling gekoppeld aan trajecten: {} met periode van {} jaar".format(trajecten,jaren_bodemdaling)
+  
+
+
+
+
+
+
+
+   
+
+
+
 
 
 def maak_plotmap(baseFigures,trajectnaam):
@@ -47,7 +113,7 @@ def maak_plotmap(baseFigures,trajectnaam):
     print "Plotmap gemaakt voor {}".format(trajectnaam)
 
 
-def maak_basisprofielen(trajectlijn,code,toetsniveau,profielen,refprofielen, bgt_waterdeel_boezem,trajectnaam,profiel_interval,profiel_lengte_land,profiel_lengte_rivier):
+def maak_basisprofielen(trajectlijn,code,toetsniveau,toetsniveau_bodemdaling,profielen,refprofielen, bgt_waterdeel_boezem,trajectnaam,bodemdalingsveld,bodemdaling_perjaar,profiel_interval,profiel_lengte_land,profiel_lengte_rivier):
     ## 1 referentieprofielen maken
     generate_profiles(profiel_interval=profiel_interval,profiel_lengte_land=140,profiel_lengte_rivier=1000,trajectlijn=trajectlijn,code=code,
     toetspeil=toetsniveau,profielen="tempRefProfielen")
@@ -175,13 +241,30 @@ def maak_basisprofielen(trajectlijn,code,toetsniveau,profielen,refprofielen, bgt
     arcpy.CreateRoutes_lr("tempProfielen", "profielnummer", profielen,"TWO_FIELDS", "van", "tot", "UPPER_LEFT", "1", "0", "IGNORE", "INDEX")
     arcpy.AddField_management(profielen,"geometrieOordeel","TEXT", field_length=50)
     
-    # veld voor trajectnaam toevoegen aan profielen
+    # veld voor trajectnaam en bodemdaling in mm/jaar toevoegen aan profielen
     arcpy.AddField_management(profielen,"dijktraject", "TEXT", field_length=200)
-    tempCursor = arcpy.da.UpdateCursor(profielen,"dijktraject")
+    arcpy.AddField_management(profielen, bodemdalingsveld,"DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.AddField_management(profielen, toetsniveaus,"DOUBLE", 2, field_is_nullable="NULLABLE")
+    arcpy.AddField_management(profielen, toetsniveaus_bodemdaling,"DOUBLE", 2, field_is_nullable="NULLABLE")
+    
+    tempCursor = arcpy.da.UpdateCursor(profielen,["dijktraject",bodemdalingsveld])
     for tRow in tempCursor:
         tRow[0] = trajectnaam
+        tRow[1] = round(bodemdaling_perjaar,2)
+        tRow[2] = toetsniveau
+        tRow[3] = toetsniveau_bodemdaling
         tempCursor.updateRow(tRow)
     del tempCursor
+
+    # # veld voor bodemdaling toevoegen aan profielen
+    # arcpy.AddField_management(profielen,"bodemdaling_mmjr", "TEXT", field_length=200)
+    # tempCursor = arcpy.da.UpdateCursor(profielen,"dijktraject")
+    # for tRow in tempCursor:
+    #     tRow[0] = trajectnaam
+    #     tempCursor.updateRow(tRow)
+    # del tempCursor
+
+
 
     # 5 routes maken refprofielen
     profielCursor = arcpy.da.UpdateCursor("tempRefProfielen", ["van","tot","SHAPE@LENGTH"])
@@ -888,15 +971,17 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
     print "Indien mogelijk referentieprofielen gefit voor {}".format(trajectnaam)
 
 
+# stap 1: bodemdaling voor totaaltrajecten bepalen
+bepaal_bodemdaling(trajecten=trajectenHDSR,bodemdalingskaart=bodemdalingskaart,code=code_hdsr,bodemdalingsveld=bodemdalingsveld,jaren_bodemdaling=jaren_bodemdaling,toetsniveaus=toetsniveaus,toetsniveaus_bodemdaling=toetsniveaus_bodemdaling)
 
-
-
-with arcpy.da.SearchCursor(trajectenHDSR,['SHAPE@',code_hdsr,toetsniveaus]) as cursor:
+with arcpy.da.SearchCursor(trajectenHDSR,['SHAPE@',code_hdsr,toetsniveaus,bodemdalingsveld,toetsniveaus_bodemdaling]) as cursor:
     for row in cursor:
         
         # lokale variabelen per dijktraject
         code = code_hdsr
         toetsniveau = float(row[2])
+        toetsniveau_bodemdaling = float(row[4])
+        bodemdaling_perjaar = float(row[3]) # in mm
         id = row[1]
         
         profielen = "profielen_"+id
@@ -912,7 +997,7 @@ with arcpy.da.SearchCursor(trajectenHDSR,['SHAPE@',code_hdsr,toetsniveaus]) as c
 
 
       
-        maak_basisprofielen(trajectlijn=trajectlijn,code=code,toetsniveau=toetsniveau,profielen=profielen, refprofielen=refprofielen, bgt_waterdeel_boezem=waterlopenBGTBoezem,trajectnaam=id,profiel_interval=profielInterval,profiel_lengte_land=profiel_lengte_land,profiel_lengte_rivier=profiel_lengte_rivier)
+        maak_basisprofielen(trajectlijn=trajectlijn,code=code,toetsniveau=toetsniveau,toetsniveau_bodemdaling=toetsniveau_bodemdaling, profielen=profielen,bodemdalingsveld=bodemdalingsveld, bodemdaling_perjaar=bodemdaling_perjaar, refprofielen=refprofielen, bgt_waterdeel_boezem=waterlopenBGTBoezem,trajectnaam=id,profiel_interval=profielInterval,profiel_lengte_land=profiel_lengte_land,profiel_lengte_rivier=profiel_lengte_rivier)
 
       
         
@@ -923,7 +1008,7 @@ with arcpy.da.SearchCursor(trajectenHDSR,['SHAPE@',code_hdsr,toetsniveaus]) as c
 
         else: 
 
-            maak_referentieprofielen(profielen=profielen,refprofielen=refprofielen, toetsniveau=toetsniveau,minKruinBreedte=minKruinBreedte,refprofielenpunten= refprofielenpunten,kruindelentraject=hoogtetest,ondergrensReferentie=ondergrensReferentie,trajectnaam=id)
+            maak_referentieprofielen(profielen=profielen,refprofielen=refprofielen, toetsniveau=toetsniveau_bodemdaling,minKruinBreedte=minKruinBreedte,refprofielenpunten= refprofielenpunten,kruindelentraject=hoogtetest,ondergrensReferentie=ondergrensReferentie,trajectnaam=id)
 
             plotmap = maak_plotmap(baseFigures=baseFigures,trajectnaam = id)
 
