@@ -13,19 +13,19 @@ sys.path.append('HDSR2020')
 from basisRWK2020 import generate_profiles, copy_trajectory_lr, split_profielen
 
 arcpy.env.overwriteOutput = True
-arcpy.env.workspace = r"D:\Projecten\HDSR\2020\gisData\geomtoetsTotaal.gdb"
-workspace = r"D:\Projecten\HDSR\2020\gisData\geomtoetsTotaal.gdb"
+arcpy.env.workspace = r"D:\Projecten\HDSR\2020\gisData\geomtoetsTest.gdb"
+workspace = r"D:\Projecten\HDSR\2020\gisData\geomtoetsTest.gdb"
 
-baseFigures = r"C:/Users/Vincent/Desktop/geomtoetsTotaalV1/"
+baseFigures = r"C:/Users/Vincent/Desktop/geomtoetsTest/"
 
 
   
 
 
-trajectenHDSR = "test239A2"
+trajectenHDSR = "test105D1"
 afstandKruinSegment = 0.5 # maximale afstand die tussen kruinsegmenten mag zijn om samen te voegen
 minKruinBreedte = 1.5
-ondergrensReferentie = 15 # aantal m onder toetsniveau
+ondergrensReferentie = 4 # aantal m onder toetsniveau
 profielInterval = 25
 profiel_lengte_land = 40
 profiel_lengte_rivier = 1000
@@ -75,8 +75,17 @@ def bepaal_bodemdaling(trajecten,bodemdalingskaart,code,bodemdalingsveld,jaren_b
     for tRow in tempCursor:
         try:
             bodemdaling_mm_jaar = round(tRow[1],2)
+            bodemdaling_periode = (bodemdaling_mm_jaar/100)*jaren_bodemdaling
             toetsniveau = round(tRow[0],2)
-            toetsniveau_nieuw = ((bodemdaling_mm_jaar*10)*jaren_bodemdaling)+toetsniveau
+            if bodemdaling_periode >= 0:
+         
+                toetsniveau_nieuw =  toetsniveau - abs(bodemdaling_periode)
+            if bodemdaling_periode <= 0:
+        
+                toetsniveau_nieuw = toetsniveau + abs(bodemdaling_periode)
+            
+
+           
             tRow[2] = toetsniveau_nieuw
             
 
@@ -247,7 +256,7 @@ def maak_basisprofielen(trajectlijn,code,toetsniveau,toetsniveau_bodemdaling,pro
     arcpy.AddField_management(profielen, toetsniveaus,"DOUBLE", 2, field_is_nullable="NULLABLE")
     arcpy.AddField_management(profielen, toetsniveaus_bodemdaling,"DOUBLE", 2, field_is_nullable="NULLABLE")
     
-    tempCursor = arcpy.da.UpdateCursor(profielen,["dijktraject",bodemdalingsveld])
+    tempCursor = arcpy.da.UpdateCursor(profielen,["dijktraject",bodemdalingsveld,toetsniveaus,toetsniveaus_bodemdaling])
     for tRow in tempCursor:
         tRow[0] = trajectnaam
         tRow[1] = round(bodemdaling_perjaar,2)
@@ -256,13 +265,6 @@ def maak_basisprofielen(trajectlijn,code,toetsniveau,toetsniveau_bodemdaling,pro
         tempCursor.updateRow(tRow)
     del tempCursor
 
-    # # veld voor bodemdaling toevoegen aan profielen
-    # arcpy.AddField_management(profielen,"bodemdaling_mmjr", "TEXT", field_length=200)
-    # tempCursor = arcpy.da.UpdateCursor(profielen,"dijktraject")
-    # for tRow in tempCursor:
-    #     tRow[0] = trajectnaam
-    #     tempCursor.updateRow(tRow)
-    # del tempCursor
 
 
 
@@ -487,7 +489,7 @@ def maak_referentieprofielen(profielen,refprofielen,toetsniveau, minKruinBreedte
     
     ## 4 invoegen van eindpunten voor referentieprofiel, vanuit landzijde
     # z_ref eindpunten = toetsniveau -15m, z_ref kruin= toetsniveau, kruinbreedte = minkruinbreedte.
-    # offset eindpunt binnen = 105 (15*1:7), offset buiten = 1.5+(15*1:2)
+    # offset eindpunt binnen = 28 (4*1:7), offset buiten = 1.5+(4*1:2)
 
     if arcpy.Exists("refProfielTabel"):
         arcpy.Delete_management("refProfielTabel")
@@ -508,8 +510,8 @@ def maak_referentieprofielen(profielen,refprofielen,toetsniveau, minKruinBreedte
         # vanuit binnenzijde
         measKruinBinnen = waardes[0]
         measKruinBuiten = measKruinBinnen+minKruinBreedte
-        measRefPuntBuiten = measKruinBuiten+30
-        measRefPuntBinnen = measKruinBinnen-105
+        measRefPuntBuiten = measKruinBuiten+8
+        measRefPuntBinnen = measKruinBinnen-28
 
 
 
@@ -554,7 +556,7 @@ def maak_referentieprofielen(profielen,refprofielen,toetsniveau, minKruinBreedte
 
     print "Referentieprofielen gemaakt voor {}".format(trajectnaam)
 
-def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kruinpunten,plotmap,trajectnaam,toetsniveau):
+def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kruinpunten,plotmap,trajectnaam,toetsniveau,ondergrensReferentie):
 
     ## 1 maken van bandbreedtepunten (totaal)
 
@@ -845,30 +847,93 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
             isectTest = (baseMerge2['difference'] < 0).values.any()
 
             
-
+            # test of ahn-waardes boven de kruin aanwezig zijn
             refKruin = baseMerge2.loc[baseMerge2['z_ref'] == toetsniveau]
             refTest = refKruin['z_ahn'].isnull().values.any()
+
+            
+
+            # check uiterste rivierzijde ahnwaarde, deze mag niet overschreden worden door eindpunt buitenzijde refprofiel
+            knipNan = baseMerge2[baseMerge2['z_ahn'].notna()]
+            rivierGrensRaster = knipNan['afstand'].max()
+
+            # eindpunt buitenzijde refprofiel
+            refBasis = baseMerge2.loc[baseMerge2['z_ref'] == toetsniveau-ondergrensReferentie]
+            buitenzijdeRefprofiel = round(float(refBasis['afstand'].max()),1)
+
+
+            print "Riviergrensraster is {}m en buitenzijde grensprofiel is {}m".format(rivierGrensRaster,buitenzijdeRefprofiel)
+
+            if buitenzijdeRefprofiel > rivierGrensRaster:
+                buitenTest = True
+            if buitenzijdeRefprofiel <= rivierGrensRaster:
+                buitenTest = False
+
+            
+            # check of nan-waardes boven refprofiel aanwezig zijn
+            indexLinkerzijdeRp = baseMerge2['z_ref'].first_valid_index()
+            indexRechterzijdeRp = baseMerge2['z_ref'].last_valid_index()
+            linkerzijdeRp = baseMerge2.iloc[indexLinkerzijdeRp]['afstand']
+            rechterzijdeRp = baseMerge2.iloc[indexRechterzijdeRp]['afstand']
+            # print indexLinkerzijdeRp, linkerzijdeRp, indexRechterzijdeRp, rechterzijdeRp
+            dfRef = baseMerge2.loc[indexLinkerzijdeRp:indexRechterzijdeRp]
+            ahnTestRef = dfRef['z_ahn'].isnull().values.any()
+            print ahnTestRef, "ahncheck boven refprofiel"
+            
+
+
+            
+            
+            # alleen inpassen als refprofiel nog onder ahn past                                                                                                                               
+            if buitenTest == False:
                 
-            while ((isectTest == True or refTest == True) and ingepastRefprofiel == True and resterend > 0):
+                while ((isectTest == True or refTest == True) and ingepastRefprofiel == True and resterend > 0):
 
-                print "Iteratie {}".format(iteraties)
+                    print "Iteratie {}".format(iteraties)
 
-                baseMerge2['afstand_ref'] = baseMerge2['afstand_ref'].shift(+1)
-                baseMerge2['z_ref'] = baseMerge2['z_ref'].shift(+1)
-                baseMerge2['difference'] = baseMerge2.z_ahn - baseMerge2.z_ref
-                
-                isectTest = (baseMerge2['difference'] < 0).values.any()
+                    # schuif het refprofiel naar rechts en test op isects
 
-                iteraties += 1
-                resterend -= 0.5
-                print resterend
-
-                refKruin = baseMerge2.loc[baseMerge2['z_ref'] == toetsniveau]
+                    baseMerge2['afstand_ref'] = baseMerge2['afstand_ref'].shift(+1)
+                    baseMerge2['z_ref'] = baseMerge2['z_ref'].shift(+1)
+                    baseMerge2['difference'] = baseMerge2.z_ahn - baseMerge2.z_ref
+                    
+                    isectTest = (baseMerge2['difference'] < 0).values.any()
 
 
-                # print kruinhoogte,"iteratie"
-                refTest = refKruin['z_ahn'].isnull().values.any()
-                
+                    # optellen 
+                    iteraties += 1
+                    resterend -= 0.5
+                    print resterend
+
+                    # test of ahn-waardes boven de kruin aanwezig zijn
+                    refKruin = baseMerge2.loc[baseMerge2['z_ref'] == toetsniveau]
+                    refTest = refKruin['z_ahn'].isnull().values.any()
+
+                     # check uiterste rivierzijde ahnwaarde, deze mag niet overschreden worden door eindpunt buitenzijde refprofiel
+                    refBasis = baseMerge2.loc[baseMerge2['z_ref'] == toetsniveau-ondergrensReferentie]
+                    buitenzijdeRefprofiel = round(float(refBasis['afstand'].max()),1)
+                    if buitenzijdeRefprofiel > rivierGrensRaster:
+                        buitenTest = True
+                        print "overschrijding, stoppen!"
+                        break
+                    if buitenzijdeRefprofiel <= rivierGrensRaster:
+                        buitenTest = False
+
+
+                    # check of nan-waardes boven refprofiel aanwezig zijn
+                    indexLinkerzijdeRp = baseMerge2['z_ref'].first_valid_index()
+                    indexRechterzijdeRp = baseMerge2['z_ref'].last_valid_index()
+                    linkerzijdeRp = baseMerge2.iloc[indexLinkerzijdeRp]['afstand']
+                    rechterzijdeRp = baseMerge2.iloc[indexRechterzijdeRp]['afstand']
+                    # print indexLinkerzijdeRp, linkerzijdeRp, indexRechterzijdeRp, rechterzijdeRp
+                    dfRef = baseMerge2.loc[indexLinkerzijdeRp:indexRechterzijdeRp]
+                    ahnTestRef = dfRef['z_ahn'].isnull().values.any()
+                    
+
+            # als uiterste ahnwaarde aan rivierzijde direct wordt overschreden, niet doorgaan        
+            if buitenTest == True:
+                pass
+
                
          
             
@@ -878,11 +943,15 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
             for oRow in oordeelCursor:
                 if oRow[0] == profielnummer:
 
-                    if isectTest == True or refTest == True:
+                    if isectTest == True or refTest == True or buitenTest == True:
                         oRow[1] = "Onvoldoende"
                     
                     if isectTest == False and refTest == False and ingepastRefprofiel == True:
-                        oRow[1] = "Voldoende"
+                        if ahnTestRef == False:
+
+                            oRow[1] = "Voldoende, aaneengesloten hoogtedata"
+                        if ahnTestRef == True:
+                            oRow[1] = "Voldoende, gaten in hoogtedata"
 
                     if isectTest == False and ingepastRefprofiel == False:
                         oRow[1] = "Onvoldoende"
@@ -895,9 +964,14 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
             del oordeelCursor
 
             # kruinlocatie als punt weergeven indien gefit
-            if (isectTest == False and refTest == False and ingepastRefprofiel == True):
+            if (isectTest == False and refTest == False and buitenTest == False and ingepastRefprofiel == True):
                 # plot groen profiel, profiel past
-                ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'],'--',label="Passend referentieprofiel", color="green",linewidth=3.5)
+
+                if ahnTestRef == False:
+                    ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'],'--',label="Passend referentieprofiel", color="green",linewidth=3.5)
+                if ahnTestRef == True:
+                    ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'],'--',label="Passend referentieprofiel, gaten in hoogtedata", color="yellow",linewidth=3.5)
+
                 kruinHoogte = baseMerge2['z_ref'].max()
                 kruinDeel = baseMerge2.loc[baseMerge2['z_ref'] == kruinHoogte]
                 kruinLandzijde = kruinDeel['afstand'].min()
@@ -972,7 +1046,7 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
 
 
 # stap 1: bodemdaling voor totaaltrajecten bepalen
-bepaal_bodemdaling(trajecten=trajectenHDSR,bodemdalingskaart=bodemdalingskaart,code=code_hdsr,bodemdalingsveld=bodemdalingsveld,jaren_bodemdaling=jaren_bodemdaling,toetsniveaus=toetsniveaus,toetsniveaus_bodemdaling=toetsniveaus_bodemdaling)
+# bepaal_bodemdaling(trajecten=trajectenHDSR,bodemdalingskaart=bodemdalingskaart,code=code_hdsr,bodemdalingsveld=bodemdalingsveld,jaren_bodemdaling=jaren_bodemdaling,toetsniveaus=toetsniveaus,toetsniveaus_bodemdaling=toetsniveaus_bodemdaling)
 
 with arcpy.da.SearchCursor(trajectenHDSR,['SHAPE@',code_hdsr,toetsniveaus,bodemdalingsveld,toetsniveaus_bodemdaling]) as cursor:
     for row in cursor:
@@ -997,19 +1071,19 @@ with arcpy.da.SearchCursor(trajectenHDSR,['SHAPE@',code_hdsr,toetsniveaus,bodemd
 
 
       
-        maak_basisprofielen(trajectlijn=trajectlijn,code=code,toetsniveau=toetsniveau,toetsniveau_bodemdaling=toetsniveau_bodemdaling, profielen=profielen,bodemdalingsveld=bodemdalingsveld, bodemdaling_perjaar=bodemdaling_perjaar, refprofielen=refprofielen, bgt_waterdeel_boezem=waterlopenBGTBoezem,trajectnaam=id,profiel_interval=profielInterval,profiel_lengte_land=profiel_lengte_land,profiel_lengte_rivier=profiel_lengte_rivier)
+        # maak_basisprofielen(trajectlijn=trajectlijn,code=code,toetsniveau=toetsniveau,toetsniveau_bodemdaling=toetsniveau_bodemdaling, profielen=profielen,bodemdalingsveld=bodemdalingsveld, bodemdaling_perjaar=bodemdaling_perjaar, refprofielen=refprofielen, bgt_waterdeel_boezem=waterlopenBGTBoezem,trajectnaam=id,profiel_interval=profielInterval,profiel_lengte_land=profiel_lengte_land,profiel_lengte_rivier=profiel_lengte_rivier)
 
       
         
-        hoogtetest = bepaal_kruinvlak_toetsniveau(trajectlijn=trajectlijn,hoogtedata=rasterAHN3BAG2m,toetsniveau=toetsniveau,profielen=profielen,refprofielen=refprofielen,trajectnaam=id)
+        # hoogtetest = bepaal_kruinvlak_toetsniveau(trajectlijn=trajectlijn,hoogtedata=rasterAHN3BAG2m,toetsniveau=toetsniveau,profielen=profielen,refprofielen=refprofielen,trajectnaam=id)
 
-        if hoogtetest == "stop":
-            break
+        # if hoogtetest == "stop":
+        #     break
 
-        else: 
+        # else: 
 
-            maak_referentieprofielen(profielen=profielen,refprofielen=refprofielen, toetsniveau=toetsniveau_bodemdaling,minKruinBreedte=minKruinBreedte,refprofielenpunten= refprofielenpunten,kruindelentraject=hoogtetest,ondergrensReferentie=ondergrensReferentie,trajectnaam=id)
+        #     maak_referentieprofielen(profielen=profielen,refprofielen=refprofielen, toetsniveau=toetsniveau_bodemdaling,minKruinBreedte=minKruinBreedte,refprofielenpunten= refprofielenpunten,kruindelentraject=hoogtetest,ondergrensReferentie=ondergrensReferentie,trajectnaam=id)
 
-            plotmap = maak_plotmap(baseFigures=baseFigures,trajectnaam = id)
+        plotmap = maak_plotmap(baseFigures=baseFigures,trajectnaam = id)
 
-            fitten_refprofiel(profielen=profielen,refprofielen=refprofielen, refprofielenpunten=refprofielenpunten,hoogtedata=rasterAHN3BAG2m,kruinpunten=kruinpunten,plotmap=plotmap,trajectnaam = id,toetsniveau=toetsniveau)
+        fitten_refprofiel(profielen=profielen,refprofielen=refprofielen, refprofielenpunten=refprofielenpunten,hoogtedata=rasterAHN3BAG2m,kruinpunten=kruinpunten,plotmap=plotmap,trajectnaam = id,toetsniveau=toetsniveau_bodemdaling, ondergrensReferentie=ondergrensReferentie)
