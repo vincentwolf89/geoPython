@@ -1,5 +1,6 @@
 import arcpy
 import os
+import math
 from arcpy.sa import *
 from itertools import groupby
 import pandas as pd
@@ -22,9 +23,10 @@ baseFigures = r"C:/Users/Vincent/Desktop/geomtoetsTest/"
   
 
 
-trajectenHDSR = "test105D1"
+trajectenHDSR = "testje"
 afstandKruinSegment = 0.5 # maximale afstand die tussen kruinsegmenten mag zijn om samen te voegen
 minKruinBreedte = 1.5
+maxNodata = 3
 ondergrensReferentie = 4 # aantal m onder toetsniveau
 profielInterval = 25
 profiel_lengte_land = 40
@@ -60,8 +62,21 @@ def bepaal_bodemdaling(trajecten,bodemdalingskaart,code,bodemdalingsveld,jaren_b
 
     # koppel bodemdalingswaarde uit raster aan middelpunten
     arcpy.CheckOutExtension("Spatial")
-    ExtractValuesToPoints("trajecten_midpoints", bodemdalingskaart, "trajecten_midpoints_bd","INTERPOLATE", "VALUE_ONLY")
+    ExtractValuesToPoints("trajecten_midpoints", bodemdalingskaart, "trajecten_midpoints_bd","", "VALUE_ONLY")
     arcpy.AlterField_management("trajecten_midpoints_bd", 'RASTERVALU', bodemdalingsveld)
+
+    # check of waarde ingevuld is, anders 0 als bodemdalingswaarde gebruiken
+    tempCursor = arcpy.da.UpdateCursor("trajecten_midpoints_bd",[bodemdalingsveld])
+    for tRow in tempCursor:
+        try:
+            int(tRow[0])
+
+        except:
+            tRow[0] = 0
+        
+        tempCursor.updateRow(tRow)
+
+    del tempCursor
 
 
     # koppel middelpunten terug aan trajecten
@@ -556,7 +571,7 @@ def maak_referentieprofielen(profielen,refprofielen,toetsniveau, minKruinBreedte
 
     print "Referentieprofielen gemaakt voor {}".format(trajectnaam)
 
-def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kruinpunten,plotmap,trajectnaam,toetsniveau,ondergrensReferentie):
+def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kruinpunten,plotmap,trajectnaam,toetsniveau,ondergrensReferentie,maxNodata):
 
     ## 1 maken van bandbreedtepunten (totaal)
 
@@ -816,7 +831,7 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
             ax1 = fig.add_subplot(111, label ="1")
             
             ax1.plot(baseMerge2['afstand'],baseMerge2['z_ahn'],label="AHN3-profiel",color="dimgrey",linewidth=5)
-            ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'],label="Initieel referentieprofiel",color="orange",linewidth=3.5)
+            # ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'],label="Initieel referentieprofiel",color="orange",linewidth=3.5)
 
 
             # bandbreedte plotten
@@ -858,188 +873,262 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
             rivierGrensRaster = knipNan['afstand'].max()
 
             # eindpunt buitenzijde refprofiel
-            refBasis = baseMerge2.loc[baseMerge2['z_ref'] == toetsniveau-ondergrensReferentie]
-            buitenzijdeRefprofiel = round(float(refBasis['afstand'].max()),1)
-
-
-            print "Riviergrensraster is {}m en buitenzijde grensprofiel is {}m".format(rivierGrensRaster,buitenzijdeRefprofiel)
-
-            if buitenzijdeRefprofiel > rivierGrensRaster:
-                buitenTest = True
-            if buitenzijdeRefprofiel <= rivierGrensRaster:
-                buitenTest = False
-
-            
-            # check of nan-waardes boven refprofiel aanwezig zijn
-            indexLinkerzijdeRp = baseMerge2['z_ref'].first_valid_index()
-            indexRechterzijdeRp = baseMerge2['z_ref'].last_valid_index()
-            linkerzijdeRp = baseMerge2.iloc[indexLinkerzijdeRp]['afstand']
-            rechterzijdeRp = baseMerge2.iloc[indexRechterzijdeRp]['afstand']
-            # print indexLinkerzijdeRp, linkerzijdeRp, indexRechterzijdeRp, rechterzijdeRp
-            dfRef = baseMerge2.loc[indexLinkerzijdeRp:indexRechterzijdeRp]
-            ahnTestRef = dfRef['z_ahn'].isnull().values.any()
-            print ahnTestRef, "ahncheck boven refprofiel"
-            
-
-
-            
-            
-            # alleen inpassen als refprofiel nog onder ahn past                                                                                                                               
-            if buitenTest == False:
-                
-                while ((isectTest == True or refTest == True) and ingepastRefprofiel == True and resterend > 0):
-
-                    print "Iteratie {}".format(iteraties)
-
-                    # schuif het refprofiel naar rechts en test op isects
-
-                    baseMerge2['afstand_ref'] = baseMerge2['afstand_ref'].shift(+1)
-                    baseMerge2['z_ref'] = baseMerge2['z_ref'].shift(+1)
-                    baseMerge2['difference'] = baseMerge2.z_ahn - baseMerge2.z_ref
+            # als geen grensprofiel ingepast kan worden, geen oordeel
+            if ingepastRefprofiel == False:
+              
+                oordeelCursor = arcpy.da.UpdateCursor(profielen,["profielnummer_str","geometrieOordeel"])
+                for oRow in oordeelCursor:
+                    if oRow[0] == profielnummer:
+                        oRow[1] = "Geen oordeel"
                     
-                    isectTest = (baseMerge2['difference'] < 0).values.any()
-
-
-                    # optellen 
-                    iteraties += 1
-                    resterend -= 0.5
-                    print resterend
-
-                    # test of ahn-waardes boven de kruin aanwezig zijn
-                    refKruin = baseMerge2.loc[baseMerge2['z_ref'] == toetsniveau]
-                    refTest = refKruin['z_ahn'].isnull().values.any()
-
-                     # check uiterste rivierzijde ahnwaarde, deze mag niet overschreden worden door eindpunt buitenzijde refprofiel
-                    refBasis = baseMerge2.loc[baseMerge2['z_ref'] == toetsniveau-ondergrensReferentie]
-                    buitenzijdeRefprofiel = round(float(refBasis['afstand'].max()),1)
-                    if buitenzijdeRefprofiel > rivierGrensRaster:
-                        buitenTest = True
-                        print "overschrijding, stoppen!"
-                        break
-                    if buitenzijdeRefprofiel <= rivierGrensRaster:
-                        buitenTest = False
-
-
-                    # check of nan-waardes boven refprofiel aanwezig zijn
-                    indexLinkerzijdeRp = baseMerge2['z_ref'].first_valid_index()
-                    indexRechterzijdeRp = baseMerge2['z_ref'].last_valid_index()
-                    linkerzijdeRp = baseMerge2.iloc[indexLinkerzijdeRp]['afstand']
-                    rechterzijdeRp = baseMerge2.iloc[indexRechterzijdeRp]['afstand']
-                    # print indexLinkerzijdeRp, linkerzijdeRp, indexRechterzijdeRp, rechterzijdeRp
-                    dfRef = baseMerge2.loc[indexLinkerzijdeRp:indexRechterzijdeRp]
-                    ahnTestRef = dfRef['z_ahn'].isnull().values.any()
-                    
-
-            # als uiterste ahnwaarde aan rivierzijde direct wordt overschreden, niet doorgaan        
-            if buitenTest == True:
-                pass
-
-               
-         
-            
-
-            # terugkoppelen of fit wel/niet gelukt is 
-            oordeelCursor = arcpy.da.UpdateCursor(profielen,["profielnummer_str","geometrieOordeel"])
-            for oRow in oordeelCursor:
-                if oRow[0] == profielnummer:
-
-                    if isectTest == True or refTest == True or buitenTest == True:
-                        oRow[1] = "Onvoldoende"
-                    
-                    if isectTest == False and refTest == False and ingepastRefprofiel == True:
-                        if ahnTestRef == False:
-
-                            oRow[1] = "Voldoende, aaneengesloten hoogtedata"
-                        if ahnTestRef == True:
-                            oRow[1] = "Voldoende, gaten in hoogtedata"
-
-                    if isectTest == False and ingepastRefprofiel == False:
-                        oRow[1] = "Onvoldoende"
-                    
-                    if refTest == False and ingepastRefprofiel == False:
-                        oRow[1] = "Onvoldoende"
-                
                     oordeelCursor.updateRow(oRow)
+                
+                del oordeelCursor
 
-            del oordeelCursor
+                # legenda aanzetten
+                ax1.legend(frameon=False, loc='upper right',prop={'size': 20})
 
-            # kruinlocatie als punt weergeven indien gefit
-            if (isectTest == False and refTest == False and buitenTest == False and ingepastRefprofiel == True):
-                # plot groen profiel, profiel past
+                # plt.show()
 
-                if ahnTestRef == False:
-                    ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'],'--',label="Passend referentieprofiel", color="green",linewidth=3.5)
-                if ahnTestRef == True:
-                    ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'],'--',label="Passend referentieprofiel, gaten in hoogtedata", color="yellow",linewidth=3.5)
+                plt.savefig("{}/{}.png".format(plotmap,profielnummer))
+                
+        
+                plt.close()
 
-                kruinHoogte = baseMerge2['z_ref'].max()
-                kruinDeel = baseMerge2.loc[baseMerge2['z_ref'] == kruinHoogte]
-                kruinLandzijde = kruinDeel['afstand'].min()
-                kruinRivierzijde = kruinDeel['afstand'].max()
-                kruinMidden = (kruinLandzijde + kruinRivierzijde) / 2
+                print profielnummer
 
 
 
-                arcpy.CreateTable_management(workspace, "kruinpuntTable", "", "")
-                arcpy.AddField_management("kruinpuntTable","profielnummer_str", "TEXT", field_length=50)
-                arcpy.AddField_management("kruinpuntTable","afstand","DOUBLE", 2, field_is_nullable="NULLABLE")
-
-                kruinTabelCursor = arcpy.da.InsertCursor("kruinpuntTable", ["profielnummer_str","afstand"])
+            # als wel grensprofiel ingepast kan worden: doorgaan
             
-                kruinTabelCursor.insertRow([profielnummer,kruinMidden])
+               
+            if ingepastRefprofiel == True:
+                ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'],label="Initieel referentieprofiel",color="orange",linewidth=3.5)
+                refBasis = baseMerge2.loc[baseMerge2['z_ref'] == toetsniveau-ondergrensReferentie]
+                buitenzijdeRefprofiel = round(float(refBasis['afstand'].max()),1)
 
-                del kruinTabelCursor
+
+                print "Riviergrensraster is {}m en buitenzijde grensprofiel is {}m".format(rivierGrensRaster,buitenzijdeRefprofiel)
+
+                if buitenzijdeRefprofiel > rivierGrensRaster:
+                    buitenTest = True
+                if buitenzijdeRefprofiel <= rivierGrensRaster:
+                    buitenTest = False
+
+            
+      
+
+            
+                # check of nan-waardes boven refprofiel aanwezig zijn
+                indexLinkerzijdeRp = baseMerge2['z_ref'].first_valid_index()
+                indexRechterzijdeRp = baseMerge2['z_ref'].last_valid_index()
+                linkerzijdeRp = baseMerge2.iloc[indexLinkerzijdeRp]['afstand']
+                rechterzijdeRp = baseMerge2.iloc[indexRechterzijdeRp]['afstand']
+                # print indexLinkerzijdeRp, linkerzijdeRp, indexRechterzijdeRp, rechterzijdeRp
+                dfRef = baseMerge2.loc[indexLinkerzijdeRp:indexRechterzijdeRp]
+                ahnTestRef = dfRef['z_ahn'].isnull().values.any()
+                
+                # test of 3 of meer aaneengesloten nodata punten in het ahnraster zitten boven refprofiel
+                noData = 0
+                ahnTest = False
+                for index, dRow in dfRef.iterrows():
+                    z_ahn = dRow['z_ahn']
+
+                    if math.isnan(z_ahn) == True:
+                        
+                   
+    
+                        noData +=1
+
+                        if noData > maxNodata:
+                            ahnTest = True
+                            break
+
+                    if math.isnan(z_ahn) == False:
+                        noData = 0
+
+                print ahnTest
                 
 
-                arcpy.MakeRouteEventLayer_lr("tempRefRoute", "profielnummer_str", "kruinpuntTable", "profielnummer_str POINT afstand", "kruinpuntlayer", "", "NO_ERROR_FIELD", "NO_ANGLE_FIELD", "NORMAL", "ANGLE", "LEFT", "POINT")
-                arcpy.CopyFeatures_management("kruinpuntlayer", "tempkruinpunt")
-                arcpy.Delete_management("kruinpuntlayer")
 
-                # invoegen punt in totaalset
-                geom = [z[0] for z in arcpy.da.SearchCursor ("tempkruinpunt", ["SHAPE@XY"])][0]
 
-                profielnummer_strip = profielnummer.strip("profielnummer_")
-                profielnummer_int = int(profielnummer_strip)
-                kruinpuntenCursor.insertRow([trajectnaam,profielnummer_int,kruinMidden, geom])
+                      
+     
 
-                del geom
+
+
+
+
+                    
+
+
             
-                # einde kruinlocatie
+
+                
+
+
+                    
+                
+
+
+                
+                
+                # alleen inpassen als refprofiel nog onder ahn past                                                                                                                               
+                if buitenTest == False:
+                    
+                    while ((isectTest == True or refTest == True) and ingepastRefprofiel == True and resterend > 0):
+
+                        print "Iteratie {}".format(iteraties)
+
+                        # schuif het refprofiel naar rechts en test op isects
+
+                        baseMerge2['afstand_ref'] = baseMerge2['afstand_ref'].shift(+1)
+                        baseMerge2['z_ref'] = baseMerge2['z_ref'].shift(+1)
+                        baseMerge2['difference'] = baseMerge2.z_ahn - baseMerge2.z_ref
+                        
+                        isectTest = (baseMerge2['difference'] < 0).values.any()
+
+
+                        # optellen 
+                        iteraties += 1
+                        resterend -= 0.5
+                        print resterend
+
+                        # test of ahn-waardes boven de kruin aanwezig zijn
+                        refKruin = baseMerge2.loc[baseMerge2['z_ref'] == toetsniveau]
+                        refTest = refKruin['z_ahn'].isnull().values.any()
+
+                        # check uiterste rivierzijde ahnwaarde, deze mag niet overschreden worden door eindpunt buitenzijde refprofiel
+                        refBasis = baseMerge2.loc[baseMerge2['z_ref'] == toetsniveau-ondergrensReferentie]
+                        buitenzijdeRefprofiel = round(float(refBasis['afstand'].max()),1)
+                        if buitenzijdeRefprofiel > rivierGrensRaster:
+                            buitenTest = True
+                            print "overschrijding, stoppen!"
+                            break
+                        if buitenzijdeRefprofiel <= rivierGrensRaster:
+                            buitenTest = False
+
+
+                        # check of nan-waardes boven refprofiel aanwezig zijn
+                        indexLinkerzijdeRp = baseMerge2['z_ref'].first_valid_index()
+                        indexRechterzijdeRp = baseMerge2['z_ref'].last_valid_index()
+                        linkerzijdeRp = baseMerge2.iloc[indexLinkerzijdeRp]['afstand']
+                        rechterzijdeRp = baseMerge2.iloc[indexRechterzijdeRp]['afstand']
+                        # print indexLinkerzijdeRp, linkerzijdeRp, indexRechterzijdeRp, rechterzijdeRp
+                        dfRef = baseMerge2.loc[indexLinkerzijdeRp:indexRechterzijdeRp]
+                        ahnTestRef = dfRef['z_ahn'].isnull().values.any()
+                        
+
+                # als uiterste ahnwaarde aan rivierzijde direct wordt overschreden, niet doorgaan        
+                if buitenTest == True:
+                    pass
+
+                
+            
+                
+
+                # terugkoppelen of fit wel/niet gelukt is 
+                oordeelCursor = arcpy.da.UpdateCursor(profielen,["profielnummer_str","geometrieOordeel"])
+                for oRow in oordeelCursor:
+                    if oRow[0] == profielnummer:
+
+                        if isectTest == True or refTest == True or buitenTest == True:
+                            oRow[1] = "Onvoldoende"
+                        
+                        if isectTest == False and refTest == False and ingepastRefprofiel == True:
+                            if ahnTest == False:
+
+                                oRow[1] = "Voldoende, aaneengesloten hoogtedata"
+                            if ahnTest == True:
+                                oRow[1] = "Voldoende, gaten in hoogtedata"
+
+                        if isectTest == False and ingepastRefprofiel == False:
+                            oRow[1] = "Onvoldoende"
+                        
+                        if refTest == False and ingepastRefprofiel == False:
+                            oRow[1] = "Onvoldoende"
+                    
+                        oordeelCursor.updateRow(oRow)
+
+                del oordeelCursor
+
+                # kruinlocatie als punt weergeven indien gefit
+                if (isectTest == False and refTest == False and buitenTest == False and ingepastRefprofiel == True):
+                    # plot groen profiel, profiel past
+
+                    if ahnTest == False:
+                        ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'],'--',label="Passend referentieprofiel", color="green",linewidth=3.5)
+                    if ahnTest == True:
+                        ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'],'--',label="Passend referentieprofiel, gaten in hoogtedata", color="yellow",linewidth=3.5)
+
+                    kruinHoogte = baseMerge2['z_ref'].max()
+                    kruinDeel = baseMerge2.loc[baseMerge2['z_ref'] == kruinHoogte]
+                    kruinLandzijde = kruinDeel['afstand'].min()
+                    kruinRivierzijde = kruinDeel['afstand'].max()
+                    kruinMidden = (kruinLandzijde + kruinRivierzijde) / 2
+
+
+
+                    arcpy.CreateTable_management(workspace, "kruinpuntTable", "", "")
+                    arcpy.AddField_management("kruinpuntTable","profielnummer_str", "TEXT", field_length=50)
+                    arcpy.AddField_management("kruinpuntTable","afstand","DOUBLE", 2, field_is_nullable="NULLABLE")
+
+                    kruinTabelCursor = arcpy.da.InsertCursor("kruinpuntTable", ["profielnummer_str","afstand"])
+                
+                    kruinTabelCursor.insertRow([profielnummer,kruinMidden])
+
+                    del kruinTabelCursor
+                    
+
+                    arcpy.MakeRouteEventLayer_lr("tempRefRoute", "profielnummer_str", "kruinpuntTable", "profielnummer_str POINT afstand", "kruinpuntlayer", "", "NO_ERROR_FIELD", "NO_ANGLE_FIELD", "NORMAL", "ANGLE", "LEFT", "POINT")
+                    arcpy.CopyFeatures_management("kruinpuntlayer", "tempkruinpunt")
+                    arcpy.Delete_management("kruinpuntlayer")
+
+                    # invoegen punt in totaalset
+                    geom = [z[0] for z in arcpy.da.SearchCursor ("tempkruinpunt", ["SHAPE@XY"])][0]
+
+                    profielnummer_strip = profielnummer.strip("profielnummer_")
+                    profielnummer_int = int(profielnummer_strip)
+                    kruinpuntenCursor.insertRow([trajectnaam,profielnummer_int,kruinMidden, geom])
+
+                    del geom
+                
+                    # einde kruinlocatie
+            
+                
+                if ((isectTest == True or refTest == True) and ingepastRefprofiel == True):
+                    # plot rood profiel, profiel past niet
+                    ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'],'--',label="Niet-passend referentieprofiel", color="red",linewidth=3.5)
+
+                if (isectTest == False or refTest == False) and ingepastRefprofiel == False:
+                    pass
+
+                
+
+                # verdere plotinstellingen
+                try:
+                    minPlotX, maxPlotX, minPlotY, maxPlotY
+                    plt.xlim(minPlotX, maxPlotX)
+                    plt.ylim(minPlotY, maxPlotY)
+
+                except ValueError:
+                    pass
+                
+                # legenda aanzetten
+                ax1.legend(frameon=False, loc='upper right',prop={'size': 20})
+
+                # plt.show()
+
+                plt.savefig("{}/{}.png".format(plotmap,profielnummer))
+                
         
+                plt.close()
+
+                print profielnummer
             
-            if ((isectTest == True or refTest == True) and ingepastRefprofiel == True):
-                # plot rood profiel, profiel past niet
-                ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'],'--',label="Niet-passend referentieprofiel", color="red",linewidth=3.5)
-
-            if (isectTest == False or refTest == False) and ingepastRefprofiel == False:
-                pass
-
             
-
-            # verdere plotinstellingen
-            try:
-                minPlotX, maxPlotX, minPlotY, maxPlotY
-                plt.xlim(minPlotX, maxPlotX)
-                plt.ylim(minPlotY, maxPlotY)
-
-            except ValueError:
-                pass
             
-            # legenda aanzetten
-            ax1.legend(frameon=False, loc='upper right',prop={'size': 20})
-
-            # plt.show()
-
-            plt.savefig("{}/{}.png".format(plotmap,profielnummer))
-            
-    
-            plt.close()
-
-            print profielnummer
-           
-        
-        
-        del kruinpuntenCursor
+    del kruinpuntenCursor
         
 
     print "Indien mogelijk referentieprofielen gefit voor {}".format(trajectnaam)
@@ -1086,4 +1175,4 @@ with arcpy.da.SearchCursor(trajectenHDSR,['SHAPE@',code_hdsr,toetsniveaus,bodemd
 
         plotmap = maak_plotmap(baseFigures=baseFigures,trajectnaam = id)
 
-        fitten_refprofiel(profielen=profielen,refprofielen=refprofielen, refprofielenpunten=refprofielenpunten,hoogtedata=rasterAHN3BAG2m,kruinpunten=kruinpunten,plotmap=plotmap,trajectnaam = id,toetsniveau=toetsniveau_bodemdaling, ondergrensReferentie=ondergrensReferentie)
+        fitten_refprofiel(profielen=profielen,refprofielen=refprofielen, refprofielenpunten=refprofielenpunten,hoogtedata=rasterAHN3BAG2m,kruinpunten=kruinpunten,plotmap=plotmap,trajectnaam = id,toetsniveau=toetsniveau_bodemdaling, ondergrensReferentie=ondergrensReferentie,maxNodata=maxNodata)

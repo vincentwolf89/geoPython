@@ -1,7 +1,7 @@
 import os
 import arcpy
 
-arcpy.env.workspace = r"D:\Projecten\HDSR\2020\gisData\cPointsPilot_1.gdb"
+arcpy.env.workspace = r"D:\Projecten\HDSR\2020\gisData\cPointsPilotClean.gdb"
 
 dir = r"C:\Users\Vincent\Desktop\cPointsPilot"
 
