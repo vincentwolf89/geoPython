@@ -1027,12 +1027,13 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
 
 
                     baseDF = baseMerge2.copy()
+                    baseMerge3 = baseMerge2.copy()
                 
 
                     # tweede poging tot fitten profiel zonder gaten in ahn
                     if isectTest == False and refTest == False and ahnTest == True and buitenTest ==False:
 
-                        baseMerge3 = baseMerge2
+                        # baseMerge3 = baseMerge2
 
                         isectTest_v2 = True
                         refTest_v2 = True
@@ -1114,8 +1115,8 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
                                 ahnTest = False
                                 buitenTest = buitenTest_v2
                                 
-                                del baseMerge2
-                                baseMerge2 = baseMerge3
+                                # del baseMerge2
+                                baseMerge2 = baseMerge3.copy()
                                 resetDF = False
                                 
 
@@ -1153,12 +1154,14 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
                         if isectTest == True or refTest == True or buitenTest == True:
                             oRow[1] = "Onvoldoende"
                         
-                        if isectTest == False and refTest == False and ingepastRefprofiel == True:
-                            if ahnTest == False:
+                        if (isectTest == False and refTest == False and buitenTest == False and ingepastRefprofiel == True and ahnTest == False):
+                            # if ahnTest == False:
 
-                                oRow[1] = "Voldoende, aaneengesloten hoogtedata"
-                            if ahnTest == True:
-                                oRow[1] = "Voldoende, gaten in hoogtedata"
+                            oRow[1] = "Voldoende, aaneengesloten hoogtedata"
+
+                        if (isectTest == False and refTest == False and buitenTest == False and ingepastRefprofiel == True and ahnTest == True):
+                            # if ahnTest == True:
+                            oRow[1] = "Voldoende, gaten in hoogtedata"
 
                         if isectTest == False and ingepastRefprofiel == False:
                             oRow[1] = "Onvoldoende"
@@ -1171,13 +1174,46 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
                 del oordeelCursor
 
                 # kruinlocatie als punt weergeven indien gefit
-                if (isectTest == False and refTest == False and buitenTest == False and ingepastRefprofiel == True):
-                    # plot groen profiel, profiel past
+                if (isectTest == False and refTest == False and buitenTest == False and ingepastRefprofiel == True and ahnTest == True):
+                    # plot geel profiel, profiel past maar niet netjes
+                    ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'],'--',label="Passend referentieprofiel, gaten in hoogtedata", color="yellow",linewidth=3.5)
+                    
+                    kruinHoogte = baseMerge2['z_ref'].max()
+                    kruinDeel = baseMerge2.loc[baseMerge2['z_ref'] == kruinHoogte]
+                    kruinLandzijde = kruinDeel['afstand'].min()
+                    kruinRivierzijde = kruinDeel['afstand'].max()
+                    kruinMidden = (kruinLandzijde + kruinRivierzijde) / 2
 
-                    if ahnTest == False:
-                        ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'],'--',label="Passend referentieprofiel", color="green",linewidth=3.5)
-                    if ahnTest == True:
-                        ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'],'--',label="Passend referentieprofiel, gaten in hoogtedata", color="yellow",linewidth=3.5)
+
+
+                    arcpy.CreateTable_management(workspace, "kruinpuntTable", "", "")
+                    arcpy.AddField_management("kruinpuntTable","profielnummer_str", "TEXT", field_length=50)
+                    arcpy.AddField_management("kruinpuntTable","afstand","DOUBLE", 2, field_is_nullable="NULLABLE")
+
+                    kruinTabelCursor = arcpy.da.InsertCursor("kruinpuntTable", ["profielnummer_str","afstand"])
+                
+                    kruinTabelCursor.insertRow([profielnummer,kruinMidden])
+
+                    del kruinTabelCursor
+                    
+
+                    arcpy.MakeRouteEventLayer_lr("tempRefRoute", "profielnummer_str", "kruinpuntTable", "profielnummer_str POINT afstand", "kruinpuntlayer", "", "NO_ERROR_FIELD", "NO_ANGLE_FIELD", "NORMAL", "ANGLE", "LEFT", "POINT")
+                    arcpy.CopyFeatures_management("kruinpuntlayer", "tempkruinpunt")
+                    arcpy.Delete_management("kruinpuntlayer")
+
+                    # invoegen punt in totaalset
+                    geom = [z[0] for z in arcpy.da.SearchCursor ("tempkruinpunt", ["SHAPE@XY"])][0]
+
+                    profielnummer_strip = profielnummer.strip("profielnummer_")
+                    profielnummer_int = int(profielnummer_strip)
+                    kruinpuntenCursor.insertRow([trajectnaam,profielnummer_int,kruinMidden, geom])
+
+                    del geom
+
+                if (isectTest == False and refTest == False and buitenTest == False and ingepastRefprofiel == True and ahnTest == False):
+                    # plot groen profiel, profiel past
+                    ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'],'--',label="Passend referentieprofiel", color="green",linewidth=3.5)
+                   
 
                     kruinHoogte = baseMerge2['z_ref'].max()
                     kruinDeel = baseMerge2.loc[baseMerge2['z_ref'] == kruinHoogte]
@@ -1214,7 +1250,7 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
                     # einde kruinlocatie
             
                 
-                if ((isectTest == True or refTest == True) and ingepastRefprofiel == True):
+                if ((isectTest == True or refTest == True or buitenTest == True) and ingepastRefprofiel == True):
                     # plot rood profiel, profiel past niet
                     ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'],'--',label="Niet-passend referentieprofiel", color="red",linewidth=3.5)
 
