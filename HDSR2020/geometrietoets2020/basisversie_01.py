@@ -23,7 +23,7 @@ baseFigures = r"C:/Users/Vincent/Desktop/geomtoetsTest/"
   
 
 
-trajectenHDSR = "testje"
+trajectenHDSR = "testTrajecten" #testahninbouw"
 afstandKruinSegment = 0.5 # maximale afstand die tussen kruinsegmenten mag zijn om samen te voegen
 minKruinBreedte = 1.5
 maxNodata = 3
@@ -671,16 +671,18 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
     with arcpy.da.SearchCursor(profielen,["SHAPE@","profielnummer_str"]) as profielCursor:
         for pRow in profielCursor:
 
+
          
 
 
             profielnummer = pRow[1]
+            # if profielnummer == "profiel_20":
             tempprofiel = "tempprofiel"
             temprefpunten = "temprefpunten"
             temprefprofiel = "temprefprofiel"
             tempbandbreedte = "tempbandbreedte"
 
-           
+        
                 
             # selecteer betreffend profiel en kopieer naar tijdelijke laag
             where = '"' + 'profielnummer_str' + '" = ' + "'" + profielnummer + "'"
@@ -790,7 +792,7 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
             maxPlotX = sortProfileDf['afstand'].max()+10
 
         
-            minPlotY = sortProfileDf['z_ahn'].min()
+            minPlotY = sortProfileDf['z_ahn'].min()-5
             # check of refprofiel zichtbaar is in plot
             if minPlotY >= toetsniveau:
                 minPlotY = toetsniveau -2
@@ -815,6 +817,7 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
             # koppelen dataframes profielen en refprofielen
             baseMerge1 = baseDf.merge(sortProfileDf, on=['afstand'],how='outer')
             baseMerge2 = baseMerge1.merge(sortrefDf, on=['afstand'],how='outer')
+
             
             # verschil bepalen tussen gewone profiel en referentieprofiel
             firstAfstand = baseMerge2['afstand_ref'].first_valid_index()
@@ -824,6 +827,8 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
             baseMerge2.loc[firstAfstand:lastAfstand, 'afstand_ref'] = baseMerge2.loc[firstAfstand:lastAfstand, 'afstand_ref'].interpolate()
             baseMerge2.loc[firstAfstand:lastAfstand, 'z_ref'] = baseMerge2.loc[firstAfstand:lastAfstand, 'z_ref'].interpolate()
             baseMerge2['difference'] = baseMerge2.z_ahn - baseMerge2.z_ref
+
+            
             
             # plot opbouwen
             plt.style.use('seaborn-whitegrid') #seaborn-ticks
@@ -875,7 +880,7 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
             # eindpunt buitenzijde refprofiel
             # als geen grensprofiel ingepast kan worden, geen oordeel
             if ingepastRefprofiel == False:
-              
+            
                 oordeelCursor = arcpy.da.UpdateCursor(profielen,["profielnummer_str","geometrieOordeel"])
                 for oRow in oordeelCursor:
                     if oRow[0] == profielnummer:
@@ -901,7 +906,7 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
 
             # als wel grensprofiel ingepast kan worden: doorgaan
             
-               
+            
             if ingepastRefprofiel == True:
                 ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'],label="Initieel referentieprofiel",color="orange",linewidth=3.5)
                 refBasis = baseMerge2.loc[baseMerge2['z_ref'] == toetsniveau-ondergrensReferentie]
@@ -916,7 +921,7 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
                     buitenTest = False
 
             
-      
+    
 
             
                 # check of nan-waardes boven refprofiel aanwezig zijn
@@ -933,10 +938,9 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
                 ahnTest = False
                 for index, dRow in dfRef.iterrows():
                     z_ahn = dRow['z_ahn']
-
                     if math.isnan(z_ahn) == True:
                         
-                   
+                
     
                         noData +=1
 
@@ -947,28 +951,10 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
                     if math.isnan(z_ahn) == False:
                         noData = 0
 
-                print ahnTest
-                
-
-
-
-                      
-     
-
-
-
-
-
-                    
-
-
             
 
-                
 
-
-                    
-                
+                print "ahntest: {}".format(ahnTest)
 
 
                 
@@ -1001,11 +987,13 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
                         # check uiterste rivierzijde ahnwaarde, deze mag niet overschreden worden door eindpunt buitenzijde refprofiel
                         refBasis = baseMerge2.loc[baseMerge2['z_ref'] == toetsniveau-ondergrensReferentie]
                         buitenzijdeRefprofiel = round(float(refBasis['afstand'].max()),1)
-                        if buitenzijdeRefprofiel > rivierGrensRaster:
+
+                        print "buitenzijderefprofiel is {} en riviergrens raster is {}".format(buitenzijdeRefprofiel,rivierGrensRaster)
+                        if buitenzijdeRefprofiel >= rivierGrensRaster:
                             buitenTest = True
                             print "overschrijding, stoppen!"
                             break
-                        if buitenzijdeRefprofiel <= rivierGrensRaster:
+                        if buitenzijdeRefprofiel < rivierGrensRaster:
                             buitenTest = False
 
 
@@ -1017,6 +1005,136 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
                         # print indexLinkerzijdeRp, linkerzijdeRp, indexRechterzijdeRp, rechterzijdeRp
                         dfRef = baseMerge2.loc[indexLinkerzijdeRp:indexRechterzijdeRp]
                         ahnTestRef = dfRef['z_ahn'].isnull().values.any()
+
+                        # test of 3 of meer aaneengesloten nodata punten in het ahnraster zitten boven refprofiel
+                        noData = 0
+                        # ahnTest = False
+                        for index, dRow in dfRef.iterrows():
+                            z_ahn = dRow['z_ahn']
+                            if math.isnan(z_ahn) == True:
+                                
+                                noData +=1
+
+                                if noData > maxNodata:
+                                    ahnTest = True
+                                    break
+
+                            if math.isnan(z_ahn) == False:
+                                noData = 0
+
+                        print "ahntest v1: {}".format(ahnTest)
+
+
+
+                    baseDF = baseMerge2.copy()
+                
+
+                    # tweede poging tot fitten profiel zonder gaten in ahn
+                    if isectTest == False and refTest == False and ahnTest == True and buitenTest ==False:
+
+                        baseMerge3 = baseMerge2
+
+                        isectTest_v2 = True
+                        refTest_v2 = True
+                        ahnTest_v2 = True
+                    
+
+                        
+                        while ahnTest_v2==True and resterend > 0:
+
+                        
+                            # probeer passende fit te vinden: isectTest, refTesten ahnTest moeten false zijn
+                            # schuif het refprofiel naar rechts en test op isects
+
+                            
+
+                            baseMerge3['afstand_ref'] = baseMerge3['afstand_ref'].shift(+1)
+                            baseMerge3['z_ref'] = baseMerge3['z_ref'].shift(+1)
+                            baseMerge3['difference'] = baseMerge3.z_ahn - baseMerge3.z_ref
+                            
+                            isectTest_v2 = (baseMerge3['difference'] < 0).values.any()
+
+
+                            # optellen 
+                            iteraties += 1
+                            resterend -= 0.5
+                            print resterend, " in tweede poging"
+
+                            # test of ahn-waardes boven de kruin aanwezig zijn
+                            refKruin_v2 = baseMerge3.loc[baseMerge3['z_ref'] == toetsniveau]
+                            refTest_v2 = refKruin_v2['z_ahn'].isnull().values.any()
+
+                            # check uiterste rivierzijde ahnwaarde, deze mag niet overschreden worden door eindpunt buitenzijde refprofiel
+                            refBasis_v2 = baseMerge3.loc[baseMerge3['z_ref'] == toetsniveau-ondergrensReferentie]
+                            buitenzijdeRefprofiel_v2 = round(float(refBasis_v2['afstand'].max()),1)
+                            if buitenzijdeRefprofiel_v2 >= rivierGrensRaster:
+                                buitenTest_v2 = True
+                                print "overschrijding, stoppen!"
+                                
+
+                                break
+                            if buitenzijdeRefprofiel_v2 < rivierGrensRaster:
+                                buitenTest_v2 = False
+
+
+                            # check of nan-waardes boven refprofiel aanwezig zijn
+                            indexLinkerzijdeRp_v2 = baseMerge3['z_ref'].first_valid_index()
+                            indexRechterzijdeRp_v2 = baseMerge3['z_ref'].last_valid_index()
+                            linkerzijdeRp_v2 = baseMerge3.iloc[indexLinkerzijdeRp_v2]['afstand']
+                            rechterzijdeRp_v2 = baseMerge3.iloc[indexRechterzijdeRp_v2]['afstand']
+                            # print indexLinkerzijdeRp, linkerzijdeRp, indexRechterzijdeRp, rechterzijdeRp
+                            dfRef_v2 = baseMerge3.loc[indexLinkerzijdeRp_v2:indexRechterzijdeRp_v2]
+                            ahnTestRef_v2 = dfRef_v2['z_ahn'].isnull().values.any()
+
+                            # test of 3 of meer aaneengesloten nodata punten in het ahnraster zitten boven refprofiel
+                            noData = 0
+                            # ahnTest = False
+                            for index, dRow in dfRef_v2.iterrows():
+                                z_ahn = dRow['z_ahn']
+                                if math.isnan(z_ahn) == True:
+                                    
+                                    noData +=1
+
+                                    if noData > maxNodata:
+                                        ahnTest_v2 = True
+                                        break
+
+                                if math.isnan(z_ahn) == False:
+                                    noData = 0
+
+                            if noData <= maxNodata: 
+                                ahnTest_v2 = False
+
+                            print "ahntest v2: {}".format(ahnTest_v2)
+
+                            if isectTest_v2 == False and refTest_v2 == False and ahnTest_v2 == False and buitenTest_v2 == False:
+                                print "fit gevonden!"
+                                isectTest = False
+                                refTest = False
+                                ahnTest = False
+                                buitenTest = buitenTest_v2
+                                
+                                del baseMerge2
+                                baseMerge2 = baseMerge3
+                                resetDF = False
+                                
+
+                                break
+
+                            else:
+                                resetDF = True
+                                print "reset DF"
+
+
+                        if resetDF == True:
+                            print "df resetten..."
+                            baseMerge2 = baseDF
+                            
+                
+
+                    # einde tweede poging
+
+
                         
 
                 # als uiterste ahnwaarde aan rivierzijde direct wordt overschreden, niet doorgaan        
@@ -1125,17 +1243,17 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
                 plt.close()
 
                 print profielnummer
+                
+                
+                
+        del kruinpuntenCursor
             
-            
-            
-    del kruinpuntenCursor
-        
 
-    print "Indien mogelijk referentieprofielen gefit voor {}".format(trajectnaam)
+        print "Indien mogelijk referentieprofielen gefit voor {}".format(trajectnaam)
 
 
 # stap 1: bodemdaling voor totaaltrajecten bepalen
-# bepaal_bodemdaling(trajecten=trajectenHDSR,bodemdalingskaart=bodemdalingskaart,code=code_hdsr,bodemdalingsveld=bodemdalingsveld,jaren_bodemdaling=jaren_bodemdaling,toetsniveaus=toetsniveaus,toetsniveaus_bodemdaling=toetsniveaus_bodemdaling)
+bepaal_bodemdaling(trajecten=trajectenHDSR,bodemdalingskaart=bodemdalingskaart,code=code_hdsr,bodemdalingsveld=bodemdalingsveld,jaren_bodemdaling=jaren_bodemdaling,toetsniveaus=toetsniveaus,toetsniveaus_bodemdaling=toetsniveaus_bodemdaling)
 
 with arcpy.da.SearchCursor(trajectenHDSR,['SHAPE@',code_hdsr,toetsniveaus,bodemdalingsveld,toetsniveaus_bodemdaling]) as cursor:
     for row in cursor:
@@ -1160,18 +1278,18 @@ with arcpy.da.SearchCursor(trajectenHDSR,['SHAPE@',code_hdsr,toetsniveaus,bodemd
 
 
       
-        # maak_basisprofielen(trajectlijn=trajectlijn,code=code,toetsniveau=toetsniveau,toetsniveau_bodemdaling=toetsniveau_bodemdaling, profielen=profielen,bodemdalingsveld=bodemdalingsveld, bodemdaling_perjaar=bodemdaling_perjaar, refprofielen=refprofielen, bgt_waterdeel_boezem=waterlopenBGTBoezem,trajectnaam=id,profiel_interval=profielInterval,profiel_lengte_land=profiel_lengte_land,profiel_lengte_rivier=profiel_lengte_rivier)
+        maak_basisprofielen(trajectlijn=trajectlijn,code=code,toetsniveau=toetsniveau,toetsniveau_bodemdaling=toetsniveau_bodemdaling, profielen=profielen,bodemdalingsveld=bodemdalingsveld, bodemdaling_perjaar=bodemdaling_perjaar, refprofielen=refprofielen, bgt_waterdeel_boezem=waterlopenBGTBoezem,trajectnaam=id,profiel_interval=profielInterval,profiel_lengte_land=profiel_lengte_land,profiel_lengte_rivier=profiel_lengte_rivier)
 
       
         
-        # hoogtetest = bepaal_kruinvlak_toetsniveau(trajectlijn=trajectlijn,hoogtedata=rasterAHN3BAG2m,toetsniveau=toetsniveau,profielen=profielen,refprofielen=refprofielen,trajectnaam=id)
+        hoogtetest = bepaal_kruinvlak_toetsniveau(trajectlijn=trajectlijn,hoogtedata=rasterAHN3BAG2m,toetsniveau=toetsniveau,profielen=profielen,refprofielen=refprofielen,trajectnaam=id)
 
-        # if hoogtetest == "stop":
-        #     break
+        if hoogtetest == "stop":
+            break
 
-        # else: 
+        else: 
 
-        #     maak_referentieprofielen(profielen=profielen,refprofielen=refprofielen, toetsniveau=toetsniveau_bodemdaling,minKruinBreedte=minKruinBreedte,refprofielenpunten= refprofielenpunten,kruindelentraject=hoogtetest,ondergrensReferentie=ondergrensReferentie,trajectnaam=id)
+            maak_referentieprofielen(profielen=profielen,refprofielen=refprofielen, toetsniveau=toetsniveau_bodemdaling,minKruinBreedte=minKruinBreedte,refprofielenpunten= refprofielenpunten,kruindelentraject=hoogtetest,ondergrensReferentie=ondergrensReferentie,trajectnaam=id)
 
         plotmap = maak_plotmap(baseFigures=baseFigures,trajectnaam = id)
 
