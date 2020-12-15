@@ -14,16 +14,16 @@ sys.path.append('HDSR2020')
 from basisRWK2020 import generate_profiles, copy_trajectory_lr, split_profielen
 
 arcpy.env.overwriteOutput = True
-arcpy.env.workspace = r"D:\Projecten\HDSR\2020\gisData\geomtoetsTest.gdb"
-workspace = r"D:\Projecten\HDSR\2020\gisData\geomtoetsTest.gdb"
+arcpy.env.workspace = r"D:\Projecten\HDSR\2020\gisData\geomtoetsV2.gdb"
+workspace = r"D:\Projecten\HDSR\2020\gisData\geomtoetsV2.gdb"
 
-baseFigures = r"C:/Users/Vincent/Desktop/geomtoetsTest/"
+baseFigures = r"C:/Users/Vincent/Desktop/geomtoets_v2/gt_results/"
 
 
   
 
 
-trajectenHDSR = "test104" #testahninbouw"
+trajectenHDSR = "RWK_areaal_2024_geomtoets"
 afstandKruinSegment = 0.5 # maximale afstand die tussen kruinsegmenten mag zijn om samen te voegen
 minKruinBreedte = 1.5
 maxNodata = 3
@@ -40,7 +40,7 @@ waterlopenBGTBoezem = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\bgt_waterde
 rasterAHN3BAG2m = r"D:\Projecten\HDSR\2020\gisData\basisData.gdb\BAG2mPlusWaterlopenAHN3"
 bodemdalingskaart = r'D:\GIS\losse rasters\bodemdalingskaart_app_data_geotiff_Bodemdalingskaart_10de_percentiel_mm_per_jaar_verticale_richting_v2018002.tif'
 
-#outputFigures = r"C:\Users\Vincent\Desktop\demoGeomtoets"
+
 
 def bepaal_bodemdaling(trajecten,bodemdalingskaart,code,bodemdalingsveld,jaren_bodemdaling,toetsniveaus,toetsniveaus_bodemdaling):
     # check op veld bodemdaling en voeg voor de zekerheid toe als nieuwe double
@@ -114,16 +114,6 @@ def bepaal_bodemdaling(trajecten,bodemdalingskaart,code,bodemdalingsveld,jaren_b
 
     print "Bodemdaling gekoppeld aan trajecten: {} met periode van {} jaar".format(trajecten,jaren_bodemdaling)
   
-
-
-
-
-
-
-
-   
-
-
 
 
 
@@ -796,7 +786,7 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
             # check of refprofiel zichtbaar is in plot
             if minPlotY >= toetsniveau:
                 minPlotY = toetsniveau -2
-            maxPlotY = sortProfileDf['z_ahn'].max()
+            maxPlotY = sortProfileDf['z_ahn'].max()+1
 
 
             # minimale en maximale afstanden bepalen voor opbouw basisdataframe
@@ -916,6 +906,9 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
 
                 print "Riviergrensraster is {}m en buitenzijde grensprofiel is {}m".format(rivierGrensRaster,buitenzijdeRefprofiel)
 
+                # default buitenTest = True!
+                buitenTest = True
+                
                 if buitenzijdeRefprofiel > rivierGrensRaster:
                     buitenTest = True
                 if buitenzijdeRefprofiel <= rivierGrensRaster:
@@ -1144,19 +1137,19 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
                                 
                                 # del baseMerge2
                                 baseMerge2 = baseMerge3.copy()
-                                resetDF = False
+                                # resetDF = False
                                 
 
                                 break
 
-                            else:
-                                resetDF = True
-                                print "reset DF"
+                            # else:
+                            #     resetDF = True
+                            #     print "reset DF"
 
 
-                        if resetDF == True:
-                            print "df resetten..."
-                            baseMerge2 = baseDF
+                        # if resetDF == True:
+                        #     print "df resetten..."
+                        #     baseMerge2 = baseDF
                             
                 
 
@@ -1316,7 +1309,7 @@ def fitten_refprofiel(profielen, refprofielen, refprofielenpunten,hoogtedata,kru
 
 
 # stap 1: bodemdaling voor totaaltrajecten bepalen
-# bepaal_bodemdaling(trajecten=trajectenHDSR,bodemdalingskaart=bodemdalingskaart,code=code_hdsr,bodemdalingsveld=bodemdalingsveld,jaren_bodemdaling=jaren_bodemdaling,toetsniveaus=toetsniveaus,toetsniveaus_bodemdaling=toetsniveaus_bodemdaling)
+bepaal_bodemdaling(trajecten=trajectenHDSR,bodemdalingskaart=bodemdalingskaart,code=code_hdsr,bodemdalingsveld=bodemdalingsveld,jaren_bodemdaling=jaren_bodemdaling,toetsniveaus=toetsniveaus,toetsniveaus_bodemdaling=toetsniveaus_bodemdaling)
 
 with arcpy.da.SearchCursor(trajectenHDSR,['SHAPE@',code_hdsr,toetsniveaus,bodemdalingsveld,toetsniveaus_bodemdaling]) as cursor:
     for row in cursor:
@@ -1341,19 +1334,19 @@ with arcpy.da.SearchCursor(trajectenHDSR,['SHAPE@',code_hdsr,toetsniveaus,bodemd
 
 
       
-        # maak_basisprofielen(trajectlijn=trajectlijn,code=code,toetsniveau=toetsniveau,toetsniveau_bodemdaling=toetsniveau_bodemdaling, profielen=profielen,bodemdalingsveld=bodemdalingsveld, bodemdaling_perjaar=bodemdaling_perjaar, refprofielen=refprofielen, bgt_waterdeel_boezem=waterlopenBGTBoezem,trajectnaam=id,profiel_interval=profielInterval,profiel_lengte_land=profiel_lengte_land,profiel_lengte_rivier=profiel_lengte_rivier)
+        maak_basisprofielen(trajectlijn=trajectlijn,code=code,toetsniveau=toetsniveau,toetsniveau_bodemdaling=toetsniveau_bodemdaling, profielen=profielen,bodemdalingsveld=bodemdalingsveld, bodemdaling_perjaar=bodemdaling_perjaar, refprofielen=refprofielen, bgt_waterdeel_boezem=waterlopenBGTBoezem,trajectnaam=id,profiel_interval=profielInterval,profiel_lengte_land=profiel_lengte_land,profiel_lengte_rivier=profiel_lengte_rivier)
 
       
         
-        # hoogtetest = bepaal_kruinvlak_toetsniveau(trajectlijn=trajectlijn,hoogtedata=rasterAHN3BAG2m,toetsniveau=toetsniveau,profielen=profielen,refprofielen=refprofielen,trajectnaam=id)
+        hoogtetest = bepaal_kruinvlak_toetsniveau(trajectlijn=trajectlijn,hoogtedata=rasterAHN3BAG2m,toetsniveau=toetsniveau,profielen=profielen,refprofielen=refprofielen,trajectnaam=id)
 
-        # if hoogtetest == "stop":
-        #     break
+        if hoogtetest == "stop":
+            pass
 
-        # else: 
+        else: 
 
-        #     maak_referentieprofielen(profielen=profielen,refprofielen=refprofielen, toetsniveau=toetsniveau_bodemdaling,minKruinBreedte=minKruinBreedte,refprofielenpunten= refprofielenpunten,kruindelentraject=hoogtetest,ondergrensReferentie=ondergrensReferentie,trajectnaam=id)
+            maak_referentieprofielen(profielen=profielen,refprofielen=refprofielen, toetsniveau=toetsniveau_bodemdaling,minKruinBreedte=minKruinBreedte,refprofielenpunten= refprofielenpunten,kruindelentraject=hoogtetest,ondergrensReferentie=ondergrensReferentie,trajectnaam=id)
 
-        plotmap = maak_plotmap(baseFigures=baseFigures,trajectnaam = id)
+            plotmap = maak_plotmap(baseFigures=baseFigures,trajectnaam = id)
 
-        fitten_refprofiel(profielen=profielen,refprofielen=refprofielen, refprofielenpunten=refprofielenpunten,hoogtedata=rasterAHN3BAG2m,kruinpunten=kruinpunten,plotmap=plotmap,trajectnaam = id,toetsniveau=toetsniveau_bodemdaling, ondergrensReferentie=ondergrensReferentie,maxNodata=maxNodata)
+            fitten_refprofiel(profielen=profielen,refprofielen=refprofielen, refprofielenpunten=refprofielenpunten,hoogtedata=rasterAHN3BAG2m,kruinpunten=kruinpunten,plotmap=plotmap,trajectnaam = id,toetsniveau=toetsniveau_bodemdaling, ondergrensReferentie=ondergrensReferentie,maxNodata=maxNodata)
