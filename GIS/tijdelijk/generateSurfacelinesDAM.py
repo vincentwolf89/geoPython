@@ -17,35 +17,50 @@ arcpy.env.workspace = r'D:\Projecten\HDSR\2020\gisData\inputDAM.gdb'
 arcpy.env.overwriteOutput = True
 
 
-uitvoerpunten = "testpunten"
+uitvoerpunten = "punten_profielen_z"
 
 
+def generate_surfacelines(uitvoerpunten):
 
-df = pd.DataFrame()
-arrayTest = arcpy.da.FeatureClassToNumPyArray(uitvoerpunten, ('profielnummer','afstand','x','y','z_ahn'))
-dfTest = pd.DataFrame(arrayTest)
-sortTest = dfTest.sort_values(by=['profielnummer','afstand'],ascending=[True,True])
+    # data inlezen
+    baseDf = pd.DataFrame()
+    inputArray = arcpy.da.FeatureClassToNumPyArray(uitvoerpunten, ('profielnummer','afstand','x','y','z_ahn'))
+    inputDf = pd.DataFrame(inputArray)
+    inputDf = inputDf.dropna()
+    sortInputDf = inputDf.sort_values(by=['profielnummer','afstand'],ascending=[True,True])
 
-grouped = sortTest.groupby('profielnummer')
-countcolums = 0
-# iterate over each group
-for group_name, df_group in grouped:
-    
-    countrows = 0
+    # groeperen per profielnummer
 
-    for row_index, row in df_group.iterrows():
-        x_column = "X{}".format(countrows)
-        y_column = "Y{}".format(countrows)
-        z_column = "Z{}".format(countrows)
+    grouped = sortInputDf.groupby('profielnummer')
 
-        df.loc[countcolums,'LOCATIONID'] = row[0] 
-        df.loc[countcolums, x_column]= row['x']
-        df.loc[countcolums, y_column]= row['y']
-        df.loc[countcolums, z_column]= row['z_ahn']
+    # kolommen, beginnen op 0
+    countcolums = 0
 
-        countrows +=1
-    countcolums += 1
+    # over iedere groep itereren
+    for group_name, df_group in grouped:
+        
+        # rijnummer, beginnen op 0
+        countrows = 0
 
-# print df
-df.set_index('LOCATIONID', inplace=True)
-df.to_excel(r'C:\Users\Vincent\Desktop\dam_pandas.xlsx')  
+        for row_index, row in df_group.iterrows():
+            x_column = "X{}".format(countrows)
+            y_column = "Y{}".format(countrows)
+            z_column = "Z{}".format(countrows)
+
+            baseDf.loc[countcolums,'LOCATIONID'] = row[0] 
+            baseDf.loc[countcolums, x_column]= row['x']
+            baseDf.loc[countcolums, y_column]= row['y']
+            baseDf.loc[countcolums, z_column]= row['z_ahn']
+
+            countrows +=1
+        countcolums += 1
+
+
+    # wegschrijven data 
+    # print df
+    baseDf.set_index('LOCATIONID', inplace=True)
+    # baseDf.to_excel(r'C:\Users\Vincent\Desktop\dam_pandas.xlsx')  
+    baseDf.to_csv(r'C:\Users\Vincent\Desktop\dam_surfacelines.csv', sep=';',decimal='.')
+
+
+generate_surfacelines(uitvoerpunten)

@@ -12,22 +12,22 @@ from itertools import groupby
 pd.set_option('mode.chained_assignment', None)
 from basisfuncties import*
 
-arcpy.env.workspace = r'D:\Projecten\WSRL\safe\lekdata\lekOost.gdb'
+arcpy.env.workspace = r'D:\Projecten\HDSR\2020\gisData\inputDAM.gdb'
 arcpy.env.overwriteOutput = True
 
 
 profiel_interval = 25
-stapgrootte_punten = 1
+stapgrootte_punten = 0.1
 profiel_lengte_land = 500
 profiel_lengte_rivier = 200
 
-trajectlijn = "leklijnOW"
-code = "traject"
+trajectlijn = r"D:\Projecten\HDSR\2020\gisData\cPointsPilot.gdb\pilotTrajecten"
+code = "Naam"
 
-raster = r'D:\Projecten\WSRL\safe\lekdata\outputLek.gdb\ahn3_lekwest2019'
+raster = r'D:\Projecten\HDSR\2020\gisData\basisData.gdb\BAG2mPlusWaterlopenAHN3'
 
 # uitvoer/invoer
-profielen = "profielenLekWest"
+profielen = r"D:\Projecten\HDSR\2020\gisData\cPointsPilot.gdb\profielenPilot"
 
 # defaultuitvoer
 invoerpunten = "punten_profielen"
@@ -41,13 +41,13 @@ veldnamen =['profielnummer', 'afstand', 'z_ahn', 'x', 'y']
 
 copy_trajectory_lr(trajectlijn,code,10)
 
-set_measurements_trajectory(profielen,trajectlijn,code,stapgrootte_punten,5)
+set_measurements_trajectory(profielen,trajectlijn,code,stapgrootte_punten,10)
 
 extract_z_arcpy(invoerpunten,uitvoerpunten,raster)
 
 add_xy(uitvoerpunten, code,trajectlijn)
 
-excelWriterTraject(uitvoerpunten,excel,veldnamen)
+# excelWriterTraject(uitvoerpunten,excel,veldnamen)
 
 
 
