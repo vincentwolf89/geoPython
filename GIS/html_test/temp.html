@@ -1,0 +1,49 @@
+<button class="groupbtn btn btn-clear" data-toggle="collapse" data-target="#conditionering_archeologie"  aria-expanded="false" aria-controls="conditionering_archeologie">Archeologie</button>
+<div class="collapse multi-collapse" id="conditionering_archeologie">
+   
+ 
+    {% for key, value in layerList.items %}
+    {% if 'conditionering_archeologie' in value.2%}
+
+    <div class="oneLine">
+        <div class="btn-group"role="group">
+        <button id="test{{key}}" class="layerbtnl btn btn-small btn-clear loadTempLayer text-nowrap" templayer="{{key}}" thema="conditionering">{{value.3}}</button>
+        <span id="loader{{key}}" class="spinner-border spinner-border-sm"></span>
+        <button id="settings{{key}}" class="btn btn-transparent" style="display:none;">
+            <i class="icon-ui-handle-vertical" style="color:black"> </i>
+        </button> 
+        </div>
+    </div>
+
+    {%endif%}
+    {%endfor%}
+
+
+
+
+</div>
+
+<button class="groupbtn btn btn-clear" data-toggle="collapse" data-target="#conditionering_milieukundig"  aria-expanded="false" aria-controls="conditionering_milieukundig">Milieukundig</button>
+<div class="collapse multi-collapse" id="conditionering_milieukundig">
+   
+ 
+    {% for key, value in layerList.items %}
+    {% if 'conditionering_milieukundig' in value.2%}
+
+    <div class="oneLine">
+        <div class="btn-group"role="group">
+        <button id="test{{key}}" class="layerbtnl btn btn-small btn-clear loadTempLayer text-nowrap" templayer="{{key}}" thema="conditionering">{{value.3}}</button>
+        <span id="loader{{key}}" class="spinner-border spinner-border-sm"></span>
+        <button id="settings{{key}}" class="btn btn-transparent" style="display:none;">
+            <i class="icon-ui-handle-vertical" style="color:black"> </i>
+        </button> 
+        </div>
+    </div>
+
+    {%endif%}
+    {%endfor%}
+
+
+
+
+</div>

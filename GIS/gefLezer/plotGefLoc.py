@@ -2,11 +2,11 @@ import os
 import arcpy
 import pandas as pd
 
-files = r'C:\Users\Vincent\Desktop\nieuw_grondonderzoek\cpt'
-arcpy.env.workspace = r'C:\Users\Vincent\Desktop\temphdsr\nieuweshapes.gdb'
-gdb = r'C:\Users\Vincent\Desktop\temphdsr\nieuweshapes.gdb'
+files = r'C:\Users\Vincent\Desktop\verwerken gisomgevingen\hdsr\Boringen GEF'
+arcpy.env.workspace = r'C:\Users\Vincent\Desktop\verwerken gisomgevingen\hdsr\hdsr.gdb'
+gdb = r'C:\Users\Vincent\Desktop\verwerken gisomgevingen\hdsr\hdsr.gdb'
 arcpy.env.overwriteOutput = True
-puntenlaag = 'sonderingen_mos'
+puntenlaag = 'boringen_december_2020'
 
 
 

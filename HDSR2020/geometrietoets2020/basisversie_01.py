@@ -27,7 +27,9 @@ trajectenHDSR = "RWK_areaal_2024_geomtoets"
 afstandKruinSegment = 0.5 # maximale afstand die tussen kruinsegmenten mag zijn om samen te voegen
 minKruinBreedte = 1.5
 maxNodata = 3
-ondergrensReferentie = 4 # aantal m onder toetsniveau
+ondergrensReferentie = 4 # aantal m onder toetsniveau: hoogte voor referentieprofiel
+toetsTaludBinnen = 2 # rekenwaarde voor 1:2 talud: buitenzijde referentieprofiel
+toetsTaludBuiten = 7 # rekenwaarde voor 1:7 talud: binnenzijde referentieprofiel
 profielInterval = 25
 profiel_lengte_land = 40
 profiel_lengte_rivier = 1000
@@ -439,7 +441,7 @@ def bepaal_kruinvlak_toetsniveau(trajectlijn,hoogtedata,toetsniveau,profielen,re
 
 
 
-def maak_referentieprofielen(profielen,refprofielen,toetsniveau, minKruinBreedte,refprofielenpunten,kruindelentraject,ondergrensReferentie,trajectnaam):
+def maak_referentieprofielen(profielen,refprofielen,toetsniveau, minKruinBreedte,refprofielenpunten,kruindelentraject,ondergrensReferentie,trajectnaam,toetsTaludBinnen,toetsTaludBuiten):
     ## 1 maak kruinpunten 
     arcpy.FeatureVerticesToPoints_management(kruindelentraject, "kruindelenTrajectEindpunten", "BOTH_ENDS")
 
@@ -494,7 +496,7 @@ def maak_referentieprofielen(profielen,refprofielen,toetsniveau, minKruinBreedte
     
     ## 4 invoegen van eindpunten voor referentieprofiel, vanuit landzijde
     # z_ref eindpunten = toetsniveau -15m, z_ref kruin= toetsniveau, kruinbreedte = minkruinbreedte.
-    # offset eindpunt binnen = 28 (4*1:7), offset buiten = 1.5+(4*1:2)
+    # offset eindpunt binnen = 28 m (4*7), offset buiten = 8 m  (4*2) 
 
     if arcpy.Exists("refProfielTabel"):
         arcpy.Delete_management("refProfielTabel")
@@ -511,20 +513,20 @@ def maak_referentieprofielen(profielen,refprofielen,toetsniveau, minKruinBreedte
 
     for profielnr, waardes in kruinDict.iteritems():
         
+        taludOffsetBinnen = ondergrensReferentie*toetsTaludBinnen
+        taludOffsetBuiten = ondergrensReferentie*toetsTaludBuiten
+
 
         # vanuit binnenzijde
         measKruinBinnen = waardes[0]
         measKruinBuiten = measKruinBinnen+minKruinBreedte
-        measRefPuntBuiten = measKruinBuiten+8
-        measRefPuntBinnen = measKruinBinnen-28
+        measRefPuntBuiten = measKruinBuiten+taludOffsetBuiten
+        measRefPuntBinnen = measKruinBinnen-taludOffsetBinnen
 
 
 
-        # # vanuit buitenzijde
-        # measKruinBuiten = waardes[1]
-        # measKruinBinnen = measKruinBuiten-minKruinBreedte
-        # measRefPuntBuiten = measKruinBuiten+30
-        # measRefPuntBinnen = measKruinBinnen-105
+    
+  
 
        
         refPuntenCursor.insertRow([profielnr,"eindpunt binnenzijde",measRefPuntBinnen])
@@ -1345,7 +1347,7 @@ with arcpy.da.SearchCursor(trajectenHDSR,['SHAPE@',code_hdsr,toetsniveaus,bodemd
 
         else: 
 
-            maak_referentieprofielen(profielen=profielen,refprofielen=refprofielen, toetsniveau=toetsniveau_bodemdaling,minKruinBreedte=minKruinBreedte,refprofielenpunten= refprofielenpunten,kruindelentraject=hoogtetest,ondergrensReferentie=ondergrensReferentie,trajectnaam=id)
+            maak_referentieprofielen(profielen=profielen,refprofielen=refprofielen, toetsniveau=toetsniveau_bodemdaling,minKruinBreedte=minKruinBreedte,refprofielenpunten= refprofielenpunten,kruindelentraject=hoogtetest,ondergrensReferentie=ondergrensReferentie,trajectnaam=id,toetsTaludBinnen=toetsTaludBinnen,toetsTaludBuiten=toetsTaludBuiten)
 
             plotmap = maak_plotmap(baseFigures=baseFigures,trajectnaam = id)
 
