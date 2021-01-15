@@ -20,8 +20,8 @@ maatregelvlakken = r"D:\Projecten\WSRL\safe\ruimtebeslag_januari2020.gdb\MA1_vla
 vaknamen = "vaknaam_20"
 
 
-# alternatieven = ["ma1_vlakken","ma2_vlakken","ma3_vlakken","ma4_vlakken","ma5_vlakken"]
-alternatieven = ["ma1_vlakken"]
+alternatieven = ["ma1_vlakken","ma2_vlakken","ma3_vlakken","ma4_vlakken","ma5_vlakken"]
+# alternatieven = ["ma1_vlakken"]
 
 
 percelen_alternatieven = []
@@ -108,7 +108,7 @@ arcpy.DeleteIdentical_management("percelen_totaal", "UNIEK_ID", "", "0")
 arcpy.SpatialJoin_analysis("percelen_totaal", priovakken, "percelen_totaal_dv", "JOIN_ONE_TO_ONE", "KEEP_ALL","","CLOSEST", "", "")
 
 # overbouw naar excel
-arrayMa = arcpy.da.FeatureClassToNumPyArray("percelen_totaal_dv", (vaknamen, eigenaar_veld_uniek))
+arrayMa = arcpy.da.FeatureClassToNumPyArray("percelen_totaal_dv", (vaknamen, eigenaar_veld_uniek,"ma1","ma2","ma3","ma4","ma5"))
 dfMa = pd.DataFrame(arrayMa)
 sortDfMa = dfMa.sort_values(by=[vaknamen],ascending=[True])
 
@@ -127,12 +127,31 @@ for group_name, df_group in grouped:
     vaknaam_temp = vaknaam_temp.replace("/","")
     vaknaam_temp = vaknaam_temp.replace("__","_")
 
+   
+    
 
-    df_unique = df_group.groupby(eigenaar_veld_uniek)[eigenaar_veld_uniek].nunique()
 
-        
+    # drop unieke waardes gebaseerd op eigenaar
+    df_uniek = df_group.drop_duplicates(subset=[eigenaar_veld_uniek])
 
-    df_unique.to_excel("{}{}.xlsx".format(output_excel,vaknaam_temp))
+
+    # velden eigenaren
+    df_uniek['voorletter'] = df_uniek[eigenaar_veld_uniek].str.split(',').str[0]
+    df_uniek['voorvoegsel'] = df_uniek[eigenaar_veld_uniek].str.split(',').str[1]
+    df_uniek['achternaam'] = df_uniek[eigenaar_veld_uniek].str.split(',').str[2]
+    df_uniek['straat'] = df_uniek[eigenaar_veld_uniek].str.split(',').str[3]
+    df_uniek['huisnummer'] = df_uniek[eigenaar_veld_uniek].str.split(',').str[4]
+    df_uniek['postcode'] = df_uniek[eigenaar_veld_uniek].str.split(',').str[5]
+    df_uniek['woonplaats'] = df_uniek[eigenaar_veld_uniek].str.split(',').str[6]
+   
+
+    print df_uniek
+
+    # "None" vervangen door "nee"
+    df_uniek = df_uniek.replace("None", "nee")
+
+    df_uniek.to_excel("{}{}.xlsx".format(output_excel,vaknaam_temp),columns=["voorletter","voorvoegsel","achternaam",
+    "straat","huisnummer","postcode","woonplaats","ma1","ma2","ma3","ma4","ma5"], index=False)
     
 
 
