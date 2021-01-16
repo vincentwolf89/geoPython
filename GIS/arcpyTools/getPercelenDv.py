@@ -26,9 +26,10 @@ alternatieven = ["ma1_vlakken","ma2_vlakken","ma3_vlakken","ma4_vlakken","ma5_vl
 
 percelen_alternatieven = []
 eigenaar_veld_uniek = "eigenaar_uniek"
+objectid_uniek = "objectid_uniek"
 eigenaar_velden = ["NAAM","VOORN","VOORV","VOORL","STRAAT","HUISNR","POSTCODE","WOONPLAATS",eigenaar_veld_uniek]
 
-
+dct_ma = {"ma1":[],"ma2":[],"ma3":[],"ma4":[],"ma5":[]}
 
 
 # selecteer percelen binnen alternatief, voor ieder alternatief
@@ -86,26 +87,102 @@ for alternatief in alternatieven:
 
     del tempCursor
     
-    # koppel alternatief terug
-    tempCursor = arcpy.da.UpdateCursor(naam_alternatief_gekoppeld, naam_alternatief)
+    # vul lijst met unieke id's voor latere terugkoppeling
+    list_ma = dct_ma[naam_alternatief]
+    tempCursor = arcpy.da.UpdateCursor(naam_alternatief_gekoppeld, [naam_alternatief,objectid_uniek])
     for tRow in tempCursor:
-        tRow[0] = "ja"
+        # tRow[0] = "ja"
+      
+        list_ma.append(tRow[1])
 
         tempCursor.updateRow(tRow)
 
     del tempCursor
 
-    print naam_alternatief_gekoppeld
 
 
 # voeg alles samen
 arcpy.Merge_management(percelen_alternatieven,"percelen_totaal")
 
 # verwijder identieke percelen
-arcpy.DeleteIdentical_management("percelen_totaal", "UNIEK_ID", "", "0")
+arcpy.DeleteIdentical_management("percelen_totaal", objectid_uniek, "", "0")
 
 # koppel aan dijkvak
 arcpy.SpatialJoin_analysis("percelen_totaal", priovakken, "percelen_totaal_dv", "JOIN_ONE_TO_ONE", "KEEP_ALL","","CLOSEST", "", "")
+
+
+
+
+# koppel terug in welk alternatief ieder perceel voorkomt
+ma1_list =  dct_ma["ma1"]
+ma2_list =  dct_ma["ma2"]
+ma3_list =  dct_ma["ma3"]
+ma4_list =  dct_ma["ma4"]
+ma5_list =  dct_ma["ma5"]
+
+ma1_uniek = list(dict.fromkeys(ma1_list))
+ma2_uniek = list(dict.fromkeys(ma2_list))
+ma3_uniek = list(dict.fromkeys(ma3_list))
+ma4_uniek = list(dict.fromkeys(ma4_list))
+ma5_uniek = list(dict.fromkeys(ma5_list))
+
+tempCursor = arcpy.da.UpdateCursor("percelen_totaal_dv", [objectid_uniek,"ma1"])
+for tRow in tempCursor:
+    if int(tRow[0]) in ma1_uniek:
+        tRow[1] = "ja"
+    else:
+        tRow[1] = "nee"
+
+    tempCursor.updateRow(tRow)
+
+del tempCursor
+
+tempCursor = arcpy.da.UpdateCursor("percelen_totaal_dv", [objectid_uniek,"ma2"])
+for tRow in tempCursor:
+    if int(tRow[0]) in ma2_uniek:
+        tRow[1] = "ja"
+    else:
+        tRow[1] = "nee"
+
+    tempCursor.updateRow(tRow)
+
+del tempCursor
+
+tempCursor = arcpy.da.UpdateCursor("percelen_totaal_dv", [objectid_uniek,"ma3"])
+for tRow in tempCursor:
+    if int(tRow[0]) in ma3_uniek:
+        tRow[1] = "ja"
+    else:
+        tRow[1] = "nee"
+
+    tempCursor.updateRow(tRow)
+
+del tempCursor
+
+tempCursor = arcpy.da.UpdateCursor("percelen_totaal_dv", [objectid_uniek,"ma4"])
+for tRow in tempCursor:
+    if int(tRow[0]) in ma4_uniek:
+        tRow[1] = "ja"
+    else:
+        tRow[1] = "nee"
+
+    tempCursor.updateRow(tRow)
+
+del tempCursor
+
+tempCursor = arcpy.da.UpdateCursor("percelen_totaal_dv", [objectid_uniek,"ma5"])
+for tRow in tempCursor:
+    if int(tRow[0]) in ma5_uniek:
+        tRow[1] = "ja"
+    else:
+        tRow[1] = "nee"
+
+    tempCursor.updateRow(tRow)
+
+del tempCursor
+
+##
+
 
 # overbouw naar excel
 arrayMa = arcpy.da.FeatureClassToNumPyArray("percelen_totaal_dv", (vaknamen, eigenaar_veld_uniek,"ma1","ma2","ma3","ma4","ma5"))
@@ -145,7 +222,7 @@ for group_name, df_group in grouped:
     df_uniek['woonplaats'] = df_uniek[eigenaar_veld_uniek].str.split(',').str[6]
    
 
-    print df_uniek
+    # print df_uniek
 
     # "None" vervangen door "nee"
     df_uniek = df_uniek.replace("None", "nee")
@@ -157,192 +234,4 @@ for group_name, df_group in grouped:
 
 
 
-
-
-# # selecteer percelen binnen alternatief, voor ieder alternatief
-# for alternatief in alternatieven:
-    
-#     naam_alternatief = alternatief.split("_")[0]
-#     arcpy.MakeFeatureLayer_management(perdelen_eigendommen, "temp_percelen") 
-#     arcpy.SelectLayerByLocation_management("temp_percelen", "INTERSECT", alternatief, "5 Meters", "NEW_SELECTION", "NOT_INVERT")
-
-#     naam_alternatief_gekoppeld = "percelen_{}".format(naam_alternatief)
-#     arcpy.CopyFeatures_management("temp_percelen", naam_alternatief_gekoppeld)
-    
-
-    
-#     # maak eigenaar veld voor unieke selectie
-#     arcpy.AddField_management(naam_alternatief_gekoppeld,"eigenaar_uniek","TEXT", field_length=500)
-#     tempCursor = arcpy.da.UpdateCursor(naam_alternatief_gekoppeld, eigenaar_velden)
-#     for tRow in tempCursor:
-
-#         waardes = []
-
-#         achternaam_eigenaar = tRow[0]
-#         voornaam_eigenaar = tRow[1]
-#         voorvoegsel_eigenaar = tRow[2]
-#         voorletter_eigenaar = tRow[3]
-#         straat_eigenaar = tRow[4]
-#         huisnummer_eigenaar = tRow[5]
-#         postcode_eigenaar = tRow[6]
-#         woonplaats_eigenaar = tRow[7]
-
-       
-#         if achternaam_eigenaar is None:
-#             achternaam_eigenaar = "_"
-#         if voornaam_eigenaar is None:
-#             voornaam_eigenaar = "_"
-#         if voorvoegsel_eigenaar is None:
-#             voorvoegsel_eigenaar = "_"
-#         if voorletter_eigenaar is None:
-#             voorletter_eigenaar = "_"
-#         if straat_eigenaar is None:
-#             straat_eigenaar = "_"
-#         if huisnummer_eigenaar is None:
-#             huisnummer_eigenaar = "_"
-#         if postcode_eigenaar is None:
-#             postcode_eigenaar = "_"
-#         if woonplaats_eigenaar is None:
-#             woonplaats_eigenaar = "_"
-
-
-#         unieke_eigenaar = achternaam_eigenaar+"_"+voorletter_eigenaar+"_"+voorvoegsel_eigenaar+"_"+straat_eigenaar+"_"+str(huisnummer_eigenaar)+"_"+postcode_eigenaar+"_"+woonplaats_eigenaar
-#         tRow[8] = unieke_eigenaar
-
-#         tempCursor.updateRow(tRow)
-
-#     del tempCursor
-#     print "unieke eigenaar aangemaakt"
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-#     percelen_alternatieven.append("percelen_{}".format(naam_alternatief))
-#     print "Selectie van percelen gemaakt voor {}".format(naam_alternatief)
-
-# # koppel per alternatief de dijkvakken aan de geselecteerde percelen
-# for p_alternatief in percelen_alternatieven:
-#     naam_alternatief_koppeling = "dv_{}".format(p_alternatief)
-#     arcpy.SpatialJoin_analysis(p_alternatief, priovakken, naam_alternatief_koppeling, "JOIN_ONE_TO_ONE", "KEEP_ALL","","CLOSEST", "", "")
-#     print "Selectie van percelen gekoppeld aan dijvakken voor {}".format(p_alternatief)
-
-    
-#     # overbouw naar excel
-#     arrayMa = arcpy.da.FeatureClassToNumPyArray(naam_alternatief_koppeling, (vaknamen, eigenaar_veld_uniek))
-#     dfMa = pd.DataFrame(arrayMa)
-#     sortDfMa = dfMa.sort_values(by=[vaknamen],ascending=[True])
-    
-
-
-
-
-# bij elkaar vegen van alle alternatieven en identieke percelen verwijderen
-
-
-    # grouped = sortDfMa.groupby(vaknamen)
-
-    # # over iedere groep itereren
-    # for group_name, df_group in grouped:
-
-    #     print df_group
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    # with pd.ExcelWriter(output_excel+'sample.xlsx') as writer:  
-    #     dfMa.to_excel(writer, sheet_name='x1')
-    # For appending to the file, use the argument mode='a' in pd.ExcelWriter.
-
-    # x2 = np.random.randn(100, 2)
-    # df2 = pd.DataFrame(x2)
-    # with pd.ExcelWriter('sample.xlsx', engine='openpyxl', mode='a') as writer:  
-        # df2.to_excel(writer, sheet_name='x2')
-
-
- 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# split op basis van dijkvakken
-
-
-
-
-# with arcpy.da.SearchCursor(priovakken,['SHAPE@',vaknamen]) as cursor:
-#     for row in cursor:
-        
-#         id = row[1]
-#         vaknaam = id
-
-#         id = id.replace(" ","_")
-#         id = id.replace("+","_")
-#         id = id.replace("(","_")
-#         id = id.replace(")","")
-#         id = id.replace(",","")
-#         id = id.replace("-","_")
-#         id = id.replace("/","")
-#         id = id.replace("__","_")
-
-#         vaknaam_temp = id
-
-    
-
-
-
-
-#         trajectlijn = "priovak_{}".format(vaknaam_temp)
-
-#         where = '"' + vaknamen + '" = ' + "'" + str(vaknaam) + "'"
-#         arcpy.Select_analysis(priovakken, trajectlijn, where)
- 
-
-
-
-#         # selecteer maatregelvlakken binnen zone
-#         arcpy.MakeFeatureLayer_management(maatregelvlakken, "temp_maatregelvlakken") 
-#         arcpy.SelectLayerByLocation_management("temp_maatregelvlakken", "INTERSECT", trajectlijn, "10 Meters", "NEW_SELECTION", "NOT_INVERT")
-#         arcpy.CopyFeatures_management("temp_maatregelvlakken", "test_selectie")
-
-#         # selecteer percelen binnen zone maatregelvlak (10m)
-
-#         break
-
-#     # exporteer selectie naar excel (losse tab?)
 

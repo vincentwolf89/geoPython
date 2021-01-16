@@ -1,5 +1,6 @@
-list = [1,3,4,5]
+dct_ma = {"ma1":[234234],"ma2":[],"ma3":[],"ma4":[],"ma5":[]}
 
-list2 = [list,3]
+list = "ma1"
+dct_ma[list].append(213)
 
-print list2
+print dct_ma
