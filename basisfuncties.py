@@ -662,7 +662,7 @@ def generate_profiles(profiel_interval,profiel_lengte_land,profiel_lengte_rivier
     arcpy.CopyFeatures_management('profielen_temp', profielen)
     # arcpy.FlipLine_edit(profielen)
 
-    print 'Profielen gemaakt op trajectlijn'
+    # print 'Profielen gemaakt op trajectlijn'
 
 
 def locate_profiles(profielen,dijkpalen,split_traject,RID,profileID,profielenUitvoer):
