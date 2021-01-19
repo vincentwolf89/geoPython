@@ -1,6 +1,7 @@
-dct_ma = {"ma1":[234234],"ma2":[],"ma3":[],"ma4":[],"ma5":[]}
+import numpy as np
 
-list = "ma1"
-dct_ma[list].append(213)
+maxwaarde = 5.432
 
-print dct_ma
+lijst = np.arange(0,maxwaarde,0.2)
+
+print lijst

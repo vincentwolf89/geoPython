@@ -12,6 +12,8 @@ import matplotlib.pyplot as plt
 import sys
 sys.path.append('.')
 
+from basisfuncties import average
+
 
 
 from basisfuncties import generate_profiles, copy_trajectory_lr
@@ -407,7 +409,7 @@ def fit_referentieprofiel(profielen,refprofielenpunten, hoogtedata, toetsniveau,
             if grensTest == False and isectTest == False:
                 print "profiel past"
                 # plot groen profiel, profiel past
-                ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'],'-',label="Initieel passend profiel", color="forestgreen",linewidth=4)
+                ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'],'-',label="Initieel passend profiel", color="forestgreen",linewidth=4,zorder=99)
 
                 # bodemhoogte = baseMerge2['z_raster'].min()
                 # hoogte_over = int(toetsniveau-bodemhoogte)
@@ -488,12 +490,30 @@ def fit_referentieprofiel(profielen,refprofielenpunten, hoogtedata, toetsniveau,
                 
                 
                 
-                
+                # kopieer dataframe
                 baseMerge3 = baseMerge2.copy()
 
-                pogingen = np.arange(0, resterend, 0.5).tolist()
-                hoogtes = [0.5,1,2,3] # testaantal
-                for poging in pogingen:
+             
+
+
+                # bepaal iteratiebereik hoogtes
+                minMeting = baseMerge3['z_raster'].min()
+                maxHoogte = toetsniveau
+
+                hoogteVerschil = abs(minMeting-maxHoogte)
+                hoogtes = np.arange(0,hoogteVerschil,0.2)
+               
+                
+                # eerste snijtest, niet noodzakelijk want zou al moeten kloppen
+                baseMerge3['test'] = np.where((baseMerge3['z_ref'] < baseMerge3['z_raster']), -1, np.nan)
+                isectTest = (baseMerge3['test'] == -1).values.any()
+                
+
+                # overhoogte
+                aantal_pogingen = 0
+                hoogte_pogingen = []
+                # start iteraties
+                while isectTest == False and resterend > 0:
 
 
                     
@@ -534,77 +554,38 @@ def fit_referentieprofiel(profielen,refprofielenpunten, hoogtedata, toetsniveau,
                             pass
 
                     if testlist:
-                        ax1.plot(testlist[-1]['afstand'],testlist[-1]['z_ref_lower'],'--',label="dummy",linewidth=2)
+                        ax1.plot(testlist[-1]['afstand'],testlist[-1]['z_ref_lower'],'--',label='_nolegend_',linewidth=2,zorder=0)
+
+                        aantal_pogingen += 1
+                        hoogte_pogingen.append(testlist[-1]['z_ref_lower'].max())
+
 
                     else:
                         
-                        ax1.plot(baseMerge3['afstand'],baseMerge3['z_ref'],'--',label="dummy", color="black",linewidth=1)
+                        ax1.plot(baseMerge3['afstand'],baseMerge3['z_ref'],'--',label='_nolegend_', color="black",linewidth=1,zorder=0)
+
+                        aantal_pogingen += 1
+                        hoogte_pogingen.append(baseMerge3['z_ref'].max())
 
             
+                    baseMerge3['test'] = np.where((baseMerge3['z_ref'] < baseMerge3['z_raster']), -1, np.nan)
+                    isectTest = (baseMerge3['test'] == -1).values.any()
 
                     # optellen 
                     iteraties += 1
                     resterend -= 0.5
                     print resterend
 
-                    
+
+                gemiddelde_hoogte = average(hoogte_pogingen)
+
+                overhoogte = round(toetsniveau-gemiddelde_hoogte,2)
+                print "gemiddelde overhoogte is {}m".format(overhoogte)   
             
                     
-
-
-
-
-
-                
-
-                
-
-
-                        
-
-                # # probeer nogmaals in te passen: laatste mogelijkheid
-                # while (resterend > 0 and isectTest == False):
-                #     print "poging 2"
-                #     print "Iteratie {}".format(iteraties)
-
-                #     # schuif het refprofiel naar rechts en test op isects
-
-                #     baseMerge2['afstand_ref'] = baseMerge2['afstand_ref'].shift(+1)
-                #     baseMerge2['z_ref'] = baseMerge2['z_ref'].shift(+1)
-            
-                #     baseMerge2['test'] = np.where((baseMerge2['z_ref'] < baseMerge2['z_raster']), -1, np.nan)
-                #     isectTest = (baseMerge2['test'] == -1).values.any()
-
-                #     # optellen 
-                #     iteraties += 1
-                #     resterend -= 0.5
-                #     print resterend
-                    
-
-                #     # zuidzijderefprofiel optellen
-                #     indexZuidzijdeRefProfiel = baseMerge2['z_ref'].first_valid_index()
-                #     zuidzijdeRefprofiel = baseMerge2.iloc[indexZuidzijdeRefProfiel]['afstand']
-            
-
-                #     if zuidzijdeRefprofiel >= zuidGrensRaster:
-                #         grensTest = False
-
-
-                
-                # ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'],'-',label="Laatst passend profiel", color="magenta",linewidth=4)
-               
-
-
-                
-             
-
-
-
-
-            # if grensTest == True or isectTest == True:
-            # # plot groen profiel, profiel past
-            #     ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'],'--',label="Niet passend scheepsprofiel", color="red",linewidth=3.5)
-            
+                ax1.text(0.5, 0.2, 'Gemiddelde overhoogte: {}m'.format(overhoogte), horizontalalignment='center',
+                verticalalignment='center', transform=ax1.transAxes, zorder=100,fontsize=40)
+         
             ax1.legend(frameon=False, loc='lower right',prop={'size': 20})
             plt.savefig("{}/{}.png".format(basefigures,profielnummer))
    
