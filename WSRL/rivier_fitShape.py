@@ -26,15 +26,11 @@ baseFigures = r"C:/Users/Vincent/Desktop/profielen_lekbodem/output_figures/"
 
 
 
-# werkplan: 
-# - basisprofielen maken
-# - referentieprofielen maken
-# - referentieprofielen fitten
 
-trajectlijn = "leklijn_demo"
+trajectlijn = "leklijn"
 code = "traject"
 hoogtedata = "lekraster_safe_totaal_2020"
-profiel_interval = 200  
+profiel_interval = 200
 profiel_lengte_land = 200
 profiel_lengte_rivier = 200
 toetsniveau = -0.5
@@ -69,6 +65,11 @@ def maak_basisprofielen(profiel_interval,profiel_lengte_land,profiel_lengte_rivi
     
     del profielCursor
     arcpy.CreateRoutes_lr("tempProfielen", "profielnummer", profielen,"TWO_FIELDS", "van", "tot", "UPPER_LEFT", "1", "0", "IGNORE", "INDEX")
+
+    # voeg veld toe voor eindoordeel en overhoogte
+    arcpy.AddField_management(profielen,"inpassing","TEXT", field_length=100)
+    arcpy.AddField_management(profielen,"overhoogte","DOUBLE", 2, field_is_nullable="NULLABLE")
+
 
     print "basisprofielen gemaakt"
 
@@ -145,6 +146,9 @@ def fit_referentieprofiel(profielen,refprofielenpunten, hoogtedata, toetsniveau,
     arcpy.AddField_management(profielen,"profielnummer_str","TEXT", field_length=50)
     # arcpy.AddField_management(refprofielen,"profielnummer_str","TEXT", field_length=50)
     arcpy.AddField_management(refprofielenpunten,"profielnummer_str","TEXT", field_length=50)
+    
+    # dictionary voor terugkoppeling oordeel
+    oordeelDct = {}
 
 
     profielCursor = arcpy.da.UpdateCursor(profielen,["profielnummer","profielnummer_str"])
@@ -184,7 +188,7 @@ def fit_referentieprofiel(profielen,refprofielenpunten, hoogtedata, toetsniveau,
     with arcpy.da.SearchCursor(profielen,["SHAPE@","profielnummer_str"]) as profielCursor:
         for pRow in profielCursor:
 
-            profielnummer = pRow[1]
+            profielnummer = str(pRow[1])
    
             tempprofiel = "tempprofiel"
             temprefpunten = "temprefpunten"
@@ -353,7 +357,7 @@ def fit_referentieprofiel(profielen,refprofielenpunten, hoogtedata, toetsniveau,
             indexEindInit = baseMerge2['z_ref'].last_valid_index()
             eindInit = baseMerge2.iloc[indexEindInit]['afstand']
 
-            resterend = round(abs(eindInit-noordGrensRaster))
+            resterend = round(abs(eindInit-noordGrensRaster))-0.5
             
             isectTest = (baseMerge2['difference'] > 0).values.any()
             
@@ -369,7 +373,7 @@ def fit_referentieprofiel(profielen,refprofielenpunten, hoogtedata, toetsniveau,
 
 
 
-                print "Iteratie {}".format(iteraties)
+                # print "Iteratie {}".format(iteraties)
 
                 # schuif het refprofiel naar rechts en test op isects
 
@@ -383,7 +387,7 @@ def fit_referentieprofiel(profielen,refprofielenpunten, hoogtedata, toetsniveau,
                 # optellen 
                 iteraties += 1
                 resterend -= 0.5
-                print resterend
+                # print resterend
                 
                 # zuidzijderefprofiel optellen
                 indexZuidzijdeRefProfiel = baseMerge2['z_ref'].first_valid_index()
@@ -407,87 +411,9 @@ def fit_referentieprofiel(profielen,refprofielenpunten, hoogtedata, toetsniveau,
             
                 
             if grensTest == False and isectTest == False:
-                print "profiel past"
+                print "profiel past", profielnummer
                 # plot groen profiel, profiel past
                 ax1.plot(baseMerge2['afstand'],baseMerge2['z_ref'],'-',label="Initieel passend profiel", color="forestgreen",linewidth=4,zorder=99)
-
-                # bodemhoogte = baseMerge2['z_raster'].min()
-                # hoogte_over = int(toetsniveau-bodemhoogte)
-
-                
-
-                # baseMerge3 = baseMerge2.copy()
-                # # probeer naar beneden te schuiven
-                # iteraties_resterend = int(resterend)
-                
-                # # iteraties_list = range(1,iteraties_resterend)
-                # iteraties_list = np.arange(1, iteraties_resterend, 1).tolist()
-                # hoogtes_list = np.arange(0, hoogte_over, 0.5).tolist()
-
-                
-                
-                
-                # for iteratie in iteraties_list:
-                    
-                #     # stappen doorlopen 
-
-                #     baseMerge3 = baseMerge2.copy()
-
-                #     # schuif 1 keer naar rechts
-                #     baseMerge3['afstand_ref'] = baseMerge3['afstand_ref'].shift(+15)
-                #     baseMerge3['z_ref'] = baseMerge3['z_ref'].shift(+15)
-
-                #     baseMerge3['test'] = np.where((baseMerge3['z_ref'] < baseMerge3['z_raster']), -1, np.nan)
-                #     isectTest = (baseMerge3['test'] == -1).values.any()
-                    
-
-
-                #     for hoogte in hoogtes_list:
-                #         # schuif het profiel naar beneden en test of dit past. Als past: doorgaan. Als niet past: passende hoogte aanhouden
-                #         baseMerge3['z_ref_lower'] = baseMerge3['z_ref']-0.5
-                #         baseMerge3['test_lower'] = np.where((baseMerge3['z_ref_lower'] < baseMerge3['z_raster']), -1, np.nan)
-                #         isectTestLower = (baseMerge3['test_lower'] == -1).values.any()
-
-
-                    
-                #         if isectTestLower == False:
-                #             print "verlaagd!"
-                #             baseMerge3['z_ref'] = baseMerge3['z_ref_lower']
-                #             ax1.plot(baseMerge3['afstand'],baseMerge3['z_ref'],'--',label="dummy", color="black",linewidth=3)
-                #         if isectTestLower == True:
-                #             break # door naar volgende iteratie
-                        
-               
-                    
-
-                    
-                #     # if isectTest == False:
-                        
-                #     #     tempDf = baseMerge3.copy()
-                #     #     for hoogte in hoogtes_list:
-                #     #         tempDf['z_ref_lower'] = tempDf['z_ref']-0.5
-                #     #         tempDf['test_lower'] = np.where((tempDf['z_ref_lower'] < tempDf['z_raster']), -1, np.nan)
-                #     #         isectTestLower = (tempDf['test_lower'] == -1).values.any()
-
-                #     #         tempDf['z_ref'] = tempDf['z_ref_lower']
-
-                #     #         if isectTestLower == False:
-                #     #             print "tot hier!", hoogte, iteratie
-
-                        
-    
-
-                #     # if isectTest == True:
-                #     #     print "hier past het niet", iteratie
-
-
-                #     # test daarna alle opties naar beneden. Als daar opties zijn: neem de laagste en plot die
-
-                
-
-                
-                
-                
                 
                 
                 # kopieer dataframe
@@ -515,29 +441,9 @@ def fit_referentieprofiel(profielen,refprofielenpunten, hoogtedata, toetsniveau,
                 # start iteraties
                 while isectTest == False and resterend > 0:
 
-
-                    
-                    # # schuif het profiel naar beneden en test of dit past. Als past: doorgaan. Als niet past: passende hoogte aanhouden
-                    # baseMerge3['z_ref_lower'] = baseMerge3['z_ref']-0.5
-                    # baseMerge3['test_lower'] = np.where((baseMerge3['z_ref_lower'] < baseMerge3['z_raster']), -1, np.nan)
-                    # isectTestLower = (baseMerge3['test_lower'] == -1).values.any()
-
-                #     if isectTestLower == False:
-                #         print "verlaagd!"
-                #         baseMerge3['z_ref'] = baseMerge3['z_ref_lower']
-                #         ax1.plot(baseMerge3['afstand'],baseMerge3['z_ref'],'--',label="dummy", color="black",linewidth=3)
-                #         break
-                        
-            
-
-                #     else:
-
                     baseMerge3['afstand_ref'] = baseMerge3['afstand_ref'].shift(+1)
                     baseMerge3['z_ref'] = baseMerge3['z_ref'].shift(+1)
-                    # baseMerge3['z_ref_lower'] = baseMerge3['z_ref_lower'].shift(+1)
 
-                    # baseMerge3['test_lower'] = np.where((baseMerge3['z_ref_lower'] < baseMerge3['z_raster']), -1, np.nan)
-                    # isectTest = (baseMerge3['test_lower'] == -1).values.any()
                     
                     testlist = []
                     for hoogte in hoogtes:
@@ -554,7 +460,7 @@ def fit_referentieprofiel(profielen,refprofielenpunten, hoogtedata, toetsniveau,
                             pass
 
                     if testlist:
-                        ax1.plot(testlist[-1]['afstand'],testlist[-1]['z_ref_lower'],'--',label='_nolegend_',linewidth=2,zorder=0)
+                        ax1.plot(testlist[-1]['afstand'],testlist[-1]['z_ref_lower'],'--',label='_nolegend_',color="black", linewidth=1,zorder=0)
 
                         aantal_pogingen += 1
                         hoogte_pogingen.append(testlist[-1]['z_ref_lower'].max())
@@ -562,7 +468,7 @@ def fit_referentieprofiel(profielen,refprofielenpunten, hoogtedata, toetsniveau,
 
                     else:
                         
-                        ax1.plot(baseMerge3['afstand'],baseMerge3['z_ref'],'--',label='_nolegend_', color="black",linewidth=1,zorder=0)
+                        ax1.plot(baseMerge3['afstand'],baseMerge3['z_ref'],'--',label='_nolegend_', color="grey",linewidth=1,zorder=0)
 
                         aantal_pogingen += 1
                         hoogte_pogingen.append(baseMerge3['z_ref'].max())
@@ -574,26 +480,67 @@ def fit_referentieprofiel(profielen,refprofielenpunten, hoogtedata, toetsniveau,
                     # optellen 
                     iteraties += 1
                     resterend -= 0.5
-                    print resterend
+                    # print resterend
 
+                if aantal_pogingen > 0:
+                    gemiddelde_hoogte = average(hoogte_pogingen)
 
-                gemiddelde_hoogte = average(hoogte_pogingen)
+                    overhoogte = round(toetsniveau-gemiddelde_hoogte,2)
+                    print "gemiddelde overhoogte is {}m".format(overhoogte)  
+                    oordeelDct[profielnummer] = ["voldoende ruimte", overhoogte]
+                else:
+                    overhoogte = 0
+                    oordeelDct[profielnummer] = ["voldoende ruimte", overhoogte]
 
-                overhoogte = round(toetsniveau-gemiddelde_hoogte,2)
-                print "gemiddelde overhoogte is {}m".format(overhoogte)   
+            
+
             
                     
                 ax1.text(0.5, 0.2, 'Gemiddelde overhoogte: {}m'.format(overhoogte), horizontalalignment='center',
                 verticalalignment='center', transform=ax1.transAxes, zorder=100,fontsize=40)
-         
+        
+
+            # terugkoppeling oordeel aan gislaag
+
+            else:
+                print "profiel past niet", profielnummer
+                oordeelDct[profielnummer] = ["onvoldoende ruimte", -999]
+
+   
+
+            
+
+            
+            
+            # for oRow in oordeelCursor:
+
+
+
             ax1.legend(frameon=False, loc='lower right',prop={'size': 20})
             plt.savefig("{}/{}.png".format(basefigures,profielnummer))
+            plt.close()
+
+            print profielnummer, oordeelDct[profielnummer]
+
+    oordeelCursor = arcpy.da.UpdateCursor(profielen,['profielnummer_str','inpassing','overhoogte'])
+
+    for oRow in oordeelCursor:
+        profielnummer_temp = str(oRow[0])
+        
+
+        
+        oRow[1] = oordeelDct[profielnummer_temp][0] 
+        oRow[2] = oordeelDct[profielnummer_temp][1] 
+
+        oordeelCursor.updateRow(oRow)
+
+    del oordeelCursor
    
 
 
 
-# maak_basisprofielen(profiel_interval=profiel_interval,profiel_lengte_land=profiel_lengte_land,profiel_lengte_rivier=profiel_lengte_rivier,trajectlijn=trajectlijn,code=code,profielen=profielen)
-# maak_referentieprofielen(profielen=profielen,refprofielenpunten=refprofielenpunten,toetsniveau=toetsniveau)
+maak_basisprofielen(profiel_interval=profiel_interval,profiel_lengte_land=profiel_lengte_land,profiel_lengte_rivier=profiel_lengte_rivier,trajectlijn=trajectlijn,code=code,profielen=profielen)
+maak_referentieprofielen(profielen=profielen,refprofielenpunten=refprofielenpunten,toetsniveau=toetsniveau)
 fit_referentieprofiel(profielen=profielen,refprofielenpunten=refprofielenpunten,hoogtedata=hoogtedata,toetsniveau=toetsniveau,basefigures=baseFigures)
 
 

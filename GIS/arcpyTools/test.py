@@ -1,7 +1,3 @@
-import numpy as np
+dict = {"test":[1,2],"test2":[3,4]}
 
-maxwaarde = 5.432
-
-lijst = np.arange(0,maxwaarde,0.2)
-
-print lijst
+print dict["test"][0]
