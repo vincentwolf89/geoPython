@@ -8,6 +8,7 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt 
+import operator
 
 import sys
 sys.path.append('.')
@@ -27,7 +28,7 @@ baseFigures = r"C:/Users/Vincent/Desktop/profielen_lekbodem/output_figures/"
 
 
 
-trajectlijn = "leklijn"
+trajectlijn = "leklijn_demo"
 code = "traject"
 hoogtedata = "lekraster_safe_totaal_2020"
 profiel_interval = 200
@@ -224,21 +225,7 @@ def fit_referentieprofiel(profielen,refprofielenpunten, hoogtedata, toetsniveau,
             del tempCursor
             arcpy.CreateRoutes_lr(tempprofiel, "profielnummer_str", 'tempRoute',"TWO_FIELDS", "van", "tot", "UPPER_LEFT", "1", "0", "IGNORE", "INDEX")
 
-            # creer routes voor refprofiel, hierop wordt uiteindelijk alles gelokaliseerd 
-            # arcpy.AddField_management(temprefprofiel,"van","DOUBLE", 2, field_is_nullable="NULLABLE")
-            # arcpy.AddField_management(temprefprofiel,"tot","DOUBLE", 2, field_is_nullable="NULLABLE")
             
-            # tempCursor = arcpy.da.UpdateCursor(temprefprofiel, ["van","tot","SHAPE@LENGTH"])
-            # for tRow in tempCursor:
-            #     lengte = tRow[2]
-            #     tRow[0] = 0
-            #     tRow[1] = lengte
-            #     tempCursor.updateRow(tRow)
-            
-            # del tempCursor
-            # arcpy.CreateRoutes_lr(temprefprofiel, "profielnummer_str", 'tempRefRoute',"TWO_FIELDS", "van", "tot", "UPPER_LEFT", "1", "0", "IGNORE", "INDEX")
-
-
 
             # profiel voorzien van z-waardes op afstand van 0.5 m
             arcpy.GeneratePointsAlongLines_management("tempRoute", "puntenRoute", "DISTANCE", Distance= 0.5)
@@ -438,32 +425,74 @@ def fit_referentieprofiel(profielen,refprofielenpunten, hoogtedata, toetsniveau,
                 # overhoogte
                 aantal_pogingen = 0
                 hoogte_pogingen = []
+
+              
+                hoogte_bovenkant_dct = {}
+                df_hoogte_bovenkant = pd.DataFrame(columns=['iteratie','hoogte_bovenkant','df'])
+
                 # start iteraties
                 while isectTest == False and resterend > 0:
 
                     baseMerge3['afstand_ref'] = baseMerge3['afstand_ref'].shift(+1)
                     baseMerge3['z_ref'] = baseMerge3['z_ref'].shift(+1)
 
-                    
                     testlist = []
+
+                    
+                   
+                    
+                    
+         
+
                     for hoogte in hoogtes:
+                        
+
+                     
                         baseMerge4 = baseMerge3.copy()
                         baseMerge4['z_ref_lower'] = baseMerge4['z_ref']- hoogte
                         baseMerge4['test_lower'] = np.where((baseMerge4['z_ref_lower'] < baseMerge4['z_raster']), -1, np.nan)
                         isectTestLower = (baseMerge4['test_lower'] == -1).values.any()
 
+
+                        
+
+                       
+
                         if isectTestLower == False:
                             testlist.append(baseMerge4)
+
+                         
+
+
+                     
+
+               
+
 
                             # ax1.plot(baseMerge4['afstand'],baseMerge4['z_ref_lower'],'--',label="dummy", color="black",linewidth=3)
                         else:
                             pass
 
+                  
+
+               
+                    
+                    
+
                     if testlist:
                         ax1.plot(testlist[-1]['afstand'],testlist[-1]['z_ref_lower'],'--',label='_nolegend_',color="black", linewidth=1,zorder=0)
 
                         aantal_pogingen += 1
-                        hoogte_pogingen.append(testlist[-1]['z_ref_lower'].max())
+                        hoogte_bovenkant = testlist[-1]['z_ref_lower'].max()
+                        hoogte_pogingen.append(hoogte_bovenkant)
+
+                        
+                        hoogte_bovenkant_dct[aantal_pogingen] = [hoogte_bovenkant,testlist[-1]]
+                        df_hoogte_bovenkant.loc[aantal_pogingen] =  [aantal_pogingen, hoogte_bovenkant,testlist[-1]]
+
+
+
+                        
 
 
                     else:
@@ -473,6 +502,8 @@ def fit_referentieprofiel(profielen,refprofielenpunten, hoogtedata, toetsniveau,
                         aantal_pogingen += 1
                         hoogte_pogingen.append(baseMerge3['z_ref'].max())
 
+
+                    
             
                     baseMerge3['test'] = np.where((baseMerge3['z_ref'] < baseMerge3['z_raster']), -1, np.nan)
                     isectTest = (baseMerge3['test'] == -1).values.any()
@@ -481,6 +512,73 @@ def fit_referentieprofiel(profielen,refprofielenpunten, hoogtedata, toetsniveau,
                     iteraties += 1
                     resterend -= 0.5
                     # print resterend
+
+
+                # print list(hoogte_bovenkant_min)
+                # print hoogte_bovenkant_min.keys()
+                # print min(hoogte_pogingen)
+
+                # zoeken naar max-group
+                try:
+                    min_bovenkant = round(min(hoogte_pogingen),1)
+                    df_hoogte_min = pd.DataFrame(columns = ['groupnr','df'])
+                    groupnr = 1 
+
+                    hoogte_start = df_hoogte_bovenkant['hoogte_bovenkant'].iloc[0]
+                    for index, row in df_hoogte_bovenkant.iterrows():
+            
+                        if round(row['hoogte_bovenkant'],1) == min_bovenkant:
+                            hoogte_start = round(row['hoogte_bovenkant'],1)
+                            groupnr = groupnr
+                            df_hoogte_min.loc[index] = [groupnr,row['df']]
+                        else:
+                            groupnr += 1
+
+                    
+                    # print df_hoogte_min['groupnr']
+                    grouped = df_hoogte_min.groupby('groupnr')
+
+                    dct_max = {}
+
+                    for group_name, df_group in grouped:
+                        groep_grootte = len(df_group.index)
+                        dct_max[group_name] = [groep_grootte,df_group]
+
+                        # print group_name
+                    
+
+                    max_groupname = max(dct_max.iteritems(), key=operator.itemgetter(1))[0]
+
+                    max_group = dct_max[max_groupname][0]
+
+                    print max_group,max_groupname
+                    midden_groep = int(max_group/2)
+
+                    # opnieuw zoeken naar max_group
+                    for group_name, df_group in grouped:
+                        if group_name == max_groupname:
+                            max_df = df_group['df'].iloc[midden_groep]
+        
+                            ax1.plot(max_df['afstand'],max_df['z_ref_lower'],'-',label="Best passende profiel", color="yellow",linewidth=4,zorder=100)
+                except:
+                    pass
+                        
+                        
+
+
+         
+
+
+                
+
+
+ 
+                        
+
+
+             
+
+
 
                 if aantal_pogingen > 0:
                     gemiddelde_hoogte = average(hoogte_pogingen)
@@ -539,8 +637,8 @@ def fit_referentieprofiel(profielen,refprofielenpunten, hoogtedata, toetsniveau,
 
 
 
-maak_basisprofielen(profiel_interval=profiel_interval,profiel_lengte_land=profiel_lengte_land,profiel_lengte_rivier=profiel_lengte_rivier,trajectlijn=trajectlijn,code=code,profielen=profielen)
-maak_referentieprofielen(profielen=profielen,refprofielenpunten=refprofielenpunten,toetsniveau=toetsniveau)
+# maak_basisprofielen(profiel_interval=profiel_interval,profiel_lengte_land=profiel_lengte_land,profiel_lengte_rivier=profiel_lengte_rivier,trajectlijn=trajectlijn,code=code,profielen=profielen)
+# maak_referentieprofielen(profielen=profielen,refprofielenpunten=refprofielenpunten,toetsniveau=toetsniveau)
 fit_referentieprofiel(profielen=profielen,refprofielenpunten=refprofielenpunten,hoogtedata=hoogtedata,toetsniveau=toetsniveau,basefigures=baseFigures)
 
 
