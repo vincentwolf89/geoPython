@@ -5,12 +5,12 @@ from itertools import groupby
 
 # from basisfuncties import*
 
-arcpy.env.workspace = r'C:\Users\Vincent\Desktop\pipingdata\gis.gdb'
-gdb = r'C:\Users\Vincent\Desktop\pipingdata\gis.gdb'
+arcpy.env.workspace = r'C:\Users\Vincent\Desktop\visualisatie pipingdata\sluisgdb.gdb'
+gdb = r'C:\Users\Vincent\Desktop\visualisatie pipingdata\sluisgdb.gdb'
 arcpy.env.overwriteOutput = True
 
-puntenOordeel = 'stph2075_gemiddeld_punten' #invoer uitvoerpunten
-outputOordeelLijn = "oordeel_gevoeligheid" # uitvoer gesplitte trajectlijn
+puntenOordeel = 'safe_stph2075_gemiddeld_punten' #invoer uitvoerpunten
+outputOordeelLijn = "safe_stph2075_oordeel_gemiddeld" # uitvoer gesplitte trajectlijn
 profielen = "profielenTotaal"
 minTrajectLengte = 0
 trajectLijn = r"D:\GoogleDrive\WSRL\safe_basis.gdb\dvIndelingSept2020"

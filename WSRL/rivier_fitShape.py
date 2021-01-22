@@ -28,15 +28,15 @@ baseFigures = r"C:/Users/Vincent/Desktop/profielen_lekbodem/output_figures/"
 
 
 
-trajectlijn = "leklijn_demo"
+trajectlijn = "leklijn"
 code = "traject"
 hoogtedata = "lekraster_safe_totaal_2020"
-profiel_interval = 200
+profiel_interval = 100
 profiel_lengte_land = 200
 profiel_lengte_rivier = 200
-toetsniveau = -0.5
+toetsniveau = -0.42
 
-profielen = "profielenLekRaster"
+profielen = "profielenLekRaster_v2"
 refprofielen = "refprofielenLekRaster"
 refprofielenpunten = "refprofielenPuntenStart"
 
@@ -95,8 +95,8 @@ def maak_referentieprofielen(profielen,refprofielenpunten,toetsniveau):
 
     for profielnummer in profielnummers:
         
-        # vanuit linkeroever, dummy afmetingen
-
+        # vanuit linkeroever
+        # initiele settings
         p1 = 0
         p2 = 0.5
         p3 = 3
@@ -106,22 +106,27 @@ def maak_referentieprofielen(profielen,refprofielenpunten,toetsniveau):
         p7 = 96.7
         p8 = 97.2
 
-        # p1 = 0
-        # p2 = 10
-        # p3 = 30
-        # p4 = 40
+        # D = 5.6
+        # T = 4
+        # Tb = 3
+        
+        # aanpassing 22-1-2021
+        D = 3.85
+        T = 3.5
+        Tb = 1.8
+  
     
         z_rivierwaterstand = toetsniveau
        
         
 
         refPuntenCursor.insertRow([profielnummer,"p1",p1,toetsniveau])
-        refPuntenCursor.insertRow([profielnummer,"p2",p2,toetsniveau-3])
-        refPuntenCursor.insertRow([profielnummer,"p3",p3,toetsniveau-4])
-        refPuntenCursor.insertRow([profielnummer,"p4",p4,toetsniveau-5.6])
-        refPuntenCursor.insertRow([profielnummer,"p5",p5,toetsniveau-5.6])
-        refPuntenCursor.insertRow([profielnummer,"p6",p6,toetsniveau-4])
-        refPuntenCursor.insertRow([profielnummer,"p7",p7,toetsniveau-3])
+        refPuntenCursor.insertRow([profielnummer,"p2",p2,toetsniveau-Tb])
+        refPuntenCursor.insertRow([profielnummer,"p3",p3,toetsniveau-T])
+        refPuntenCursor.insertRow([profielnummer,"p4",p4,toetsniveau-D])
+        refPuntenCursor.insertRow([profielnummer,"p5",p5,toetsniveau-D])
+        refPuntenCursor.insertRow([profielnummer,"p6",p6,toetsniveau-T])
+        refPuntenCursor.insertRow([profielnummer,"p7",p7,toetsniveau-Tb])
         refPuntenCursor.insertRow([profielnummer,"p8",p8,toetsniveau])
        
         # refPuntenCursor.insertRow([profielnummer,"p1",p1,z_rivierwaterstand])
@@ -315,8 +320,8 @@ def fit_referentieprofiel(profielen,refprofielenpunten, hoogtedata, toetsniveau,
             fig = plt.figure(figsize=(80, 10))
             ax1 = fig.add_subplot(111, label ="1")
             
-            ax1.plot(baseMerge2['afstand'],baseMerge2['z_raster'],label="Vaarwegmeting Lek 2020",color="dimgrey",linewidth=5)
-            ax1.axhline(toetsniveau, color='blue', linestyle='--',linewidth=5,label="Waterstand [{} m NAP]".format(toetsniveau))
+            ax1.plot(baseMerge2['afstand'],baseMerge2['z_raster'],label="Vaarwegmeting Lek 2020",color="black",linewidth=5)
+            ax1.axhline(toetsniveau, color='blue', linestyle='-',linewidth=5,label="Waterstand [{} m NAP]".format(toetsniveau))
 
             
             
@@ -594,7 +599,7 @@ def fit_referentieprofiel(profielen,refprofielenpunten, hoogtedata, toetsniveau,
 
             
                     
-                ax1.text(0.5, 0.2, 'Gemiddelde overhoogte: {}m'.format(overhoogte), horizontalalignment='center',
+                ax1.text(0.5, 1.1, 'Gemiddelde overhoogte: {}m'.format(overhoogte), horizontalalignment='center',
                 verticalalignment='center', transform=ax1.transAxes, zorder=100,fontsize=40)
         
 
@@ -637,8 +642,8 @@ def fit_referentieprofiel(profielen,refprofielenpunten, hoogtedata, toetsniveau,
 
 
 
-# maak_basisprofielen(profiel_interval=profiel_interval,profiel_lengte_land=profiel_lengte_land,profiel_lengte_rivier=profiel_lengte_rivier,trajectlijn=trajectlijn,code=code,profielen=profielen)
-# maak_referentieprofielen(profielen=profielen,refprofielenpunten=refprofielenpunten,toetsniveau=toetsniveau)
+maak_basisprofielen(profiel_interval=profiel_interval,profiel_lengte_land=profiel_lengte_land,profiel_lengte_rivier=profiel_lengte_rivier,trajectlijn=trajectlijn,code=code,profielen=profielen)
+maak_referentieprofielen(profielen=profielen,refprofielenpunten=refprofielenpunten,toetsniveau=toetsniveau)
 fit_referentieprofiel(profielen=profielen,refprofielenpunten=refprofielenpunten,hoogtedata=hoogtedata,toetsniveau=toetsniveau,basefigures=baseFigures)
 
 
